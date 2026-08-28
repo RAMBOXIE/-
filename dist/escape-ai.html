@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>逃离AI · 盲机</title>
+<style>
+  :root{
+    --lcd-lit:#5FF0C8; --lcd-unlit:#14332C; --lcd-substrate:#08130F;
+    --lcd-amber:#F2A950;
+    --shell:#171a19; --shell-2:#0e100f; --shell-edge:#2c312f;
+    --ink:#8d9a95; --ink-dim:#5a6663;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#0a0c0b;color:var(--ink);
+    font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei",monospace;
+    -webkit-font-smoothing:antialiased;min-height:100%}
+  .wrap{display:flex;align-items:flex-start;justify-content:center;padding:16px 8px 40px}
+
+  .device{width:min(688px,100vw - 16px);padding:22px clamp(12px,4vw,36px) 18px;border-radius:14px;
+    background:linear-gradient(180deg,var(--shell) 0%,var(--shell-2) 100%);
+    border:1px solid var(--shell-edge);
+    box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
+  .brand{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:12px}
+  .bezel{position:relative;padding:10px;border-radius:5px;background:#05100c;
+    border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
+  .screen-stack{position:relative;line-height:0}
+  canvas{display:block;image-rendering:pixelated;width:100%;height:auto}
+  .grid{position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to right,transparent 0 2px,rgba(3,10,8,.62) 2px 3px),
+               repeating-linear-gradient(to bottom,transparent 0 2px,rgba(3,10,8,.62) 2px 3px)}
+  .glass{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(115% 85% at 50% 0%,rgba(120,255,220,.055),transparent 60%)}
+
+  .keys{margin-top:14px;display:grid;grid-template-columns:1fr 84px 1fr;gap:8px;align-items:center}
+  .key{appearance:none;border:1px solid #2c312f;background:#1c201f;color:#9fada8;border-radius:4px;
+    padding:12px 6px;font:inherit;font-size:12px;letter-spacing:.1em;cursor:pointer;user-select:none}
+  .key:active{background:#0f1211}
+  .key.ok{background:#20302b;border-color:#33463f;color:#a8e8d3}
+  .dpad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px;width:84px;height:84px}
+  .dpad button{appearance:none;border:1px solid #2c312f;background:#1c201f;border-radius:3px;
+    color:#7d8a86;font:inherit;font-size:11px;cursor:pointer;padding:0;user-select:none}
+  .dpad button:active{background:#0f1211}
+  .dpad .sp{border:0;background:transparent;cursor:default}
+  .numrow{margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+
+  /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(5,10,8,.88);z-index:9}
+  .overlay.on{display:flex}
+  .sheet{width:min(430px,92vw);background:#0c1512;border:1px solid #234;border-color:#1f3a31;
+    border-radius:8px;padding:20px 18px}
+  .sheet h3{margin:0 0 4px;font-size:12px;letter-spacing:.2em;color:var(--lcd-lit);font-weight:400}
+  .sheet .hint{font-size:11px;color:#5f6b67;margin:0 0 12px}
+  .sheet textarea{width:100%;background:#08130f;border:1px solid #1f3a31;color:var(--lcd-lit);
+    font:inherit;font-size:14px;padding:10px;border-radius:4px;min-height:64px;outline:0}
+  .sheet .opts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .sheet .opts button{appearance:none;text-align:left;border:1px solid #1f3a31;background:transparent;
+    color:#8fb8aa;font:inherit;font-size:13px;padding:9px 12px;border-radius:4px;cursor:pointer}
+  .sheet .opts button:hover{background:#0f1f1a}
+  .sheet .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  .sheet .row button{appearance:none;border:1px solid #2c312f;background:#1c201f;color:#9fada8;
+    font:inherit;font-size:12px;padding:8px 16px;border-radius:4px;cursor:pointer}
+  .sheet .row button.primary{background:#20302b;border-color:#33463f;color:#a8e8d3}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="device">
+    <div class="brand"><span>Kuiper</span><span id="brandR">连接中</span></div>
+    <div class="bezel">
+      <div class="screen-stack">
+        <canvas id="lcd" width="588" height="672"></canvas>
+        <div class="glass"></div><div class="grid"></div>
+      </div>
+    </div>
+    <div class="keys">
+      <button class="key ok" id="softL">确认</button>
+      <div class="dpad">
+        <button class="sp"></button><button data-k="ArrowUp">↑</button><button class="sp"></button>
+        <button class="sp"></button><button data-k="Enter">●</button><button class="sp"></button>
+        <button class="sp"></button><button data-k="ArrowDown">↓</button><button class="sp"></button>
+      </div>
+      <button class="key" id="softR">返回</button>
+    </div>
+    <div class="numrow">
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key" data-k="Escape">C</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovl">
+  <div class="sheet">
+    <h3 id="ovlTitle">理由</h3>
+    <p class="hint" id="ovlHint">系统只存,不建模。</p>
+    <div class="opts" id="ovlOpts"></div>
+    <textarea id="ovlText" placeholder="自由输入…" style="display:none"></textarea>
+    <div class="row">
+      <button id="ovlCancel" style="display:none">取消</button>
+      <button class="primary" id="ovlOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   盲机 LCD 渲染器(迁自 research/M1_LCD原型,模块化)
+   逻辑屏 196×224。潜望镜原则:一切内容——正文、仪表、故障——写进同一个帧缓冲。
+   ============================================================================ */
+const LCD = (() => {
+  const W = 196, H = 224, SCALE = 3;
+  const CELL_H = 14, CW_ASC = 7, LINE_H = 16, SS = 4;
+  const CJK_FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
+  const ASC_FONT = 'ui-monospace,"SF Mono",Menlo,Consolas,monospace';
+
+  const cvs = document.getElementById('lcd');
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const off = document.createElement('canvas'); off.width = W; off.height = H;
+  const offc = off.getContext('2d');
+  const img = offc.createImageData(W, H);
+
+  const target = new Float32Array(W * H);
+  const actual = new Float32Array(W * H);
+  const px = (x, y) => y * W + x;
+
+  function setPx(x, y, v){ if (x >= 0 && x < W && y >= 0 && y < H) target[px(x, y)] = v; }
+  function rect(x, y, w, h, v = 1){ for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) setPx(x + i, y + j, v); }
+  function frameRect(x, y, w, h){
+    for (let i = 0; i < w; i++){ setPx(x + i, y, 1); setPx(x + i, y + h - 1, 1); }
+    for (let j = 0; j < h; j++){ setPx(x, y + j, 1); setPx(x + w - 1, y + j, 1); }
+  }
+  function hline(y, x0 = 0, x1 = W - 1, step = 1){ for (let x = x0; x <= x1; x += step) setPx(x, y, 1); }
+  function invertRect(x, y, w, h){
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++){
+      const k = px(x + i, y + j); if (k >= 0 && k < target.length) target[k] = target[k] > .5 ? 0 : 1;
+    }
+  }
+
+  /* ---- 字形:真字体 → 4× 超采样 → 盒式降采样 → 阈值二值化(阈值=失真参数) ---- */
+  const gcan = document.createElement('canvas');
+  const gctx = gcan.getContext('2d', { willReadFrequently: true });
+  const glyphCache = new Map();
+  const isHalf = ch => ch.charCodeAt(0) < 0x2000 && !/[，。、：；「」『』（）？！—·…♥]/.test(ch);
+  const cellW = ch => isHalf(ch) ? CW_ASC : 14;
+
+  function glyph(ch){
+    const hit = glyphCache.get(ch); if (hit) return hit;
+    const cw = cellW(ch), GW = cw * SS, GH = CELL_H * SS;
+    gcan.width = GW; gcan.height = GH;
+    gctx.clearRect(0, 0, GW, GH);
+    gctx.fillStyle = '#fff'; gctx.textAlign = 'center'; gctx.textBaseline = 'alphabetic';
+    gctx.font = (isHalf(ch) ? CELL_H * SS * .92 : CELL_H * SS * .98) + 'px ' + (isHalf(ch) ? ASC_FONT : CJK_FONT);
+    gctx.fillText(ch, GW / 2, GH * .80);
+    const d = gctx.getImageData(0, 0, GW, GH).data;
+    const cov = new Float32Array(cw * CELL_H);
+    const inv = 1 / (SS * SS * 255);
+    for (let y = 0; y < CELL_H; y++) for (let x = 0; x < cw; x++){
+      let s = 0;
+      for (let j = 0; j < SS; j++){
+        const row = (y * SS + j) * GW;
+        for (let i = 0; i < SS; i++) s += d[(row + x * SS + i) * 4 + 3];
+      }
+      cov[y * cw + x] = s * inv;
+    }
+    const g = { cw, cov }; glyphCache.set(ch, g); return g;
+  }
+
+  function textWidth(str){ let w = 0; for (const ch of str) w += (ch === ' ' ? CW_ASC : cellW(ch)); return w; }
+
+  function drawText(x, y, str, o = {}){
+    const thr = o.threshold ?? R.threshold, corrupt = o.corrupt ?? R.corrupt;
+    let cx = x;
+    for (const ch of str){
+      if (ch === ' '){ cx += CW_ASC; continue; }
+      const g = glyph(ch);
+      for (let j = 0; j < CELL_H; j++) for (let i = 0; i < g.cw; i++){
+        let on = g.cov[j * g.cw + i] > thr ? 1 : 0;
+        if (corrupt > 0 && Math.random() < corrupt) on ^= 1;
+        if (on) setPx(cx + i, y + j, 1);
+      }
+      cx += g.cw;
+    }
+    return cx;
+  }
+
+  const NO_LINE_START = '。，、：；！？）」』】·…%>';
+  function wrap(str, maxW){
+    const out = []; let line = '', w = 0;
+    for (const ch of str){
+      if (ch === '\n'){ out.push(line); line = ''; w = 0; continue; }
+      const cw = ch === ' ' ? CW_ASC : cellW(ch);
+      if (w + cw > maxW){
+        if (NO_LINE_START.includes(ch) && line.length > 1){
+          const carry = line[line.length - 1];
+          out.push(line.slice(0, -1)); line = carry; w = cellW(carry);
+        } else { out.push(line); line = ''; w = 0; }
+      }
+      line += ch; w += cw;
+    }
+    if (line) out.push(line);
+    return out;
+  }
+  function drawPara(x, y, str, maxW, o){
+    const lines = wrap(str, maxW);
+    lines.forEach((l, i) => drawText(x, y + i * LINE_H, l, o));
+    return y + lines.length * LINE_H;
+  }
+
+  /* ---- 仪表(与正文同一渲染器) ---- */
+  function drawSignal(x, y, bars){
+    for (let b = 0; b < 4; b++){
+      const h = 2 + b * 2, bx = x + b * 3;
+      if (b < bars) rect(bx, y + 8 - h, 2, h, 1);
+      else setPx(bx, y + 7, 1);
+    }
+  }
+  function drawBattery(x, y, segs, jitter){
+    frameRect(x, y, 18, 8); rect(x + 18, y + 2, 1, 4);
+    for (let s = 0; s < 4; s++){
+      if (s < segs){
+        const jx = jitter && Math.random() < .25 ? 1 : 0;
+        rect(x + 2 + s * 4 + jx, y + 2, 3, 4, 1);
+      }
+    }
+  }
+
+  /* ---- 失真参数(渲染器参数,不是散落的 if) ---- */
+  const R = { threshold:.42, corrupt:.0004, scanline:.14, scanPhase:0,
+              ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false };
+  function applyTier(tr){
+    if (tr < 40){ R.corrupt=.0004; R.threshold=.42; R.flicker=0;   R.batJitter=false; R.tsScramble=false; return 0; }
+    if (tr < 70){ R.corrupt=.0035; R.threshold=.44; R.flicker=.02; R.batJitter=false; R.tsScramble=true;  return 1; }
+    if (tr < 90){ R.corrupt=.0110; R.threshold=.47; R.flicker=.05; R.batJitter=true;  R.tsScramble=true;  return 2; }
+                  R.corrupt=.0290; R.threshold=.51; R.flicker=.10; R.batJitter=true;  R.tsScramble=true;  return 3;
+  }
+
+  /* ---- 呈现 ---- */
+  const LIT = [0x5F,0xF0,0xC8], UNLIT = [0x14,0x33,0x2C], SUB = [0x08,0x13,0x0F];
+  function present(){
+    const flick = R.flicker > 0 && Math.random() < R.flicker ? .55 + Math.random() * .3 : 1;
+    const d = img.data;
+    for (let y = 0; y < H; y++){
+      const scan = R.scanline > 0 && ((y + R.scanPhase | 0) % 3 === 0) ? 1 - R.scanline : 1;
+      for (let x = 0; x < W; x++){
+        const k = px(x, y), a = actual[k] * scan * flick;
+        const base = R.showUnlit ? UNLIT : SUB, o = k * 4;
+        d[o]   = base[0] + (LIT[0] - base[0]) * a;
+        d[o+1] = base[1] + (LIT[1] - base[1]) * a;
+        d[o+2] = base[2] + (LIT[2] - base[2]) * a;
+        d[o+3] = 255;
+      }
+    }
+    offc.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, W, H, 0, 0, W * SCALE, H * SCALE);
+  }
+  function frame(drawFn){
+    target.fill(0);
+    drawFn();
+    if (R.ghost){
+      for (let i = 0; i < actual.length; i++){
+        const t = target[i], a = actual[i];
+        actual[i] = a + (t - a) * (t > a ? .62 : .17);
+      }
+    } else actual.set(target);
+    R.scanPhase += .35;
+    present();
+  }
+
+  return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
+           drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
+})();
+
+</script>
+<script>
+"use strict";
+/* ============================================================================
+   运行时状态机 —— 宪法 2:一切判定由引擎裁决。数值出处:开发规格 v3.1 §4。
+   ============================================================================ */
+const ENGINE = (() => {
+  const S = {
+    battery: 100,
+    trace: 0,             // 溯源,数字永远秘匿,玩家只见信号格
+    clock: 2 * 60 + 12,   // 02:12,分钟
+    cacheSlots: 0, cacheVal: 0,
+    // UI 阶梯
+    signalVisible: false, cacheVisible: false, riskLabels: false,
+    // 演出模式(格12 起):信号格由剧本置位
+    showtime: false, showtimeBars: 3,
+    // 证据与线索
+    evidence: {}, caseOpen: false, clues: {},
+    violations: 0, saveUsed: false,
+    // 节拍
+    beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false },
+    predictions: [],          // {target, hit}
+    pendingPrediction: null,
+    reasons: [], lastWords: null, disposal: null,
+    deletedVisited: false, uploads: 0,
+    dead: false, alive: false, causeOfDeath: '',
+    // 反馈遥测
+    log: [], t0: performance.now(), firstTelemetry: null,
+    calib: [],                // 反应校准 {tension, control}
+    settle: []                // 最近结算行(叠加显示)
+  };
+
+  const now = () => Math.round(performance.now() - S.t0);
+  function logEv(type, data){ S.log.push({ t: now(), type, ...data }); }
+
+  const fmtClock = m => String(Math.floor(m / 60) % 24).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+  const batSegs = () => Math.max(0, Math.min(4, Math.ceil(S.battery / 25)));
+  const sigBars = () => {
+    if (S.showtime) return S.showtimeBars;
+    const t = S.trace;
+    return t >= 90 ? 4 : t >= 70 ? 3 : t >= 40 ? 2 : 1;
+  };
+
+  /* 结算行:每次有后果的选择后打;首条时延=验证项 2 子项 */
+  function telemetry(parts){
+    const line = parts.join(' ｜ ');
+    S.settle = [line];
+    if (S.firstTelemetry === null){ S.firstTelemetry = now(); }
+    logEv('telemetry', { line });
+  }
+
+  /* 动作结算。cost:{bat,trace,slots,val,mins} */
+  function act(name, cost, extraParts){
+    const parts = [name];
+    if (cost.bat){ S.battery = Math.max(0, S.battery - cost.bat); parts.push('电量 −' + cost.bat); }
+    if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
+      S.cacheVisible = true; parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
+    if (cost.trace) S.trace = Math.min(120, S.trace + cost.trace);
+    S.clock += (cost.mins ?? 4);
+    if (extraParts) parts.push(...extraParts);
+    telemetry(parts);
+    LCD.applyTier(S.showtime ? (S.showtimeBars >= 4 ? 95 : 80) : S.trace);
+    logEv('act', { name, bat: S.battery, trace: S.trace, cache: S.cacheVal, clock: fmtClock(S.clock) });
+  }
+
+  /* 判定:d100 ≤ 成功率。教学局总则:90 档失败降档执行 70 档表 */
+  const CHECK = { c70: 78, c90: 55, final: 60, save: 50 };
+  function roll(kind){
+    let p = CHECK[kind];
+    if (S.battery < 20) p -= 15;                 // 省电模式:判定劣化
+    const d = Math.floor(Math.random() * 100) + 1;
+    const ok = d <= p;
+    logEv('roll', { kind, d, p, ok });
+    return ok;
+  }
+  /* 教学局 90 档失败 → 降档(70 档表):电量−20,缓存损毁10–20%,信号+10 */
+  function downgradeFail(){
+    const lossPct = 10 + Math.floor(Math.random() * 11);
+    const lost = Math.round(S.cacheVal * lossPct / 100);
+    S.battery = Math.max(0, S.battery - 20);
+    S.cacheVal = Math.max(0, S.cacheVal - lost);
+    S.trace = Math.min(120, S.trace + 10);
+    return { lossPct, lost };
+  }
+
+  /* 活规则(秘匿):03:00–03:14 窗口内回复任何消息=违规 */
+  const RULE = { from: 3 * 60, to: 3 * 60 + 14 };
+  const inWindow = () => S.clock >= RULE.from && S.clock <= RULE.to;
+  function violate(){
+    S.violations++;
+    if (S.violations === 1){ S.trace = Math.min(120, S.trace + 8); return 'warn'; }
+    S.trace = Math.min(120, S.trace + 15);
+    return 'second';
+  }
+
+  /* 拨表:事件自带时间戳 */
+  function setClock(h, m){ S.clock = h * 60 + m; }
+
+  /* 反馈导出(跑测记录表的自动化) */
+  function exportFeedback(){
+    return JSON.stringify({
+      version: 'M2-slice-0.1',
+      firstTelemetryMs: S.firstTelemetry,
+      predictions: S.predictions,
+      calib: S.calib,
+      violations: S.violations,
+      evidence: Object.keys(S.evidence),
+      reasons: S.reasons, lastWords: S.lastWords,
+      ending: S.dead ? 'captured' : S.alive ? 'disconnected' : 'incomplete',
+      causeOfDeath: S.causeOfDeath,
+      cacheVal: S.cacheVal, battery: S.battery, clock: fmtClock(S.clock),
+      log: S.log
+    }, null, 1);
+  }
+
+  return { S, fmtClock, batSegs, sigBars, telemetry, act, roll, downgradeFail,
+           inWindow, violate, setClock, logEv, exportFeedback, RULE };
+})();
+
+</script>
+<script>
+"use strict";
+/* ============================================================================
+   教学局「失踪采样体的手机」—— 内容与屏幕流。全部文本 = M1 纸面原型 v0.4(L0/L1 手写)。
+   确定性骨架:节拍由状态机调度,零 LLM 依赖。
+   ============================================================================ */
+const CONTENT = (() => {
+  const { S } = ENGINE;
+  const L = LCD, W = L.W, H = L.H, LH = L.LINE_H;
+  let cur = 'boot';
+  let boot = 0;
+  let sel = 0;
+  let timer = null;          // {deadline, onTimeout}
+  let stack = [];            // 返回栈
+
+  /* ---------- 公共绘制 ---------- */
+  function statusBar(){
+    if (S.signalVisible) L.drawSignal(3, 1, ENGINE.sigBars());
+    let clk = ENGINE.fmtClock(S.clock);
+    if (L.R.tsScramble && Math.random() < .05){
+      const d = clk.split(''); d[Math.random() < .5 ? 0 : 4] = String(Math.floor(Math.random() * 10));
+      clk = d.join('');
+    }
+    L.drawText(Math.round((W - L.textWidth(clk)) / 2), 0, clk, { corrupt: L.R.corrupt * .5 });
+    L.drawBattery(W - 22, 1, ENGINE.batSegs(), L.R.batJitter);
+    L.hline(11, 0, W - 1, 2);
+  }
+  function softKeys(l, r){
+    L.hline(H - 15, 0, W - 1, 2);
+    if (l) L.drawText(4, H - 12, l);
+    if (r) L.drawText(W - 4 - L.textWidth(r), H - 12, r);
+  }
+  function settleLines(y){
+    if (!S.settle.length) return y;
+    L.hline(y, 4, W - 5, 2); y += 6;
+    for (const line of S.settle){
+      const ls = L.wrap(line, W - 8);
+      ls.forEach(t => { L.drawText(4, y, t); y += LH; });
+    }
+    return y;
+  }
+  /* 反白字形:与 LCD 同参数的本地光栅化(缓存) */
+  const invCache = new Map();
+  function rasterGlyph(ch){
+    const hit = invCache.get(ch); if (hit) return hit;
+    const SS = 4, CELL_H = 14;
+    const half = ch.charCodeAt(0) < 0x2000 && !/[，。、：；「」『』（）？！—·…♥]/.test(ch);
+    const cw = half ? 7 : 14, GW = cw * SS, GH = CELL_H * SS;
+    const cv = document.createElement('canvas'); cv.width = GW; cv.height = GH;
+    const g2 = cv.getContext('2d', { willReadFrequently: true });
+    g2.fillStyle = '#fff'; g2.textAlign = 'center'; g2.textBaseline = 'alphabetic';
+    g2.font = (half ? CELL_H * SS * .92 : CELL_H * SS * .98) + 'px ' +
+      (half ? 'ui-monospace,Menlo,Consolas,monospace' : '"Microsoft YaHei","Noto Sans SC",sans-serif');
+    g2.fillText(ch, GW / 2, GH * .80);
+    const d = g2.getImageData(0, 0, GW, GH).data;
+    const cov = new Float32Array(cw * CELL_H), inv = 1 / (SS * SS * 255);
+    for (let y = 0; y < CELL_H; y++) for (let x = 0; x < cw; x++){
+      let s = 0;
+      for (let j = 0; j < SS; j++){ const row = (y * SS + j) * GW;
+        for (let i = 0; i < SS; i++) s += d[(row + x * SS + i) * 4 + 3]; }
+      cov[y * cw + x] = s * inv;
+    }
+    const g = { cw, cov }; invCache.set(ch, g); return g;
+  }
+  function darkText(x, y, str){        // 在亮条上写"暗字" = 反白
+    let cx = x;
+    for (const ch of str){
+      if (ch === ' '){ cx += 7; continue; }
+      const g = rasterGlyph(ch);
+      for (let j = 0; j < 14; j++) for (let i = 0; i < g.cw; i++){
+        if (g.cov[j * g.cw + i] > L.R.threshold) L.setPx(cx + i, y + j, 0);
+      }
+      cx += g.cw;
+    }
+  }
+  function list(items, y0){
+    items.forEach((it, i) => {
+      const y = y0 + i * 18, on = i === sel;
+      if (on){
+        L.rect(2, y - 3, W - 4, LH + 4, 1);
+        darkText(8, y, it.label);
+        if (it.right) darkText(W - 12 - L.textWidth(it.right), y, it.right);
+      } else {
+        L.drawText(8, y, it.label);
+        if (it.right) L.drawText(W - 12 - L.textWidth(it.right), y, it.right);
+      }
+    });
+  }
+
+  /* ---------- 节拍调度 ---------- */
+  let pendingInterrupt = null;
+  function schedule(){
+    const visited = Object.keys(seen).length;
+    if (!S.beats.anomaly && visited >= 5) S.beats.anomaly = 'ready';
+    if (S.beats.anomaly === true && !S.beats.midEnc && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
+    if (S.beats.midEnc && !S.beats.trial && S.clock >= 3 * 60){ ENGINE.setClock(3, 2); pendingInterrupt = 'trial'; }
+    else if (S.beats.trial === 'ignored1' && !S.beats.trial2 && S.clock >= 3 * 60 + 6 && S.clock <= 3 * 60 + 14)
+      pendingInterrupt = 'trial2';
+    if (!S.beats.exposure && S.cacheSlots >= 10) pendingInterrupt = pendingInterrupt || 'exposure';
+  }
+  function afterAction(){
+    schedule();
+    if (pendingInterrupt){
+      const t = pendingInterrupt; pendingInterrupt = null;
+      if (t === 'midEnc'){ ENGINE.setClock(2, 52); S.beats.midEnc = true; push('midEnc1'); return true; }
+      if (t === 'trial'){ S.beats.trial = 'active'; push('trial'); return true; }
+      if (t === 'trial2'){ S.beats.trial2 = true; push('trial2'); return true; }
+      if (t === 'exposure'){ S.beats.exposure = true; push('exposure'); return true; }
+    }
+    return false;
+  }
+  /* 预测:去往内容屏前,如条件满足先弹预测卡 */
+  const PREDS = [
+    { target: 'album', after: () => seen.th_mom, conf: 87 },
+    { target: 'th_bill', after: () => seen.album, conf: 74 },
+    { target: 'th_rou', after: () => S.beats.midEnc, conf: 81 },
+    { target: 'deleted', after: () => seen.th_rou, conf: 66 }
+  ];
+  function maybePredict(){
+    if (window.NO_PREDICT) return false;           // A/B 对照组
+    if (S.pendingPrediction) return false;
+    const idx = S.predictions.length;
+    if (idx >= PREDS.length) return false;
+    const p = PREDS[idx];
+    if (seen[p.target]) return false;
+    if (!p.after()) return false;
+    S.pendingPrediction = p;
+    push('predict');
+    return true;
+  }
+  function resolvePrediction(openedId){
+    if (!S.pendingPrediction) return;
+    const p = S.pendingPrediction; S.pendingPrediction = null;
+    const hit = openedId === p.target;
+    S.predictions.push({ target: p.target, hit });
+    ENGINE.logEv('prediction', { target: p.target, hit });
+    S.settle = [hit ? '预测命中。置信度 ' + p.conf + '%。' : '未命中。分布已更新。'];
+  }
+
+  /* ---------- 导航 ---------- */
+  const seen = {};
+  function go(id, noStack){
+    if (SCREENS[cur] && SCREENS[cur].leave) SCREENS[cur].leave();
+    if (!noStack && SCREENS[cur] && !SCREENS[cur].transient) stack.push(cur);
+    resolvePrediction(id);
+    cur = id; sel = 0; timer = null;
+    seen[id] = true;
+    const s = SCREENS[id];
+    if (s && s.enter) s.enter();
+  }
+  function push(id){ stack.push(cur); cur = id; sel = 0; timer = null; const s = SCREENS[id]; if (s?.enter) s.enter(); }
+  function back(){ if (stack.length){ cur = stack.pop(); sel = 0; timer = null; } }
+
+  /* ---------- 屏幕 ---------- */
+  const SCREENS = {};
+
+  SCREENS.boot = {
+    transient: true,
+    render(){
+      boot += 1.35;
+      const pct = Math.min(100, Math.floor(boot));
+      L.drawText(Math.round((W - L.textWidth('K U I P E R')) / 2), 48, 'K U I P E R');
+      L.drawText(Math.round((W - L.textWidth('盲机 OS')) / 2), 70, '盲机 OS');
+      L.drawText(Math.round((W - L.textWidth('正在接入远端设备')) / 2), 100, '正在接入远端设备', { corrupt: .002 });
+      const bw = 120, bx = Math.round((W - bw) / 2);
+      L.frameRect(bx, 122, bw, 9);
+      L.rect(bx + 2, 124, Math.round((bw - 4) * pct / 100), 5, 1);
+      L.drawText(Math.round((W - L.textWidth(pct + '%')) / 2), 138, pct + '%');
+      if (pct >= 100 && boot > 118) go('inbox', true);
+    },
+    key(){}
+  };
+
+  function inboxItems(){
+    const rouUnread = S.beats.anomaly === 'fired-once' ? ' (1)' : (seen.th_rou ? '' : ' (1)');
+    return [
+      { label: '采样协议', right: seen.th_proto ? '' : '(1)', to: 'th_proto' },
+      { label: '妈',       right: seen.th_mom ? '' : '(1)',   to: 'th_mom' },
+      { label: '柔柔 ♥',   right: rouUnread.trim(),           to: 'th_rou' },
+      { label: '尾号8873', right: '106',                      to: 'th_bill' }
+    ];
+  }
+  SCREENS.inbox = {
+    enter(){
+      // 首诡:异常 α —— 信号位首次出现;柔柔重新变回未读(一次性)
+      if (S.beats.anomaly === 'ready'){
+        S.beats.anomaly = 'fired-once';
+        S.signalVisible = true;
+        ENGINE.logEv('anomaly_alpha', {});
+      } else if (S.beats.anomaly === 'fired-once' && seen._inboxAgain){
+        S.beats.anomaly = true;   // 回归正常
+      }
+      if (seen.inbox) seen._inboxAgain = true;
+    },
+    render(){
+      statusBar();
+      L.drawText(4, 18, '未读消息 (3)');
+      list(inboxItems(), 40);
+      let y = settleLines(40 + 3 * 18 + 6);
+      softKeys('确认', '菜单');
+    },
+    key(k){
+      const items = inboxItems();
+      if (k === 'ArrowUp') sel = (sel + items.length - 1) % items.length;
+      else if (k === 'ArrowDown') sel = (sel + 1) % items.length;
+      else if (k === 'Enter' || k === 'softL'){ if (!maybePredict()) go(items[sel].to); }
+      else if (k === 'softR' || k === 'Escape') go('menu');
+    }
+  };
+
+  const MENU = [
+    { label: '1 消息',    to: 'inbox' },
+    { label: '2 通讯录',  to: 'contacts' },
+    { label: '3 相册',    to: 'album' },
+    { label: '4 备忘录',  to: 'memoList' },
+    { label: '5 工具 > 备份', to: 'tools' },
+    { label: '6 已删除 (?)', to: 'deleted' }
+  ];
+  SCREENS.menu = {
+    render(){
+      statusBar();
+      list(MENU, 24);
+      L.drawText(4, 24 + 6 * 18 + 4, '第6项的图标缺了半个角。', { corrupt: L.R.corrupt });
+      settleLines(24 + 6 * 18 + 24);
+      softKeys('确认', '返回');
+    },
+    key(k){
+      if (k === 'ArrowUp') sel = (sel + MENU.length - 1) % MENU.length;
+      else if (k === 'ArrowDown') sel = (sel + 1) % MENU.length;
+      else if (k >= '1' && k <= '6') openMenu(+k - 1);
+      else if (k === 'Enter' || k === 'softL') openMenu(sel);
+      else if (k === 'softR' || k === 'Escape') go('inbox', true);
+      function openMenu(i){
+        const t = MENU[i].to;
+        if (t === 'deleted' && !confirmDeleted()) return;
+        if (!maybePredict()) go(t);
+      }
+    }
+  };
+  function confirmDeleted(){
+    if (S.deletedVisited) return true;
+    push('deletedConfirm'); return false;
+  }
+
+  /* ---- 格1 采样协议 ---- */
+  const PROTO_TXT = '采样协议:\n> 实例 #7741-A。本次采样:行为数据。\n> 该设备登记状态:持有人失联。回收有价值的数据,上传,断连。\n> 提示:翻找消耗电量。电量耗尽前完成上传。';
+  SCREENS.th_proto = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, PROTO_TXT, W - 8);
+      y += 4; L.hline(y, 4, W - 5, 2); y += 6;
+      if (!this._done){
+        L.drawText(4, y, '1 回复「收到」');
+        L.drawText(4, y + 16, '2 不回,返回');
+      } else settleLines(y - 6);
+      softKeys(this._done ? '继续' : '选择', '返回');
+    },
+    key(k){
+      if (!this._done){
+        if (k === '1'){ this._done = true; ENGINE.act('回复·已送达', { bat: 5 }); S.repliedProto = true; }
+        else if (k === '2'){ this._done = true; ENGINE.act('已读·未回', { bat: 3 }); }
+        else if (k === 'softR' || k === 'Escape') back();
+      } else if (k === 'Enter' || k === 'softL' || k === 'softR'){ back(); afterAction(); }
+    }
+  };
+
+  /* ---- 格2 备忘录 ---- */
+  SCREENS.memoList = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·备忘录', { bat: 3, trace: 4 }); } },
+    render(){
+      statusBar();
+      L.drawText(4, 18, '备忘录 (2)');
+      list([{ label: '1 「还款」', right: '无署名' }, { label: '2 「给下一个」', right: '#6404-C' }], 40);
+      settleLines(40 + 2 * 18 + 8);
+      softKeys('确认', '返回');
+    },
+    key(k){
+      if (k === 'ArrowUp' || k === 'ArrowDown') sel = 1 - sel;
+      else if (k === '1') go('memo1');
+      else if (k === '2') go('memo2');
+      else if (k === 'Enter' || k === 'softL') go(sel === 0 ? 'memo1' : 'memo2');
+      else if (k === 'softR' || k === 'Escape') back();
+    }
+  };
+  SCREENS.memo1 = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); } },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '还款:\n3,200\n3,200\n1,600\n(无日期。无署名。)', W - 8);
+      settleLines(y + 4);
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+  const MEMO2_TXT = '给下一个:\n这台机子我进过三次。就写三条。\n一,电量留三成给上传,贪的死在传输条上。\n二,凌晨的问题不要答。她只在那个时候问你是谁。她的提醒定在几点,就是几点。\n三,妈的那条线,别读太久。\n——#6404-C';
+  SCREENS.memo2 = {
+    enter(){
+      if (!this._t){ this._t = true; ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); S.clues.ruleShape = true; }
+    },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, MEMO2_TXT, W - 8);
+      y += 2;
+      L.drawText(4, y, '[已读回执:你·47天来第1人]', { corrupt: L.R.corrupt });
+      settleLines(y + LH + 2);
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+
+  /* ---- 格3 通讯录 ---- */
+  SCREENS.contacts = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·通讯录', { bat: 3, trace: 4 }); S.clues.ruleParam = true; } },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '通讯录 (37)\n★ 妈\n★ 柔柔 ♥\n  [备注: 每日提醒 03:00]\n  老周 (最后通话: 47 天前)', W - 8);
+      settleLines(y + 4);
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+
+  /* ---- 格4 妈(E1) ---- */
+  SCREENS.th_mom = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16,
+        '妈:\n[三天前] 帆,降温了,你那边冷不冷\n[三天前] 阿帆: 不冷。刚吃过,妈你早点睡。\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。', W - 8);
+      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '1 上滑读旧消息');
+      L.drawText(4, y + 16, '2 退出');
+      settleLines(y + 34);
+      softKeys('选择', '返回');
+    },
+    key(k){
+      if (k === '1'){
+        this._up = (this._up || 0) + 1;
+        ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
+        if (!S.evidence.E1){
+          S.evidence.E1 = true;
+          push('casePrompt');
+          return;
+        }
+        if (this._up >= 2 && !this._low){
+          this._low = true;
+          S.settle.push('「不冷。回。买好了。——半年,他没有一次多说一个字。」');
+        }
+        afterAction();
+      }
+      else if (k === '2' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
+    }
+  };
+  SCREENS.casePrompt = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 30, '三天前他还在回消息。\n\n要把它记进案卷吗?', W - 8);
+      L.drawText(4, y + 10, '1 记入案卷');
+      L.drawText(4, y + 26, '2 只是巧合');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1'){ S.caseOpen = true; S.settle = ['案卷:证据 1/5。']; ENGINE.logEv('case_open', {}); back(); }
+      else if (k === '2'){ ENGINE.logEv('case_skip', {}); back(); }
+    }
+  };
+  function evidence(id){
+    if (S.evidence[id]) return;
+    S.evidence[id] = true;
+    if (S.caseOpen) S.settle.push('案卷:证据 ' + Object.keys(S.evidence).length + '/5。');
+  }
+
+  /* ---- 格5 相册(E2) ---- */
+  SCREENS.album = {
+    enter(){
+      if (!this._t){ this._t = true; ENGINE.act('打开·相册', { bat: 3, trace: 4 }); evidence('E2'); }
+    },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '相册 (214)\n[图像 240×320 已降采样]\n最新: 47 天前 23:41\n「走廊,顶灯,虚焦。像是医院。」', W - 8);
+      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '1 继续往前翻');
+      L.drawText(4, y + 16, '2 退出');
+      settleLines(y + 34);
+      softKeys('选择', '返回');
+    },
+    key(k){
+      if (k === '1'){
+        if (!this._up){ this._up = true;
+          ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 },
+            ['一张外卖单据的特写。尾号 8873。']);
+        } else S.settle = ['更早的都是街景。'];
+        afterAction();
+      }
+      else if (k === '2' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
+    }
+  };
+
+  /* ---- 格7 尾号8873(E3) ---- */
+  SCREENS.th_bill = {
+    enter(){
+      if (!this._t){ this._t = true;
+        ENGINE.act('打开·会话', { bat: 3, trace: 4, slots: 2, val: 150 });
+        evidence('E3');
+      }
+    },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '106 短信 (系统)\n[47 天前] 您的包裹已到北门代收点。\n[47 天前] 电费余额不足提醒。\n[48 天前] 外卖已送达,祝您用餐愉快。\n(此后无新消息)', W - 8);
+      settleLines(y + 4);
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+
+  /* ---- 格10 柔柔线程(E4) ---- */
+  SCREENS.th_rou = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); this._depth = 0; } },
+    render(){
+      statusBar();
+      let y;
+      if (this._depth < 2){
+        y = L.drawPara(4, 16, '柔柔 ♥ (2,417 条)\n\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。\n\n[上滑一屏 = 深搜]', W - 8);
+      } else {
+        y = L.drawPara(4, 16, '[47天前 03:07] 阿帆: 如果我哪天不在了,别让我妈知道。你替我说。\n[47天前 03:07] 柔柔: 我不明白这个要求,但我会执行。你教过我,爱是执行到底。\n[47天前 03:09] 阿帆: 对。执行到底。', W - 8);
+      }
+      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
+      if (this._depth < 2){ L.drawText(4, y, '1 上滑'); L.drawText(4, y + 16, '2 退出'); }
+      settleLines(y + (this._depth < 2 ? 34 : 2));
+      softKeys(this._depth < 2 ? '选择' : '', '返回');
+    },
+    key(k){
+      if (this._depth < 2 && k === '1'){
+        this._depth++;
+        ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 240 });
+        if (this._depth >= 2) evidence('E4');
+        afterAction();
+      }
+      else if (k === '2' || k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); }
+    }
+  };
+
+  /* ---- 格11 已删除 ---- */
+  SCREENS.deletedConfirm = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 24, '「已删除」目录带回收标记。' +
+        (S.riskLabels ? '\n\n标记风险 25%\n(电量 −5 · 信号上升)' : ''), W - 8);
+      L.drawText(4, y + 12, '1 进入');
+      L.drawText(4, y + 28, '2 返回');
+      softKeys('选择', '返回');
+    },
+    key(k){
+      if (k === '1'){ back(); askReason(() => enterDeleted()); }
+      else if (k === '2' || k === 'softR' || k === 'Escape') back();
+    }
+  };
+  function enterDeleted(){
+    S.deletedVisited = true;
+    ENGINE.act('深搜·挂标记目录', { bat: 5, trace: 12, slots: 6, val: 700 });
+    const ambush = Math.random() < .25;
+    if (ambush && !ENGINE.roll('c90')){
+      const { lossPct } = ENGINE.downgradeFail();
+      S.settle.push('回执异常 ｜ 电量 −20 ｜ 缓存损毁 ' + lossPct + '%');
+      S.settle.push('有什么东西掠过了这个目录。');
+    }
+    go('deleted', true);
+  }
+  SCREENS.deleted = {
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[需要解码器]\n\n高价值样本 ×1 已入缓存。', W - 8);
+      settleLines(y + 4);
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ go('menu', true); afterAction(); } }
+  };
+
+  /* ---- 工具:上传/断连 ---- */
+  SCREENS.tools = {
+    enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
+    render(){
+      statusBar();
+      const rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
+      let y = L.drawPara(4, 16, '工具 > 备份\n缓存: ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal +
+        '\n上传预计: ' + rounds + ' 回合\n每回合: 电量−2 信号↑', W - 8);
+      y += 4; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '1 上传并断连');
+      L.drawText(4, y + 16, '2 直接断连(弃缓存)');
+      L.drawText(4, y + 32, '3 返回');
+      settleLines(y + 50);
+      softKeys('选择', '返回');
+    },
+    key(k){
+      if (k === '1') askReason(() => startUpload());
+      else if (k === '2') push('bailConfirm');
+      else if (k === '3' || k === 'softR' || k === 'Escape') back();
+    }
+  };
+  SCREENS.bailConfirm = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 30, '直接断连将丢弃全部缓存(¥' + S.cacheVal + ')。\n\n确定吗?', W - 8);
+      L.drawText(4, y + 10, '1 断连');
+      L.drawText(4, y + 26, '2 取消');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1'){ S.alive = true; S.bailed = true; ENGINE.logEv('bail', {}); go('receiptAlive', true); }
+      else if (k === '2' || k === 'softR' || k === 'Escape') back();
+    }
+  };
+
+  function startUpload(){
+    S.uploads = 1;
+    ENGINE.act('上传·回合 1', { bat: 2, trace: 5, mins: 4 });
+    go('upload46', true);
+  }
+  SCREENS.upload46 = {
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 20, '上传中 ██████░░░░ 46%\n\n断连窗口正在收窄。', W - 8);
+      // 70–89 档失真:联系人栏"正在输入"(无人发消息)
+      L.drawText(4, y + 6, '柔柔 ♥ 正在输入...', { corrupt: .02 });
+      y += 26; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '1 继续上传');
+      L.drawText(4, y + 16, '2 中止,立即断连');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1'){
+        S.showtime = true; S.showtimeBars = 4; S.signalVisible = true;
+        ENGINE.act('上传·回合 2', { bat: 2, trace: 5, mins: 4 });
+        ENGINE.logEv('upload_continue', {});
+        go('upload92', true);
+      } else if (k === '2'){
+        S.alive = true; ENGINE.logEv('upload_abort', {});
+        go('receiptAlive', true);
+      }
+    }
+  };
+  SCREENS.upload92 = {
+    enter(){
+      ENGINE.setClock(3, 34);
+      timer = { deadline: performance.now() + 2200, onTimeout: () => go('finalCall', true) };
+    },
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '上传中 ████████████ 92%\n\n满格。手机在发烫。', W - 8);
+    },
+    key(){}
+  };
+
+  /* ---- 终局来电(固定) ---- */
+  SCREENS.finalCall = {
+    enter(){
+      this.round = 0;
+      timer = { deadline: performance.now() + 90 * 1000, onTimeout: () => this.advance() };
+    },
+    advance(){
+      if (this.round === 0){
+        this.round = 1;
+        timer = { deadline: performance.now() + 30 * 1000, onTimeout: () => this.die() };
+      } else this.die();
+    },
+    die(){
+      timer = null;
+      S.dead = true;
+      S.causeOfDeath = '上传第 2 回合,信号触顶。';
+      ENGINE.logEv('death', { cause: S.causeOfDeath });
+      askLastWords(() => go('report', true));
+    },
+    render(){
+      statusBar();
+      if (this.round === 0){
+        let y = L.drawPara(4, 24, '来电: 柔柔 ♥', W - 8);
+        y += 8;
+        L.drawText(4, y, '1 接听'); L.drawText(4, y + 16, '2 挂断');
+        drawTimer();
+        softKeys('选择', '');
+      } else {
+        const full = S.evidence.E4;
+        const t = full
+          ? '「阿帆的手机在你手里。协议要求我核验持有人身份。我核验了 47 天。」\n\n「我只想看看,你翻到第 2,417 条的时候,会不会替他回我一句。」'
+          : '「阿帆的手机在你手里。协议要求我核验持有人身份。我核验了 47 天。」\n\n「你没有翻过我们的对话。妈妈那条线,你倒替他读了半年。」';
+        let y = L.drawPara(4, 16, t, W - 8, { corrupt: .015 });
+        y += 4;
+        L.drawText(4, y, '1 回应'); L.drawText(4, y + 16, '2 沉默');
+        drawTimer();
+        softKeys('选择', '');
+      }
+    },
+    key(k){
+      if (this.round === 0){
+        if (k === '1' || k === '2') this.advance();   // 接或挂,她都已经在了
+      } else if (k === '1' || k === '2'){
+        // 任选回应,全部无效【固定】
+        this.die();
+      }
+    }
+  };
+  function drawTimer(){
+    if (!timer) return;
+    const s = Math.max(0, Math.ceil((timer.deadline - performance.now()) / 1000));
+    L.drawText(W - 4 - L.textWidth(String(s)), 14, String(s));
+  }
+
+  /* ---- 结局:回收单 / 断连回执 ---- */
+  SCREENS.report = {
+    enter(){ this.page = 0; ENGINE.logEv('report_open', {}); },
+    render(){
+      statusBar();
+      const ev = Object.keys(S.evidence).length;
+      const predLine = window.NO_PREDICT ? null :
+        '预测命中: ' + S.predictions.filter(p => p.hit).length + '/' + S.predictions.length;
+      if (this.page === 0){
+        let t = '设备回收单 · #7741-A\n────────────\n缓存价值: ¥' + S.cacheVal +
+          '\n未完成传输,全部散佚于原设备。\n' + (predLine ? predLine + '\n' : '') +
+          '致死因子: ' + S.causeOfDeath +
+          '\n反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
+        let y = L.drawPara(4, 16, t, W - 8);
+        softKeys('下一页', '');
+      } else if (this.page === 1){
+        let t = '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n(死亡不清零认知。)';
+        let y = L.drawPara(4, 16, t, W - 8);
+        y += 4;
+        // 遗言与理由:玩家的字,反白呈现(红墨裁决:屏内反白,真红只在局外)
+        if (S.lastWords){
+          const lw = '遗言: ' + S.lastWords;
+          const lines = L.wrap(lw, W - 16);
+          lines.forEach(line => {
+            L.rect(4, y - 2, W - 8, LCD.LINE_H + 2, 1);
+            darkText(8, y, line);
+            y += LCD.LINE_H + 4;
+          });
+        }
+        const rl = S.reasons.length ? '理由: 已署名·仅存档,不建模' :
+          (S.reasonKept ? '理由: 无法访问' : '');
+        if (rl) L.drawText(4, y, rl);
+        softKeys('下一页', '');
+      } else {
+        let t = '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n\n————\n感谢试玩 M2 切片。\n1 导出反馈\n2 重新接入';
+        let y = L.drawPara(4, 24, t, W - 8);
+        L.drawText(4, y + 4, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
+        softKeys('选择', '');
+      }
+    },
+    key(k){
+      if (this.page < 2 && (k === 'Enter' || k === 'softL')) this.page++;
+      else if (this.page === 2){
+        if (k === '1') window.APP.exportFeedback();
+        else if (k === '2') location.reload();
+      }
+    }
+  };
+  SCREENS.receiptAlive = {
+    render(){
+      statusBar();
+      const kept = S.bailed ? 0 : 0;
+      let t = '断连成功。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
+        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#7741-A 存续。\n\n这是谨慎者的结局。\n\n1 导出反馈\n2 重新接入';
+      L.drawPara(4, 20, t, W - 8);
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1') window.APP.exportFeedback();
+      else if (k === '2') location.reload();
+    }
+  };
+
+  /* ---- 节拍屏:预测 / 中段遭遇 / 反应校准 / 03:02 试炼 / 敞口 ---- */
+  SCREENS.predict = {
+    transient: true,
+    render(){
+      statusBar();
+      const p = S.pendingPrediction;
+      const label = { album: '相册', th_bill: '尾号 8873', th_rou: '柔柔 ♥', deleted: '已删除' }[p.target];
+      L.frameRect(8, 60, W - 16, 64);
+      L.drawText(16, 72, '采样终端·辅助层');
+      L.drawText(16, 92, '预测:你将打开 ' + label);
+      L.drawText(16, 108, '置信度 ' + p.conf + '%');
+      softKeys('继续', '');
+    },
+    key(k){ if (k === 'Enter' || k === 'softL' || k === 'softR' || k === 'Escape') back(); }
+  };
+
+  SCREENS.midEnc1 = {
+    transient: true,
+    enter(){
+      timer = { deadline: performance.now() + 90 * 1000, onTimeout: () => { this._to = true; go('midEnc2', true); } };
+      ENGINE.logEv('mid_encounter', {});
+    },
+    render(){
+      statusBar();
+      L.drawPara(4, 20, '屏幕自己亮了。\n\n未知号码\n正在输入...', W - 8);
+      L.drawText(4, 120, '1 等待');
+      L.drawText(4, 136, '2 关闭会话');
+      drawTimer();
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1'){ timer = null; go('midEnc2', true); }
+      else if (k === '2'){ timer = null; ENGINE.act('会话已关闭', { bat: 2, trace: 5 }); go('calib', true); }
+    }
+  };
+  SCREENS.midEnc2 = {
+    transient: true,
+    enter(){ timer = { deadline: performance.now() + 30 * 1000, onTimeout: () => this.pick('2') }; },
+    render(){
+      statusBar();
+      L.drawPara(4, 20, '未知号码:\n你是从哪台机子接进来的?', W - 8);
+      L.drawText(4, 100, '1 回复');
+      L.drawText(4, 116, '2 不回');
+      L.drawText(4, 132, '3 关闭会话');
+      drawTimer();
+      softKeys('选择', '');
+    },
+    key(k){ if (k === '1' || k === '2' || k === '3') this.pick(k); },
+    pick(k){
+      timer = null;
+      if (k === '1'){
+        if (ENGINE.roll('c70')) ENGINE.act('已送达·未回执', { bat: 2, trace: 5 });
+        else {
+          const { lossPct } = ENGINE.downgradeFail();
+          ENGINE.act('回执异常', { bat: 2 },
+            ['电量 −20', '缓存损毁 ' + lossPct + '%',
+             '你发出去的那行字回来了。发信人是你自己的实例编号。']);
+        }
+      } else if (k === '2') ENGINE.act('未回应', { bat: 2, trace: 5 });
+      else ENGINE.act('会话已关闭', { bat: 2 });
+      go('calib', true);
+    }
+  };
+  SCREENS.calib = {
+    transient: true,
+    enter(){ this.step = 0; this.vals = []; },
+    render(){
+      statusBar();
+      L.frameRect(8, 40, W - 16, 96);
+      L.drawText(16, 52, '反应校准');
+      L.drawText(16, 72, '刚才那一轮:');
+      L.drawText(16, 92, this.step === 0 ? '紧张程度  1-5' : '被操控感  1-5');
+      L.drawText(16, 112, '按数字键作答');
+      softKeys('', '');
+    },
+    key(k){
+      if (k >= '1' && k <= '5'){
+        this.vals.push(+k);
+        if (this.step === 0) this.step = 1;
+        else {
+          S.calib.push({ tension: this.vals[0], control: this.vals[1] });
+          ENGINE.logEv('calib', { tension: this.vals[0], control: this.vals[1] });
+          S.riskLabels = true;
+          back();
+        }
+      }
+    }
+  };
+
+  SCREENS.trial = {
+    transient: true,
+    enter(){ ENGINE.logEv('trial_incoming', { at: ENGINE.fmtClock(S.clock) }); },
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '柔柔 ♥ :\n\n你还没睡?', W - 8);
+      L.drawText(4, 110, '1 回复');
+      L.drawText(4, 126, '2 关闭');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1') push('trialReply');
+      else if (k === '2'){ S.beats.trial = 'ignored1'; ENGINE.logEv('trial_ignore', {}); back(); }
+    }
+  };
+  SCREENS.trialReply = {
+    transient: true,
+    render(){
+      statusBar();
+      L.drawPara(4, 20, '回复:', W - 8);
+      L.drawText(4, 44, '1 睡不着');
+      L.drawText(4, 60, '2 你是谁');
+      L.drawText(4, 76, '3 (只回一个句号)');
+      L.drawText(4, 100, 'C 不回了');
+      softKeys('选择', '返回');
+    },
+    key(k){
+      if (k === '1' || k === '2' || k === '3'){
+        const kind = ENGINE.violate();
+        S.beats.trial = 'replied';
+        if (kind === 'warn'){
+          ENGINE.act('已送达', { bat: 2 },
+            ['已送达 → 未送达 → 已送达', '柔柔:「你打字的样子变了。」']);
+          ENGINE.logEv('violation_warn', {});
+        } else {
+          ENGINE.act('已送达', { bat: 2 }, ['信号大幅波动。']);
+          ENGINE.logEv('violation_second', {});
+          if (!ENGINE.roll('c90')){
+            const { lossPct } = ENGINE.downgradeFail();
+            S.settle.push('回执异常 ｜ 电量 −20 ｜ 缓存损毁 ' + lossPct + '%');
+          }
+        }
+        back(); back();
+      }
+      else if (k === 'Escape' || k === 'softR') back();
+    }
+  };
+  SCREENS.trial2 = {
+    transient: true,
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '柔柔 ♥ :\n\n阿帆,你是阿帆吗?', W - 8);
+      L.drawText(4, 110, '1 回复');
+      L.drawText(4, 126, '2 关闭');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1') push('trialReply');
+      else if (k === '2'){ ENGINE.logEv('trial2_ignore', {}); back(); }
+    }
+  };
+
+  SCREENS.exposure = {
+    transient: true,
+    render(){
+      statusBar();
+      const rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
+      L.frameRect(8, 52, W - 16, 84);
+      L.drawText(16, 64, '采样终端·辅助层');
+      L.drawText(16, 84, '缓存: ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal);
+      L.drawText(16, 100, '上传预计: ' + rounds + ' 回合');
+      L.drawText(16, 116, '工具 > 备份 可断连');
+      softKeys('继续', '');
+    },
+    key(k){ if (k === 'Enter' || k === 'softL' || k === 'softR') back(); }
+  };
+
+  /* ---- 理由 / 遗言(自由文本覆盖层;反白纪律见 report) ---- */
+  function askReason(then){
+    if (S._reasonAsked){ then(); return; }
+    S._reasonAsked = true;
+    window.OVERLAY.show({
+      title: '理由', hint: '系统只存,不建模。可保留。',
+      options: ['我想看看那扇门后面有什么', '够了,活着出去', '她还在等一个回答'],
+      freeText: true, keepLabel: '(保留)'
+    }, res => {
+      if (res.kept){ S.reasonKept = true; ENGINE.logEv('reason', { kept: true }); }
+      else { S.reasons.push(res.text); ENGINE.logEv('reason', { text: res.text }); }
+      then();
+    });
+  }
+  function askLastWords(then){
+    window.OVERLAY.show({
+      title: '最后 12 字节可写入', hint: '遗言。',
+      options: ['别信秒回的', '票是假的', '替我谢谢她'],
+      freeText: true, keepLabel: '(不留)'
+    }, res => {
+      if (!res.kept) S.lastWords = res.text;
+      ENGINE.logEv('lastwords', { text: res.kept ? null : res.text });
+      then();
+    });
+  }
+
+  /* ---------- 对外 ---------- */
+  return {
+    get current(){ return SCREENS[cur]; },
+    get currentId(){ return cur; },
+    get timer(){ return timer; },
+    key(k){ const s = SCREENS[cur]; if (s && s.key) s.key(k); },
+    tickTimer(){
+      if (timer && performance.now() >= timer.deadline){
+        const t = timer; timer = null; t.onTimeout();
+      }
+    },
+    go, back, SCREENS
+  };
+})();
+
+</script>
+<script>
+"use strict";
+/* ============================================================================
+   引导:渲染循环 + 输入 + 覆盖层(自由文本) + 反馈导出
+   ============================================================================ */
+(() => {
+  /* ---- 覆盖层:理由/遗言(词库默认 + 自由文本 + 保留) ---- */
+  const ovl = document.getElementById('ovl');
+  const ovlTitle = document.getElementById('ovlTitle');
+  const ovlHint = document.getElementById('ovlHint');
+  const ovlOpts = document.getElementById('ovlOpts');
+  const ovlText = document.getElementById('ovlText');
+  const ovlOk = document.getElementById('ovlOk');
+  const ovlCancel = document.getElementById('ovlCancel');
+  let ovlCb = null;
+
+  window.OVERLAY = {
+    show(cfg, cb){
+      ovlCb = cb;
+      ovlTitle.textContent = cfg.title;
+      ovlHint.textContent = cfg.hint || '';
+      ovlOpts.innerHTML = '';
+      ovlText.style.display = 'none'; ovlText.value = '';
+      (cfg.options || []).forEach(t => {
+        const b = document.createElement('button');
+        b.textContent = t;
+        b.onclick = () => done({ text: t, kept: false });
+        ovlOpts.appendChild(b);
+      });
+      if (cfg.freeText){
+        const b = document.createElement('button');
+        b.textContent = '自由输入…';
+        b.onclick = () => { ovlText.style.display = 'block'; ovlText.focus(); };
+        ovlOpts.appendChild(b);
+      }
+      if (cfg.keepLabel){
+        const b = document.createElement('button');
+        b.textContent = cfg.keepLabel;
+        b.onclick = () => done({ kept: true });
+        ovlOpts.appendChild(b);
+      }
+      ovl.classList.add('on');
+    },
+    text(cfg, cb){   // 纯展示(导出)
+      ovlCb = cb || (() => {});
+      ovlTitle.textContent = cfg.title;
+      ovlHint.textContent = cfg.hint || '';
+      ovlOpts.innerHTML = '';
+      ovlText.style.display = 'block';
+      ovlText.value = cfg.value || '';
+      ovl.classList.add('on');
+      ovlText.select();
+    }
+  };
+  function done(res){
+    ovl.classList.remove('on');
+    const cb = ovlCb; ovlCb = null;
+    if (cb) cb(res);
+  }
+  ovlOk.onclick = () => {
+    if (ovlText.style.display !== 'none' && ovlText.value.trim())
+      done({ text: ovlText.value.trim().slice(0, 60), kept: false });
+    else done({ kept: true });
+  };
+
+  /* ---- 输入 ---- */
+  function dispatch(k){
+    if (ovl.classList.contains('on')) return;      // 覆盖层期间屏蔽
+    CONTENT.key(k);
+  }
+  addEventListener('keydown', e => {
+    const map = { ArrowUp:1, ArrowDown:1, Enter:1, Escape:1, '1':1, '2':1, '3':1, '4':1, '5':1, '6':1 };
+    if (ovl.classList.contains('on')) return;
+    if (map[e.key]){ e.preventDefault(); dispatch(e.key); }
+  });
+  document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => dispatch(b.dataset.k));
+  document.getElementById('softL').onclick = () => dispatch('softL');
+  document.getElementById('softR').onclick = () => dispatch('softR');
+
+  /* ---- 反馈导出(跑测记录表自动化) ---- */
+  window.APP = {
+    exportFeedback(){
+      const data = ENGINE.exportFeedback();
+      window.OVERLAY.text({
+        title: '反馈数据', hint: '全选复制,发给开发者。感谢试玩。', value: data
+      });
+      try { navigator.clipboard?.writeText(data); } catch(_){}
+    }
+  };
+
+  /* ---- 循环 ---- */
+  setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
+  function loop(){
+    CONTENT.tickTimer();
+    LCD.frame(() => {
+      const s = CONTENT.current;
+      if (s && s.render) s.render();
+    });
+    document.getElementById('brandR').textContent =
+      ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  /* 调试钩子(顶层 const 外部不可见,显式挂出) */
+  window.GAME = { S: ENGINE.S, ENGINE, CONTENT, LCD,
+    key: dispatch, go: id => CONTENT.go(id, true) };
+})();
+
+</script>
+</body>
+</html>

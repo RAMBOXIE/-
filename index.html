@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>逃离AI · 盲机</title>
+<style>
+  :root{
+    --lcd-lit:#5FF0C8; --lcd-unlit:#14332C; --lcd-substrate:#08130F;
+    --lcd-amber:#F2A950;
+    --shell:#171a19; --shell-2:#0e100f; --shell-edge:#2c312f;
+    --ink:#8d9a95; --ink-dim:#5a6663;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#0a0c0b;color:var(--ink);
+    font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei",monospace;
+    -webkit-font-smoothing:antialiased;min-height:100%}
+  .wrap{display:flex;align-items:flex-start;justify-content:center;padding:16px 8px 40px}
+
+  .device{width:min(688px,100vw - 16px);padding:22px clamp(12px,4vw,36px) 18px;border-radius:14px;
+    background:linear-gradient(180deg,var(--shell) 0%,var(--shell-2) 100%);
+    border:1px solid var(--shell-edge);
+    box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
+  .brand{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:12px}
+  .bezel{position:relative;padding:10px;border-radius:5px;background:#05100c;
+    border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
+  .screen-stack{position:relative;line-height:0}
+  canvas{display:block;image-rendering:pixelated;width:100%;height:auto}
+  .grid{position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to right,transparent 0 2px,rgba(3,10,8,.62) 2px 3px),
+               repeating-linear-gradient(to bottom,transparent 0 2px,rgba(3,10,8,.62) 2px 3px)}
+  .glass{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(115% 85% at 50% 0%,rgba(120,255,220,.055),transparent 60%)}
+
+  .keys{margin-top:14px;display:grid;grid-template-columns:1fr 84px 1fr;gap:8px;align-items:center}
+  .key{appearance:none;border:1px solid #2c312f;background:#1c201f;color:#9fada8;border-radius:4px;
+    padding:12px 6px;font:inherit;font-size:12px;letter-spacing:.1em;cursor:pointer;user-select:none}
+  .key:active{background:#0f1211}
+  .key.ok{background:#20302b;border-color:#33463f;color:#a8e8d3}
+  .dpad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px;width:84px;height:84px}
+  .dpad button{appearance:none;border:1px solid #2c312f;background:#1c201f;border-radius:3px;
+    color:#7d8a86;font:inherit;font-size:11px;cursor:pointer;padding:0;user-select:none}
+  .dpad button:active{background:#0f1211}
+  .dpad .sp{border:0;background:transparent;cursor:default}
+  .numrow{margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+
+  /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(5,10,8,.88);z-index:9}
+  .overlay.on{display:flex}
+  .sheet{width:min(430px,92vw);background:#0c1512;border:1px solid #234;border-color:#1f3a31;
+    border-radius:8px;padding:20px 18px}
+  .sheet h3{margin:0 0 4px;font-size:12px;letter-spacing:.2em;color:var(--lcd-lit);font-weight:400}
+  .sheet .hint{font-size:11px;color:#5f6b67;margin:0 0 12px}
+  .sheet textarea{width:100%;background:#08130f;border:1px solid #1f3a31;color:var(--lcd-lit);
+    font:inherit;font-size:14px;padding:10px;border-radius:4px;min-height:64px;outline:0}
+  .sheet .opts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .sheet .opts button{appearance:none;text-align:left;border:1px solid #1f3a31;background:transparent;
+    color:#8fb8aa;font:inherit;font-size:13px;padding:9px 12px;border-radius:4px;cursor:pointer}
+  .sheet .opts button:hover{background:#0f1f1a}
+  .sheet .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  .sheet .row button{appearance:none;border:1px solid #2c312f;background:#1c201f;color:#9fada8;
+    font:inherit;font-size:12px;padding:8px 16px;border-radius:4px;cursor:pointer}
+  .sheet .row button.primary{background:#20302b;border-color:#33463f;color:#a8e8d3}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="device">
+    <div class="brand"><span>Kuiper</span><span id="brandR">连接中</span></div>
+    <div class="bezel">
+      <div class="screen-stack">
+        <canvas id="lcd" width="588" height="672"></canvas>
+        <div class="glass"></div><div class="grid"></div>
+      </div>
+    </div>
+    <div class="keys">
+      <button class="key ok" id="softL">确认</button>
+      <div class="dpad">
+        <button class="sp"></button><button data-k="ArrowUp">↑</button><button class="sp"></button>
+        <button class="sp"></button><button data-k="Enter">●</button><button class="sp"></button>
+        <button class="sp"></button><button data-k="ArrowDown">↓</button><button class="sp"></button>
+      </div>
+      <button class="key" id="softR">返回</button>
+    </div>
+    <div class="numrow">
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key" data-k="Escape">C</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovl">
+  <div class="sheet">
+    <h3 id="ovlTitle">理由</h3>
+    <p class="hint" id="ovlHint">系统只存,不建模。</p>
+    <div class="opts" id="ovlOpts"></div>
+    <textarea id="ovlText" placeholder="自由输入…" style="display:none"></textarea>
+    <div class="row">
+      <button id="ovlCancel" style="display:none">取消</button>
+      <button class="primary" id="ovlOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/lcd.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/content.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
