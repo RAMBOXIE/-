@@ -27,6 +27,18 @@ const LCD = (() => {
     for (let j = 0; j < h; j++){ setPx(x, y + j, 1); setPx(x + w - 1, y + j, 1); }
   }
   function hline(y, x0 = 0, x1 = W - 1, step = 1){ for (let x = x0; x <= x1; x += step) setPx(x, y, 1); }
+  function disc(cx, cy, r, v = 1){
+    const r2 = r * r;
+    for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++)
+      if (i * i + j * j <= r2) setPx(cx + i, cy + j, v);
+  }
+  function ring(cx, cy, r, thick = 2){
+    const ro = r * r, ri = (r - thick) * (r - thick);
+    for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++){
+      const d = i * i + j * j;
+      if (d <= ro && d >= ri) setPx(cx + i, cy + j, 1);
+    }
+  }
   function invertRect(x, y, w, h){
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++){
       const k = px(x + i, y + j); if (k >= 0 && k < target.length) target[k] = target[k] > .5 ? 0 : 1;
@@ -76,6 +88,21 @@ const LCD = (() => {
         if (on) setPx(cx + i, y + j, 1);
       }
       cx += g.cw;
+    }
+    return cx;
+  }
+
+  /* 放大字(开机标志/来电人名):字形覆盖率按 scale×scale 块放大 */
+  function drawTextScaled(x, y, str, scale, o = {}){
+    const thr = o.threshold ?? R.threshold;
+    let cx = x;
+    for (const ch of str){
+      if (ch === ' '){ cx += CW_ASC * scale; continue; }
+      const g = glyph(ch);
+      for (let j = 0; j < CELL_H; j++) for (let i = 0; i < g.cw; i++){
+        if (g.cov[j * g.cw + i] > thr) rect(cx + i * scale, y + j * scale, scale, scale, 1);
+      }
+      cx += g.cw * scale;
     }
     return cx;
   }
@@ -165,5 +192,6 @@ const LCD = (() => {
   }
 
   return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
+           disc, ring, drawTextScaled,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();

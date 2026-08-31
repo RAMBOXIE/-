@@ -1,6 +1,7 @@
 "use strict";
 /* ============================================================================
-   引导:渲染循环 + 输入 + 覆盖层(自由文本) + 反馈导出
+   引导:渲染循环 + 触摸/手势输入 + 覆盖层(自由文本) + 音频 + 反馈导出
+   交互原则:LCD 像素呈现 + 触摸式操作——点屏幕上的选项,滑动翻阅,右滑返回。
    ============================================================================ */
 (() => {
   /* ---- 覆盖层:理由/遗言(词库默认 + 自由文本 + 保留) ---- */
@@ -10,7 +11,6 @@
   const ovlOpts = document.getElementById('ovlOpts');
   const ovlText = document.getElementById('ovlText');
   const ovlOk = document.getElementById('ovlOk');
-  const ovlCancel = document.getElementById('ovlCancel');
   let ovlCb = null;
 
   window.OVERLAY = {
@@ -62,19 +62,86 @@
     else done({ kept: true });
   };
 
-  /* ---- 输入 ---- */
+  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
+  let actx = null, hissSrc = null;
+  window.AUDIO = {
+    ensure(){
+      try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(_){}
+      try { if (actx && actx.state === 'suspended') actx.resume(); } catch(_){}
+      return actx;
+    },
+    hiss(on){
+      try {
+        const c = this.ensure(); if (!c) return;
+        if (on){
+          if (hissSrc) return;
+          const len = c.sampleRate * 2;
+          const buf = c.createBuffer(1, len, c.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * .5;
+          const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+          const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+          bp.frequency.value = 900; bp.Q.value = .5;
+          const g = c.createGain(); g.gain.value = .05;
+          src.connect(bp); bp.connect(g); g.connect(c.destination);
+          src.start(); hissSrc = src;
+        } else if (hissSrc){
+          try { hissSrc.stop(); } catch(_){}
+          hissSrc = null;
+        }
+      } catch(_){}
+    },
+    blip(freq, dur){
+      try {
+        const c = this.ensure(); if (!c) return;
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'square'; o.frequency.value = freq || 620;
+        g.gain.value = .035;
+        o.connect(g); g.connect(c.destination);
+        o.start(); o.stop(c.currentTime + (dur || .09));
+      } catch(_){}
+    }
+  };
+
+  /* ---- 输入:触摸/点击 + 手势 + 键盘兜底 ---- */
   function dispatch(k){
     if (ovl.classList.contains('on')) return;      // 覆盖层期间屏蔽
     CONTENT.key(k);
   }
+  const zone = document.getElementById('tapzone');
+  const cvs = document.getElementById('lcd');
+  let pd = null;   // {x,y,t}
+  zone.addEventListener('pointerdown', e => {
+    window.AUDIO.ensure();
+    pd = { x: e.clientX, y: e.clientY, t: performance.now() };
+    e.preventDefault();
+  });
+  zone.addEventListener('pointerup', e => {
+    if (!pd) return;
+    const dx = e.clientX - pd.x, dy = e.clientY - pd.y;
+    const dt = performance.now() - pd.t;
+    pd = null;
+    if (ovl.classList.contains('on')) return;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    if (ady > 30 && ady > adx * 1.4){ dispatch(dy < 0 ? 'swipeUp' : 'swipeDown'); return; }
+    if (adx > 40 && adx > ady * 1.4){ dispatch(dx > 0 ? 'swipeRight' : 'swipeLeft'); return; }
+    if (dt < 700 && adx < 14 && ady < 14){
+      const r = cvs.getBoundingClientRect();
+      const lx = (e.clientX - r.left) / r.width * LCD.W;
+      const ly = (e.clientY - r.top) / r.height * LCD.H;
+      CONTENT.tap(lx, ly);
+    }
+    e.preventDefault();
+  });
+  zone.addEventListener('pointercancel', () => { pd = null; });
+
   addEventListener('keydown', e => {
-    const map = { ArrowUp:1, ArrowDown:1, Enter:1, Escape:1, '1':1, '2':1, '3':1, '4':1, '5':1, '6':1 };
+    const map = { ArrowUp:1, ArrowDown:1, Enter:1, Escape:1,
+                  '1':1, '2':1, '3':1, '4':1, '5':1, '6':1, '7':1 };
     if (ovl.classList.contains('on')) return;
     if (map[e.key]){ e.preventDefault(); dispatch(e.key); }
   });
-  document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => dispatch(b.dataset.k));
-  document.getElementById('softL').onclick = () => dispatch('softL');
-  document.getElementById('softR').onclick = () => dispatch('softR');
 
   /* ---- 反馈导出(跑测记录表自动化) ---- */
   window.APP = {
@@ -91,10 +158,7 @@
   setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
   function loop(){
     CONTENT.tickTimer();
-    LCD.frame(() => {
-      const s = CONTENT.current;
-      if (s && s.render) s.render();
-    });
+    LCD.frame(() => CONTENT.render());
     document.getElementById('brandR').textContent =
       ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';
     requestAnimationFrame(loop);
@@ -103,5 +167,5 @@
 
   /* 调试钩子(顶层 const 外部不可见,显式挂出) */
   window.GAME = { S: ENGINE.S, ENGINE, CONTENT, LCD,
-    key: dispatch, go: id => CONTENT.go(id, true) };
+    key: dispatch, go: id => CONTENT.go(id, true), tap: (x, y) => CONTENT.tap(x, y) };
 })();

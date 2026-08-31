@@ -1,16 +1,20 @@
 "use strict";
 /* ============================================================================
-   运行时状态机 —— 宪法 2:一切判定由引擎裁决。数值出处:开发规格 v3.1 §4。
+   运行时状态机 —— 宪法 2:一切判定由引擎裁决。
+   数值出处:开发规格 v3.1 §4 + design/数值体系_v1.0.xlsx(可调参数的唯一数据源)。
    ============================================================================ */
 const ENGINE = (() => {
+  const _d = new Date();
+  const pad2 = n => String(n).padStart(2, '0');
   const S = {
     battery: 100,
     trace: 0,             // 溯源,数字永远秘匿,玩家只见信号格
     clock: 2 * 60 + 12,   // 02:12,分钟
+    dateStr: _d.getFullYear() + '-' + pad2(_d.getMonth() + 1) + '-' + pad2(_d.getDate()),
     cacheSlots: 0, cacheVal: 0,
     // UI 阶梯
     signalVisible: false, cacheVisible: false, riskLabels: false,
-    // 演出模式(格12 起):信号格由剧本置位
+    // 演出模式(上传收束起):信号格由剧本置位
     showtime: false, showtimeBars: 3,
     // 证据与线索
     evidence: {}, caseOpen: false, clues: {},
@@ -21,7 +25,7 @@ const ENGINE = (() => {
     pendingPrediction: null,
     reasons: [], lastWords: null, disposal: null,
     deletedVisited: false, uploads: 0,
-    dead: false, alive: false, causeOfDeath: '',
+    dead: false, alive: false, exhausted: false, powerOut: false, causeOfDeath: '',
     // 反馈遥测
     log: [], t0: performance.now(), firstTelemetry: null,
     calib: [],                // 反应校准 {tension, control}
@@ -38,6 +42,7 @@ const ENGINE = (() => {
     const t = S.trace;
     return t >= 90 ? 4 : t >= 70 ? 3 : t >= 40 ? 2 : 1;
   };
+  const sigGlyph = b => '▂▄▆█'.slice(0, Math.max(1, b));
 
   /* 结算行:每次有后果的选择后打;首条时延=验证项 2 子项 */
   function telemetry(parts){
@@ -47,14 +52,26 @@ const ENGINE = (() => {
     logEv('telemetry', { line });
   }
 
-  /* 动作结算。cost:{bat,trace,slots,val,mins} */
+  /* 动作结算。cost:{bat,trace,slots,val,mins}
+     电量扣除必须可见:结算行永远带「−X → 余量%」。 */
   function act(name, cost, extraParts){
     const parts = [name];
-    if (cost.bat){ S.battery = Math.max(0, S.battery - cost.bat); parts.push('电量 −' + cost.bat); }
+    const barsBefore = sigBars();
+    if (cost.bat){
+      const before = S.battery;
+      S.battery = Math.max(0, S.battery - cost.bat);
+      parts.push('电量 −' + cost.bat + ' → ' + S.battery + '%');
+      if (before >= 20 && S.battery < 20) parts.push('省电模式。判定 −15');
+      if (S.battery === 0) S.powerOut = true;   // 力竭:content 在 afterAction 收束
+    }
     if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
       S.cacheVisible = true; parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
-    if (cost.trace) S.trace = Math.min(120, S.trace + cost.trace);
+    if (cost.trace){ S.trace = Math.min(120, S.trace + cost.trace);
+      if (S.signalVisible) parts.push('信号 ▲'); }
     S.clock += (cost.mins ?? 4);
+    const barsAfter = sigBars();
+    if (S.signalVisible && barsAfter !== barsBefore)
+      parts.push('信号 ' + sigGlyph(barsAfter) + ' ' + barsAfter + '格');
     if (extraParts) parts.push(...extraParts);
     telemetry(parts);
     LCD.applyTier(S.showtime ? (S.showtimeBars >= 4 ? 95 : 80) : S.trace);
@@ -76,12 +93,13 @@ const ENGINE = (() => {
     const lossPct = 10 + Math.floor(Math.random() * 11);
     const lost = Math.round(S.cacheVal * lossPct / 100);
     S.battery = Math.max(0, S.battery - 20);
+    if (S.battery === 0) S.powerOut = true;
     S.cacheVal = Math.max(0, S.cacheVal - lost);
     S.trace = Math.min(120, S.trace + 10);
     return { lossPct, lost };
   }
 
-  /* 活规则(秘匿):03:00–03:14 窗口内回复任何消息=违规 */
+  /* 活规则(秘匿):03:00–03:14 窗口内回复任何消息=违规(拨打电话不算回复) */
   const RULE = { from: 3 * 60, to: 3 * 60 + 14 };
   const inWindow = () => S.clock >= RULE.from && S.clock <= RULE.to;
   function violate(){
@@ -97,20 +115,20 @@ const ENGINE = (() => {
   /* 反馈导出(跑测记录表的自动化) */
   function exportFeedback(){
     return JSON.stringify({
-      version: 'M2-slice-0.1',
+      version: 'M2-slice-0.2',
       firstTelemetryMs: S.firstTelemetry,
       predictions: S.predictions,
       calib: S.calib,
       violations: S.violations,
       evidence: Object.keys(S.evidence),
       reasons: S.reasons, lastWords: S.lastWords,
-      ending: S.dead ? 'captured' : S.alive ? 'disconnected' : 'incomplete',
+      ending: S.alive ? 'disconnected' : S.dead ? (S.exhausted ? 'exhausted' : 'captured') : 'incomplete',
       causeOfDeath: S.causeOfDeath,
       cacheVal: S.cacheVal, battery: S.battery, clock: fmtClock(S.clock),
       log: S.log
     }, null, 1);
   }
 
-  return { S, fmtClock, batSegs, sigBars, telemetry, act, roll, downgradeFail,
+  return { S, fmtClock, batSegs, sigBars, sigGlyph, telemetry, act, roll, downgradeFail,
            inWindow, violate, setClock, logEv, exportFeedback, RULE };
 })();
