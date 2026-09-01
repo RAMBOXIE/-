@@ -99,8 +99,10 @@ const ENGINE = (() => {
     return { lossPct, lost };
   }
 
-  /* 活规则(秘匿):03:00–03:14 窗口内回复任何消息=违规(拨打电话不算回复) */
+  /* 活规则(秘匿):窗口内回复任何消息=违规(拨打电话不算回复)。
+     A 局 03:00–03:14;B 局由 content 按 runCount 重摇(setRule)。 */
   const RULE = { from: 3 * 60, to: 3 * 60 + 14 };
+  function setRule(from, to){ RULE.from = from; RULE.to = to; }
   const inWindow = () => S.clock >= RULE.from && S.clock <= RULE.to;
   function violate(){
     S.violations++;
@@ -112,10 +114,11 @@ const ENGINE = (() => {
   /* 拨表:事件自带时间戳 */
   function setClock(h, m){ S.clock = h * 60 + m; }
 
-  /* 反馈导出(跑测记录表的自动化) */
-  function exportFeedback(){
+  /* 反馈导出(跑测记录表的自动化);extra = content 注入的场景层字段 */
+  function exportFeedback(extra){
     return JSON.stringify({
-      version: 'M2-slice-0.2',
+      version: 'M2-slice-0.3',
+      ...(extra || {}),
       firstTelemetryMs: S.firstTelemetry,
       predictions: S.predictions,
       calib: S.calib,
@@ -130,5 +133,5 @@ const ENGINE = (() => {
   }
 
   return { S, fmtClock, batSegs, sigBars, sigGlyph, telemetry, act, roll, downgradeFail,
-           inWindow, violate, setClock, logEv, exportFeedback, RULE };
+           inWindow, violate, setClock, setRule, logEv, exportFeedback, RULE };
 })();

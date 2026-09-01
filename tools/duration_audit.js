@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-const SRC = ['js/lcd.js', 'js/engine.js', 'js/content.js']
+const SRC = ['js/lcd.js', 'js/save.js', 'js/engine.js', 'js/content.js']
   .map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n;\n');
 
 /* ---------------- 画像 ---------------- */
@@ -28,6 +28,9 @@ const PERSONAS = [
 
 /* ---------------- 强制等待表(秒,真实计时器/动画时长) ---------------- */
 const WAIT = {
+  bootB:      1.5,   // B 局锁屏一划(仪式压缩)
+  e5voice:    19,    // E5 语音备忘转写播放(18s)
+  residue:    6,     // 遗言独屏逐字打出
   boot:       6.6,   // 握手动画 4.6s 自动跳转 + connect 进度条 ≈2s
   dialZhou:   1.0,   // 老周 900ms 铃声 → 停机
   dialMom:    5.5,   // 妈 5500ms 铃声 → 无人接听
@@ -41,7 +44,7 @@ const WAIT = {
 };
 
 /* ---------------- 桩环境 + 计量 hook ---------------- */
-function runScenario(name, driverFn){
+function runScenario(name, driverFn, saveObj){
   let FAKE_T = 1000;
   const perf = { now: () => FAKE_T };
   function ctxStub(){
@@ -54,12 +57,18 @@ function runScenario(name, driverFn){
     };
   }
   const canvasStub = () => ({ width: 0, height: 0, getContext: () => ctxStub() });
+  const storage = { _m: Object.create(null),
+    getItem(k){ return k in this._m ? this._m[k] : null; },
+    setItem(k, v){ this._m[k] = String(v); },
+    removeItem(k){ delete this._m[k]; } };
+  if (saveObj) storage.setItem('escape_ai_save', JSON.stringify(saveObj));
   const env = {
     performance: perf,
     document: {
       getElementById: id => id === 'lcd' ? canvasStub() : null,
       createElement: () => canvasStub()
     },
+    localStorage: storage,
     addEventListener(){}, navigator: {},
     location: { reload(){} },
     OVERLAY: { show(cfg, cb){ cb({ text: '测试文本', kept: false }); }, text(){} },
@@ -71,14 +80,14 @@ function runScenario(name, driverFn){
   env.__collect = (LCD, ENGINE, CONTENT) => { env.__LCD = LCD; env.__ENGINE = ENGINE; env.__CONTENT = CONTENT; };
 
   const boot = new Function('window', 'document', 'performance', 'addEventListener',
-    'navigator', 'location', 'OVERLAY', 'APP', 'AUDIO',
+    'navigator', 'location', 'localStorage', 'OVERLAY', 'APP', 'AUDIO',
     '"use strict";' + SRC + ';\nwindow.__collect(LCD, ENGINE, CONTENT);');
   const RND0 = Math.random;
   Math.random = () => 0.5;    // 判定全成功、无伏击、无字符腐蚀噪声
   let audit;
   try {
     boot.call(env, env, env.document, perf, env.addEventListener,
-      env.navigator, env.location, env.OVERLAY, env.APP, env.AUDIO);
+      env.navigator, env.location, storage, env.OVERLAY, env.APP, env.AUDIO);
     const { __LCD: LCD, __ENGINE: ENGINE, __CONTENT: CONTENT } = env;
 
     /* ---- hook:文本出口计量 ---- */
@@ -343,13 +352,109 @@ const PATHS = [
       KF('1'); expect('report');                   // 回应无效 → 遗言 → 回收单
       KF('Enter'); KF('Enter'); frame();           // 三页读完
     }
+  },
+  {
+    id: 'D', name: '剧本B·A普通线继承·断连成功',
+    save: {                                        // A 普通线死亡存档(与 driveB 同构)
+      runCount: 1, lastEnding: 'captured',
+      evidence: ['E1', 'E2', 'E3', 'E4'], caseOpen: true,
+      clues: { ruleShape: true, ruleParam: true }, riskLabels: true,
+      deletedVisitedA: true, recsA: ['rec047', 'rec012'],
+      lastCacheVal: 2270, lastReason: '我想看看那扇门后面有什么', lastReasonKept: false,
+      lastWords: '别信秒回的', violationsA: 1,
+      bottleRead: false, bottleTaken: false, bottleReply: null, bottleSealed: null,
+      attribution: null, vault: null, residueClaimed: false, disposal: null,
+      memGiven: false, predsA: [], predsB: []
+    },
+    waits: ['bootB', 'e5voice', 'residue', 'upload92'],
+    decisions: [
+      '任务卡:主目标',
+      '漂流瓶:取走', '漂流瓶:致谢', '漂流瓶:关闭方式',
+      '采样协议:回/不回',
+      'D1 饵:标记可信与否',
+      '试炼:回复 vs 关闭', '试炼回复:选哪句',
+      '归因:三选/自由',
+      '已删除:进入', '理由(进已删除)',
+      '旧机:读取写入', '旧机:回收方式',
+      '处置:三选', '处置理由',
+      '掉落归属:缓存/保险箱',
+      '清洗:用/不用', '封瓶:三选', '封瓶:一句话'
+    ],
+    drive(io){
+      const { K, KF, frame, advance, expect, CONTENT } = io;
+      const toMenu = () => {
+        for (let i = 0; i < 5 && CONTENT.currentId !== 'menu'; i++) K('Escape');
+        if (CONTENT.currentId !== 'menu') CONTENT.go('menu', true);
+        frame();
+      };
+      CONTENT.SCREENS.bootB.enter();
+      frame(); advance(1300); frame();
+      KF('Enter'); expect('goalB');
+      KF('2'); expect('inbox');
+      /* 漂流瓶(首行) */
+      KF('Enter'); expect('bottleIn');
+      KF('t'); KF('x'); KF('Escape'); expect('inbox');
+      /* 协议 B */
+      KF('ArrowDown'); KF('Enter'); expect('th_proto');
+      KF('1'); KF('Enter'); expect('inbox');
+      /* 备忘 4 条(口诀 + 踩饵) */
+      KF('Escape'); expect('menu');
+      KF('4'); expect('memoList');
+      KF('1'); expect('memo1'); KF('Enter');
+      KF('2'); expect('memo2'); KF('Enter');
+      KF('3'); expect('memo3'); KF('Enter');
+      KF('4'); expect('memo4');
+      KF('b'); KF('Escape'); expect('memoList');
+      KF('Escape'); expect('menu');
+      /* 时钟自然越过窗口起点 → 试炼(踩坑)→ 归因 */
+      KF('2'); expect('contacts');
+      KF('Escape'); expect('trialB');
+      KF('1'); expect('trialReply');
+      KF('1'); expect('trialB');
+      KF('2'); expect('menu');
+      /* 柔柔局间消息(对照重读) */
+      KF('1'); expect('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
+      KF('1');
+      KF('Escape'); expect('inbox');
+      /* 已删除:理由伏击 → 预测 → 旧机 → E5 → 真相 */
+      KF('Escape'); expect('menu');
+      KF('7'); expect('deletedConfirm');
+      KF('1'); expect('deleted');
+      KF('Enter'); expect('predict'); KF('Enter'); expect('deleted');
+      KF('ArrowDown'); KF('Enter'); expect('oldPhone');
+      KF('1'); expect('residueRead');
+      advance(6500);
+      KF('Escape'); expect('oldPhone');
+      KF('2'); expect('deleted');
+      KF('Enter'); expect('e5voice');
+      advance(19500);
+      KF('Escape'); expect('truth');
+      KF('Enter'); KF('Enter'); expect('deleted');
+      KF('Escape'); expect('menu');
+      /* 处置(在她的线程内)→ 解封 → 掉落 */
+      KF('1'); expect('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
+      KF('D'); expect('disposal');
+      KF('1'); expect('unveil');
+      KF('Enter'); expect('lootDrop');
+      KF('2'); expect('th_rou');
+      toMenu();
+      /* 收束:清洗 → 上传 → 断连成功 → 封瓶 */
+      KF('6'); expect('tools');
+      KF('c'); frame();
+      KF('1'); expect('upload92B');
+      advance(2400); expect('sealBottle');
+      KF('3'); expect('receiptFull');
+      frame();
+    }
   }
 ];
 
 /* ================= 运行 + 汇总 ================= */
 const results = [];
 for (const p of PATHS){
-  const audit = runScenario(p.id + ' ' + p.name, p.drive);
+  const audit = runScenario(p.id + ' ' + p.name, p.drive, p.save);
   const readChars = Math.round(audit.total);
   const forcedWaitSec = p.waits.reduce((s, w) => s + WAIT[w], 0);
   const topScreens = [...audit.perScreenChars.entries()]
@@ -390,6 +495,13 @@ line('-');
 for (const r of results){
   console.log(pad(r.id + ' ' + r.name, 26) +
     PERSONAS.map(p => pad(r.minutes[p.name].total.toFixed(1), 8)).join(''));
+}
+/* 会话口径:A 局全内容(C)+ 剧本 B(D)。红线 ≥24min(规格 v0.2) */
+const rc = results.find(r => r.id === 'C'), rd = results.find(r => r.id === 'D');
+if (rc && rd){
+  line('-');
+  console.log(pad('会话 = C + D(红线 ≥24)', 26) +
+    PERSONAS.map(p => pad((rc.minutes[p.name].total + rd.minutes[p.name].total).toFixed(1), 8)).join(''));
 }
 
 for (const r of results){

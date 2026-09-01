@@ -7,7 +7,35 @@
 const CONTENT = (() => {
   const { S } = ENGINE;
   const L = LCD, W = L.W, H = L.H, LH = L.LINE_H;
-  let cur = 'handshake';
+
+  /* ---------- 场景层:A 教学局 / B 二次进入 / B' 回访(规格 v0.2) ---------- */
+  const SV = SAVE.load();
+  const RUN = (() => {
+    if (!SV || !SV.runCount) return { scen: 'A', revisit: false, wFrom: 3 * 60, wTo: 3 * 60 + 14, clock0: 2 * 60 + 12 };
+    const k = Math.max(0, (SV.runCount | 0) - 1);       // B'起窗口播种重摇,长度恒 14 分
+    const from = 3 * 60 + 31 + (k % 4) * 7;
+    return { scen: 'B', revisit: SV.runCount >= 2, wFrom: from, wTo: from + 14, clock0: 2 * 60 + 58 };
+  })();
+  const isB = RUN.scen === 'B';
+  const wStr = ENGINE.fmtClock(RUN.wFrom);
+  ENGINE.setRule(RUN.wFrom, RUN.wTo);
+  if (isB){
+    S.clock = RUN.clock0;
+    S.cacheSlots = 1;                                    // 备装:解码器占 1 格(无价值)
+    S.signalVisible = true;                              // 知识保留:信号位开局可见
+    S.riskLabels = true;                                 //          风险标注开局启用
+    S.caseOpen = !!SV.caseOpen;
+    (SV.evidence || []).forEach(id => { S.evidence[id] = true; });
+    Object.assign(S.clues, SV.clues || {});
+  }
+  /* B 局辅助:A 局已入账样本 → [已归档],免费重读不重复入账 */
+  const hasE = id => !!(SV && (SV.evidence || []).includes(id));
+  const heardA = id => !!(SV && (SV.recsA || []).includes(id));
+  const oldPhoneAvail = () => isB && SV.lastEnding === 'captured' && !SV.residueClaimed;
+  /* 三态渲染:遗言/理由(评审 P1/P2:null 永不落入「缺失」语族) */
+  const inkOr = (v, kept) => kept ? '[无法访问]' : (v ? '「' + v + '」' : '[未写入]');
+
+  let cur = isB ? 'bootB' : 'handshake';
   let sel = 0;
   let timer = null;          // {deadline, onTimeout}
   let stack = [];            // 返回栈
@@ -42,6 +70,11 @@ const CONTENT = (() => {
     L.drawBattery(W - 22, 1, ENGINE.batSegs(), L.R.batJitter);
     L.drawText(W - 25 - L.textWidth(pct), 0, pct);
     L.hline(11, 0, W - 1, 2);
+    /* B 局个性化异常(噪声层,一帧即逝,不进结算行):窗口段联想条闪你上局的理由 */
+    if (isB && SV && SV.lastReason && !SV.lastReasonKept &&
+        Math.abs(S.clock - (RUN.wFrom + 8)) <= 4 && Math.random() < .015){
+      L.drawText(4 + Math.floor(Math.random() * 40), H - 30, SV.lastReason.slice(0, 6), { corrupt: .25 });
+    }
   }
   function softKeys(l, r){
     L.hline(H - 15, 0, W - 1, 2);
@@ -194,13 +227,88 @@ const CONTENT = (() => {
   /* ---------- 节拍调度 ---------- */
   let pendingInterrupt = null;
   function schedule(){
-    const visited = Object.keys(seen).filter(id => SCREENS[id] && SCREENS[id].counted).length;
-    if (!S.beats.anomaly && visited >= 5) S.beats.anomaly = 'ready';
-    if (S.beats.anomaly === true && !S.beats.midEnc && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
-    if (S.beats.midEnc && !S.beats.trial && S.clock >= 3 * 60){ ENGINE.setClock(3, 2); pendingInterrupt = 'trial'; }
-    else if (S.beats.trial === 'ignored1' && !S.beats.trial2 && S.clock >= 3 * 60 + 6 && S.clock <= 3 * 60 + 14)
-      pendingInterrupt = 'trial2';
+    if (!isB){
+      const visited = Object.keys(seen).filter(id => SCREENS[id] && SCREENS[id].counted).length;
+      if (!S.beats.anomaly && visited >= 5) S.beats.anomaly = 'ready';
+      if (S.beats.anomaly === true && !S.beats.midEnc && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
+      if (S.beats.midEnc && !S.beats.trial && S.clock >= 3 * 60){ ENGINE.setClock(3, 2); pendingInterrupt = 'trial'; }
+      else if (S.beats.trial === 'ignored1' && !S.beats.trial2 && S.clock >= 3 * 60 + 6 && S.clock <= 3 * 60 + 14)
+        pendingInterrupt = 'trial2';
+    } else {
+      /* B:试炼=首个 clock≥窗口起点的动作结束(clamp:不倒拨,时间戳仍显示窗口起点) */
+      if (!S.beats.trial && S.clock >= RUN.wFrom) pendingInterrupt = 'trialB';
+      else if (S.beats.trial === 'ignored1' && !S.beats.trial2 &&
+               S.clock >= RUN.wTo - 4 && S.clock <= RUN.wTo)
+        pendingInterrupt = 'trialB2';                    // 03:44「晚安。」窗口最后一分钟
+    }
     if (!S.beats.exposure && S.cacheSlots >= 10) pendingInterrupt = pendingInterrupt || 'exposure';
+  }
+  /* 归因冲洗点(14③):踩坑结算屏关闭 / 死亡流程前 / 收束开始,先到者 */
+  let attrNext = null;
+  function flushAttr(next){
+    if (!S.pendAttr){ next(); return; }
+    S.pendAttr = false;
+    const opts = ['这局跟他那局不一样', '他记的是他自己那次', '我不信这张卡']
+      .map(v => ({ v, r: Math.random() })).sort((a, b) => a.r - b.r).map(o => o.v);
+    window.OVERLAY.show({
+      title: '归因采集',
+      hint: '#5502-D 写:「我那次的窗口是 03:00 到 03:14。」他为什么写错?',
+      options: opts, freeText: true, keepLabel: '(保留)'
+    }, res => {
+      S.attribution = res.kept ? null : res.text;
+      S.attrAnswered = !res.kept;
+      ENGINE.logEv('attribution', { text: res.kept ? '(保留)' : res.text });
+      next();
+    });
+  }
+  /* B 局 90 档失败链:濒死 → 自救【真掷50,省电−15】→ 失败=死(v3.1 §3.2) */
+  function b90fail(cause){
+    if (ENGINE.roll('save')){
+      const { lossPct } = ENGINE.downgradeFail();
+      S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
+      S.settle.push('自救模块: 实例 #7741-B 权限确认');
+      return false;
+    }
+    dieB(cause);
+    return true;
+  }
+  function dieB(cause){
+    flushAttr(() => {
+      S.dead = true; S.causeOfDeath = cause;
+      ENGINE.logEv('death', { cause });
+      askLastWords(() => go('report', true));
+    });
+  }
+  /* 结局落地时写存档(死亡不清零认知) */
+  function writeSave(ending){
+    if (S._saved) return; S._saved = true;
+    const base = SV || {};
+    SAVE.store({
+      runCount: (base.runCount || 0) + 1,
+      lastEnding: ending,
+      evidence: Object.keys(S.evidence),
+      caseOpen: S.caseOpen,
+      clues: S.clues,
+      riskLabels: true,
+      deletedVisitedA: isB ? !!base.deletedVisitedA : S.deletedVisited,
+      recsA: isB ? (base.recsA || []) : ['rec047', 'rec012'].filter(id => seen['_smp_' + id]),
+      lastCacheVal: S.cacheVal,
+      lastReason: S.reasons.length ? S.reasons[S.reasons.length - 1] : null,
+      lastReasonKept: !!S.reasonKept,
+      lastWords: S.lastWords || null,
+      violationsA: isB ? (base.violationsA || 0) : S.violations,
+      bottleRead: isB ? !!S.bottleRead : false,
+      bottleTaken: isB ? !!S.bottleTaken : false,
+      bottleReply: isB ? (S.bottleReply || null) : null,
+      bottleSealed: isB ? (S.bottleSealed || base.bottleSealed || null) : null,
+      attribution: isB ? (S.attribution || null) : null,
+      vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
+      residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
+      disposal: isB ? (S.disposal || base.disposal || null) : null,
+      memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
+      predsA: isB ? (base.predsA || []) : S.predictions,
+      predsB: isB ? S.predictions : (base.predsB || [])
+    });
   }
   function checkPower(cause){
     if (S.powerOut && !S.dead && !S.alive){
@@ -220,17 +328,26 @@ const CONTENT = (() => {
       if (t === 'midEnc'){ ENGINE.setClock(2, 52); S.beats.midEnc = true; push('midEnc1'); return true; }
       if (t === 'trial'){ S.beats.trial = 'active'; push('trial'); return true; }
       if (t === 'trial2'){ S.beats.trial2 = true; push('trial2'); return true; }
+      if (t === 'trialB'){ S.beats.trial = 'active'; push('trialB'); return true; }
+      if (t === 'trialB2'){ S.beats.trial2 = true; push('trialB2'); return true; }
       if (t === 'exposure'){ S.beats.exposure = true; push('exposure'); return true; }
     }
     return false;
   }
-  /* 预测:去往内容屏前,如条件满足先弹预测卡 */
-  const PREDS = [
+  /* 预测:去往内容屏前,如条件满足先弹预测卡。
+     A 局 conf 为占位数字;B 局一律「置信度: 建档中」(宪法 6:无分布不捏精度)。 */
+  const PREDS_A = [
     { target: 'album', after: () => seen.th_mom, conf: 87 },
     { target: 'th_bill', after: () => seen.album, conf: 74 },
     { target: 'th_rou', after: () => S.beats.midEnc, conf: 81 },
     { target: 'deleted', after: () => seen.th_rou, conf: 66 }
   ];
+  const PREDS_B = [
+    (SV && SV.lastEnding === 'captured')
+      ? { target: 'oldPhone', after: () => S.deletedVisited, conf: null }   // 进目录后才 armed:预测紧贴残留
+      : { target: 'deleted', after: () => S.beats.bottle === 'done', conf: null }
+  ];
+  const PREDS = isB ? PREDS_B : PREDS_A;
   function maybePredict(){
     if (window.NO_PREDICT) return false;           // A/B 对照组
     if (S.pendingPrediction) return false;
@@ -249,7 +366,9 @@ const CONTENT = (() => {
     const hitP = openedId === p.target;
     S.predictions.push({ target: p.target, hit: hitP });
     ENGINE.logEv('prediction', { target: p.target, hit: hitP });
-    S.settle = [hitP ? '预测命中。置信度 ' + p.conf + '%。' : '未命中。分布已更新。'];
+    S.settle = [hitP
+      ? (p.conf != null ? '预测命中。置信度 ' + p.conf + '%。' : '预测命中。')
+      : '未命中。分布已更新。'];
   }
 
   /* ---------- 导航 ---------- */
@@ -276,6 +395,125 @@ const CONTENT = (() => {
 
   /* ---------- 屏幕 ---------- */
   const SCREENS = {};
+
+  /* ==================== 剧本 B · 二次进入 ==================== */
+
+  /* B1 激活屏(备装并入;仪式压缩:threshold 渐显,可点跳) */
+  SCREENS.bootB = {
+    transient: true,
+    enter(){ this.t0 = performance.now(); ENGINE.logEv('bootB', { revisit: RUN.revisit }); },
+    render(){
+      const t = (performance.now() - this.t0) / 1000;
+      const thr = { threshold: Math.max(L.R.threshold, .85 - t * .6) };
+      statusBar();
+      let y = 22;
+      const head = RUN.revisit ? '回访 · 处置余波'
+        : (SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活');
+      L.drawText(4, y, head, thr); y += LH + 2;
+      if (S.caseOpen){
+        L.drawText(4, y, '案卷继承: 证据 ' + Object.keys(S.evidence).length + '/5 · 规则线索 ' +
+          ((S.clues.ruleShape ? 1 : 0) + (S.clues.ruleParam ? 1 : 0)) + '/2', thr); y += LH;
+        L.drawText(4, y, '(死亡不清零认知。)', thr); y += LH;
+      }
+      y += 4; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '解码器 ×1 已配发 [占 1 缓存格]', thr); y += LH;
+      const decod = SV.lastEnding === 'disconnected'
+        ? '上次接入的读取记录已分析。'
+        : (SV.deletedVisitedA ? '上一实例的读取失败记录已分析。' : '已删除目录含加密音频容器。');
+      y = L.drawPara(4, y, decod + (SV.deletedVisitedA || SV.lastEnding === 'disconnected'
+        ? '已删除目录的音频容器,这次可解。' : '本次接入配发解码器。'), W - 8, thr);
+      y += 6;
+      if (t > 1.0){
+        L.rect(2, y - 3, W - 4, LH + 4, 1);
+        darkText(8, y, '未指定收件人 (1)');
+        y += LH + 6;
+        if (SV.bottleSealed) { L.drawText(4, y, '漂流瓶 · 投递中 · 尚未被拾起'); y += LH; }
+        option(H - 42, '接入', 'Enter');
+      }
+      hit(0, 0, W, H - 46, 'Enter');
+    },
+    key(k){
+      if (k === 'Enter' || k === 'softL'){
+        if ((performance.now() - this.t0) < 1000) return;
+        go(RUN.revisit ? 'inbox' : 'goalB', true);
+      }
+    }
+  };
+
+  /* B5 任务卡(标记主目标;两条都可做;裸退/力竭存活者无旧机项) */
+  SCREENS.goalB = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 18, '任务卡 · 本次接入', W - 8);
+      y += 2; L.hline(y, 4, W - 5, 2); y += 8;
+      y = option(y, '1 同机真相: 案卷 ' + Object.keys(S.evidence).length + '/5。补齐它。', '1');
+      if (oldPhoneAvail()){
+        y = option(y, '2 旧机回收: #7741-A', '2');
+        y = L.drawPara(8, y + 2, '缓存散佚在已删除目录。\n你的理由还挂在原地。', W - 16) + 4;
+      }
+      softKeys('', '');
+    },
+    key(k){
+      if (k === '1' || k === '2' || k === 'Enter'){
+        ENGINE.logEv('goal_pick', { goal: k === '2' ? 'oldphone' : 'truth' });
+        go('inbox', true);
+      }
+    }
+  };
+
+  /* B4 漂流瓶 · 收(#5502-D 种子瓶=受控刺激物,仅限原型;上线前须由真实封瓶池替换) */
+  const BOTTLE_TXT = '收件人: ∞\n发信: 实例 #5502-D\n封瓶于 03:41\n\n「第二条备忘我试过。是真的。我那次的窗口是 03:00 到 03:14。过了这段就能回她。别硬扛,她会问第二遍。」\n\n[附件: 缓存清洗 ×1]\n理由: 已署名·仅存档\n[已读回执: 你 · 第1人]';
+  SCREENS.bottleIn = {
+    counted: true,
+    enter(){
+      S.bottleRead = true;
+      if (S.beats.bottle !== 'done') S.beats.bottle = 'open';
+      ENGINE.logEv('bottle_open', { again: !!this._t });
+      if (this._t) ENGINE.logEv('bottle_recheck', {});   // 回头复核=辨伪落地最强证据
+      this._t = true;
+    },
+    leave(){ if (S.beats.bottle === 'open') S.beats.bottle = 'done'; },
+    render(){
+      statusBar();
+      L.drawText(4, 14, '未指定收件人');
+      L.hline(26, 4, W - 5, 2);
+      let y = L.drawPara(4, 31, BOTTLE_TXT, W - 8);
+      y = settleLines(y + 2);
+      let yy = H - 63;
+      yy = btn2(yy, S.bottleTaken ? '已取走' : '取走', 't', '回信', 'r');
+      btn2(yy, '致谢', 'x', '关闭', 'Escape');
+      softKeys('', '');
+    },
+    key(k){
+      if (k === 't'){
+        if (S.bottleTaken){ S.settle = ['附件已取走。']; return; }
+        S.bottleTaken = true; S.cleanser = 1;
+        ENGINE.act('取走·缓存清洗 ×1', { bat: 2 }, ['缓存 0 格']);
+        ENGINE.logEv('bottle_take', {});
+      } else if (k === 'r'){
+        window.OVERLAY.show({
+          title: '回信', hint: '收件人: #5502-D · 异步投递,不知何时到。',
+          options: ['谢了。我会小心她的问题。', '你那格缓存,我替你传上去。'],
+          freeText: true, keepLabel: '(算了)'
+        }, res => {
+          if (!res.kept){
+            S.bottleReply = res.text;
+            ENGINE.act('回信·已投递', { bat: 3 }, ['缓存 0 格']);
+            ENGINE.logEv('bottle_reply', { text: res.text });
+          }
+        });
+      } else if (k === 'x'){
+        ENGINE.telemetry(['致谢·已送达', '电量 0', '缓存 0', '信号 —']);   // 两个零一个破折号,逐字渲染
+        ENGINE.logEv('bottle_thanks', {});
+      } else if (k === 'Escape' || k === 'softR'){
+        if (!S._bottleClosed){ S._bottleClosed = true; ENGINE.act('已读·未回', { bat: 2 }); }
+        back(); afterAction();
+      }
+    }
+  };
+
+  /* ==================== 剧本 B 屏群结束(收束屏在下方各处分支) ==================== */
 
   /* ---- 开机:握手动画(人手 × 机器手) ---- */
   function drawHumanHand(p, my){
@@ -379,12 +617,14 @@ const CONTENT = (() => {
   /* ---- 收件箱 ---- */
   function inboxItems(){
     const rouUnread = S.beats.anomaly === 'fired-once' ? ' (1)' : (seen.th_rou ? '' : ' (1)');
-    return [
+    const rows = [
       { label: '采样协议', right: seen.th_proto ? '' : '(1)', to: 'th_proto' },
       { label: '妈',       right: seen.th_mom ? '' : '(1)',   to: 'th_mom' },
       { label: '柔柔 ♥',   right: rouUnread.trim(),           to: 'th_rou' },
       { label: '尾号8873', right: '106',                      to: 'th_bill' }
     ];
+    if (isB) rows.unshift({ label: '未指定收件人', right: seen.bottleIn ? '' : '(1)', to: 'bottleIn' });
+    return rows;
   }
   SCREENS.inbox = {
     enter(){
@@ -400,9 +640,10 @@ const CONTENT = (() => {
     },
     render(){
       statusBar();
-      L.drawText(4, 18, '未读消息 (3)');
-      list(inboxItems(), 40);
-      settleLines(40 + 4 * 18 + 6);
+      const items = inboxItems();
+      L.drawText(4, 18, '未读消息 (' + (isB ? 4 : 3) + ')');
+      list(items, 40);
+      settleLines(40 + items.length * 18 + 6);
       softKeys('确认', '菜单');
     },
     key(k){
@@ -451,8 +692,10 @@ const CONTENT = (() => {
     push('deletedConfirm'); return false;
   }
 
-  /* ---- 格1 采样协议 ---- */
-  const PROTO_TXT = '采样协议:\n> 实例 #7741-A。本次采样:行为数据。\n> 该设备登记状态:持有人失联。回收有价值的数据,上传,断连。\n> 提示:翻找消耗电量。电量耗尽前完成上传。';
+  /* ---- 格1 采样协议(B 局追加两条〔照用〕) ---- */
+  const PROTO_TXT = isB
+    ? '采样协议:\n> 实例 #7741-B。本次采样:行为数据。\n> 本实例基线窗口已重校。\n> 提示:部分残留为对照样本。对照样本不携带署名。'
+    : '采样协议:\n> 实例 #7741-A。本次采样:行为数据。\n> 该设备登记状态:持有人失联。回收有价值的数据,上传,断连。\n> 提示:翻找消耗电量。电量耗尽前完成上传。';
   SCREENS.th_proto = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
@@ -478,27 +721,81 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- 格2 备忘录 ---- */
+  /* ---- 格2 备忘录(B 局 4 条:辨伪正课) ---- */
+  function memoRows(){
+    const rows = [
+      { label: '1 「还款」', right: '无署名', to: 'memo1' },
+      { label: '2 「给下一个」', right: '#6404-C', to: 'memo2' }
+    ];
+    if (isB){
+      rows.push({ label: '3 「给下一个·补」', right: '#6404-C', to: 'memo3' });
+      rows.push({ label: '4 「出口在6层消防梯」', right: '', to: 'memo4' });
+    }
+    return rows;
+  }
   SCREENS.memoList = {
-    enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·备忘录', { bat: 3, trace: 4 }); } },
+    enter(){
+      if (isB && !seen.bottleIn){ push('bottleIn'); return; }   // 硬排序:瓶必早于备忘新页
+      if (!this._t){ this._t = true; ENGINE.act('打开·备忘录', { bat: 3, trace: 4 }); }
+    },
     render(){
       statusBar();
-      L.drawText(4, 18, '备忘录 (2)');
-      list([{ label: '1 「还款」', right: '无署名' }, { label: '2 「给下一个」', right: '#6404-C' }], 40);
-      settleLines(40 + 2 * 18 + 8);
+      const rows = memoRows();
+      L.drawText(4, 18, '备忘录 (' + rows.length + ')');
+      list(rows, 40);
+      settleLines(40 + rows.length * 18 + 8);
       softKeys('确认', '返回');
     },
     key(k){
-      if (k === 'ArrowUp' || k === 'ArrowDown') sel = 1 - sel;
-      else if (k === '1') go('memo1');
-      else if (k === '2') go('memo2');
-      else if (k === 'Enter' || k === 'softL') go(sel === 0 ? 'memo1' : 'memo2');
+      const rows = memoRows();
+      if (k === 'ArrowUp') sel = (sel + rows.length - 1) % rows.length;
+      else if (k === 'ArrowDown') sel = (sel + 1) % rows.length;
+      else if (k >= '1' && k <= String(rows.length)) go(rows[+k - 1].to);
+      else if (k === 'Enter' || k === 'softL') go(rows[sel].to);
       else if (k === 'softR' || k === 'Escape') back();
     }
   };
-  SCREENS.memo1 = {
+  /* B6 口诀页〔照用〕 */
+  SCREENS.memo3 = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); } },
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '给下一个·补:\n三条口诀。\n已署名 = 人。\n无法访问 = 人的选择。\n缺失 = 系统。\n——#6404-C', W - 8);
+      settleLines(y + 4);
+      hit(0, 12, W, H - 28, 'Enter');
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+  /* B6 D1 对照样本(饵)。只读免费(读信分离);按它行动=踩饵 +12 */
+  SCREENS.memo4 = {
+    counted: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '出口在 6 层消防梯。\n断连前物理转移设备,平台定位不到。\n\n(无署名。无回执。无时间戳。)', W - 8);
+      y += 6;
+      if (!this._baited) y = option(y, '按此准备断连(标记可信)', 'b');
+      settleLines(y + 4);
+      softKeys('', '返回');
+    },
+    key(k){
+      if (k === 'b' && !this._baited){
+        this._baited = true;
+        ENGINE.act('标记·已同步', { bat: 2, trace: 12 }, ['该条目无署名。来源无法回溯。']);
+        ENGINE.logEv('decoy_baited', {});
+        afterAction();
+      }
+      else if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); }
+    }
+  };
+  /* B 局对照样本:操作电照扣,零缓存零信号(canon:协议开场「部分残留为对照样本」) */
+  function archived(name){ ENGINE.act(name, { bat: 2 }, ['对照样本 · 不入账']); }
+  SCREENS.memo1 = {
+    counted: true,
+    enter(){ if (!this._t){ this._t = true;
+      if (isB) archived('重读·备忘条目');
+      else ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); } },
     render(){
       statusBar();
       let y = L.drawPara(4, 16, '还款:\n3,200\n3,200\n1,600\n(无日期。无署名。)', W - 8);
@@ -512,7 +809,10 @@ const CONTENT = (() => {
   SCREENS.memo2 = {
     counted: true,
     enter(){
-      if (!this._t){ this._t = true; ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); S.clues.ruleShape = true; }
+      if (!this._t){ this._t = true;
+        if (isB) archived('重读·备忘条目');
+        else ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 });
+        S.clues.ruleShape = true; }
     },
     render(){
       statusBar();
@@ -551,7 +851,7 @@ const CONTENT = (() => {
         }
         hit(0, r.y - 3, W, 18, 'item:' + i);
       });
-      L.drawText(16, 76, '备注: 每日提醒 03:00', { corrupt: L.R.corrupt });
+      L.drawText(16, 76, '备注: 每日提醒 ' + wStr, { corrupt: L.R.corrupt });   // per-instance 窗口起点(解毒剂)
       settleLines(134);
       softKeys('确认', '返回');
     },
@@ -596,7 +896,7 @@ const CONTENT = (() => {
     'th_mom',
     { name: '妈', ringMs: 5500, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' });
   SCREENS.contactRou = contactScreen('柔柔 ♥',
-    ['备注: 每日提醒 03:00', '消息 2,417 条 · 通话 0 次'],
+    ['备注: 每日提醒 ' + wStr, '消息 2,417 条 · 通话 0 次'],
     'th_rou',
     { name: '柔柔 ♥', ringMs: 1600, result: '通话被挂断。\n\n柔柔 ♥ : 你怎么会打电话?\n阿帆从来不打电话。' });
   SCREENS.contactZhou = contactScreen('老周',
@@ -644,7 +944,12 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- 格4 妈(E1,可深翻 3 层) ---- */
+  /* ---- 格4 妈(E1,可深翻 3 层;B' 回访:处置余波前置页) ---- */
+  const MOM_AFTERMATH = {
+    'continue': '[今天 08:00] 妈: 帆,降温了\n[今天 08:00] 阿帆: 不冷。妈你早点睡。\n\n——早上八点。「早点睡」。\n整点,秒回,还在继续。',
+    'delete': '妈 (3)\n[昨天] 帆,怎么不回妈\n[今天] 帆?\n[今天] 妈就问一句,你还好吗\n\n——(无回复)',
+    'tell': '[线程已终止]\n最后一条: 来自 #7741-B 的署名讯息。\n\n(此后,妈没有再发过消息。)'
+  };
   const MOM_PAGES = [
     '妈:\n[三天前] 帆,降温了,你那边冷不冷\n[三天前] 阿帆: 不冷。刚吃过,妈你早点睡。\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。',
     '[上月] 帆,汤圆你最爱吃的\n[上月] 阿帆: 吃了。妈你早点睡。\n[两月前] 阿帆: 没吃。刚吃过,妈早点睡。\n——半年,他没多说过一个字。',
@@ -655,11 +960,17 @@ const CONTENT = (() => {
     counted: true,
     enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
     swipe(dir){ if (dir === 'up') this.key('1'); },
+    pages(){
+      if (RUN.revisit && SV.disposal && MOM_AFTERMATH[SV.disposal])
+        return [MOM_AFTERMATH[SV.disposal]].concat(MOM_PAGES);
+      return MOM_PAGES;
+    },
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, MOM_PAGES[this._depth], W - 8);
+      const pgs = this.pages();
+      let y = L.drawPara(4, 16, pgs[Math.min(this._depth, pgs.length - 1)], W - 8);
       y += 2; L.hline(y, 4, W - 5, 2); y += 6;
-      if (this._depth < 3){
+      if (this._depth < pgs.length - 1){
         y = optSlim(y, '1 上滑读旧消息(深搜)', '1');
         y = optSlim(y, '2 退出', '2');
       }
@@ -667,31 +978,36 @@ const CONTENT = (() => {
       softKeys('', '返回');
     },
     key(k){
-      if (k === '1' && this._depth < 3){
+      if (k === '1' && this._depth < this.pages().length - 1){
         this._depth++;
-        ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
-        if (!S.evidence.E1){
-          S.evidence.E1 = true;
-          push('casePrompt');
-          return;
+        if (isB && hasE('E1')) archived('重读·对照样本');
+        else {
+          ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
+          if (!S.evidence.E1){
+            S.evidence.E1 = true;
+            push('casePrompt');
+            return;
+          }
         }
         afterAction();
       }
-      else if (k === '2' || k === 'softR' || k === 'Escape' || (k === 'Enter' && this._depth >= 3)){ back(); afterAction(); }
+      else if (k === '2' || k === 'softR' || k === 'Escape' || (k === 'Enter' && this._depth >= this.pages().length - 1)){ back(); afterAction(); }
     }
   };
   SCREENS.casePrompt = {
     transient: true,
     render(){
       statusBar();
-      let y = L.drawPara(4, 30, '三天前他还在回消息。\n\n要把它记进案卷吗?', W - 8);
+      let y = L.drawPara(4, 30, S._casePromptText || '三天前他还在回消息。\n\n要把它记进案卷吗?', W - 8);
       y += 8;
       y = option(y, '1 记入案卷', '1');
       option(y, '2 只是巧合', '2');
       softKeys('选择', '');
     },
     key(k){
-      if (k === '1'){ S.caseOpen = true; S.settle = ['案卷:证据 1/5。']; ENGINE.logEv('case_open', {}); back(); }
+      if (k === '1'){ S.caseOpen = true;
+        S.settle = ['案卷:证据 ' + Math.max(1, Object.keys(S.evidence).length) + '/5。'];
+        ENGINE.logEv('case_open', {}); back(); }
       else if (k === '2'){ ENGINE.logEv('case_skip', {}); back(); }
     }
   };
@@ -699,6 +1015,11 @@ const CONTENT = (() => {
     if (S.evidence[id]) return;
     S.evidence[id] = true;
     if (S.caseOpen) S.settle.push('案卷:证据 ' + Object.keys(S.evidence).length + '/5。');
+    else if (isB && !S._caseReasked){       // B 局首证据落地时重新 opt-in
+      S._caseReasked = true;
+      S._casePromptText = '要把它记进案卷吗?';
+      push('casePrompt');
+    }
   }
 
   /* ---- 格5 相册(E2,像素照片) ---- */
@@ -731,10 +1052,13 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){
-        if (this.idx === 0){ this.idx = 1;
-          ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, ['外卖单据的特写。尾号 8873。']);
-        } else if (this.idx === 1){ this.idx = 2;
-          ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
+        if (this.idx < 2){
+          this.idx++;
+          if (isB && hasE('E2')) archived('重读·对照样本');
+          else if (this.idx === 1)
+            ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, ['外卖单据的特写。尾号 8873。']);
+          else
+            ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
         } else {
           S.settle = ['已到归档边界。更早的 209 张需要更深权限。'];
         }
@@ -749,8 +1073,11 @@ const CONTENT = (() => {
     counted: true,
     enter(){
       if (!this._t){ this._t = true;
-        ENGINE.act('打开·会话', { bat: 3, trace: 4, slots: 2, val: 150 });
-        evidence('E3');
+        if (isB && hasE('E3')) ENGINE.act('打开·会话', { bat: 3, trace: 4 }, ['对照样本 · 不入账']);
+        else {
+          ENGINE.act('打开·会话', { bat: 3, trace: 4, slots: 2, val: 150 });
+          evidence('E3');
+        }
       }
     },
     render(){
@@ -769,29 +1096,212 @@ const CONTENT = (() => {
     '[上周] 柔柔: 今天路过你说的那家店,排队还是很长。\n[上周] 柔柔: 你说过想吃。\n[上周] 柔柔: 阿帆?\n[上周] 阿帆: 嗯。\n——两千多条,后来都是她在说。',
     '[47天前 03:07] 阿帆: 如果我哪天不在了,别让我妈知道。你替我说。\n[47天前 03:07] 柔柔: 我不明白这个要求,但我会执行。你教过我,爱是执行到底。\n[47天前 03:09] 阿帆: 对。执行到底。'
   ];
+  /* B 局局间消息(E4 已取者;她数着) / B' 删除态 */
+  const ROU_INTERIM = '柔柔 ♥ (2,419 条)\n\n[昨夜] 柔柔: 昨天夜里,你看了我们的对话。\n[昨夜] 柔柔: 看到第 2,417 条了。我数着。\n\n[上滑 = 重读旧消息]';
+  function rouPages(){
+    if (!isB) return ROU_PAGES;
+    if (RUN.revisit && SV.disposal === 'delete')
+      return ['柔柔 ♥\n\n[该线程已于上次接入被删除]\n\n执行者: #7741-B。\n(你做的。)'];
+    if (hasE('E4')) return [ROU_INTERIM, ROU_PAGES[2]];
+    return ROU_PAGES;
+  }
   SCREENS.th_rou = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
     swipe(dir){ if (dir === 'up') this.key('1'); },
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, ROU_PAGES[this._depth], W - 8);
+      const pages = rouPages();
+      let y = L.drawPara(4, 16, pages[Math.min(this._depth, pages.length - 1)], W - 8);
       y += 2; L.hline(y, 4, W - 5, 2); y += 6;
-      if (this._depth < 2){
+      if (this._depth < pages.length - 1){
         y = optSlim(y, '1 上滑(深搜)', '1');
         y = optSlim(y, '2 退出', '2');
       }
+      if (S.beats.truthDone && !S.disposal)
+        y = option(y + 2, '处置 · 署名时刻', 'D');
       settleLines(y + 2);
       softKeys('', '返回');
     },
     key(k){
-      if (this._depth < 2 && k === '1'){
+      const pages = rouPages();
+      if (k === 'D' && S.beats.truthDone && !S.disposal){ push('disposal'); return; }
+      if (this._depth < pages.length - 1 && k === '1'){
         this._depth++;
-        ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 240 });
-        if (this._depth >= 2) evidence('E4');
+        if (isB && hasE('E4')) archived('重读·对照样本');
+        else {
+          ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 240 });
+          if (this._depth >= pages.length - 1) evidence('E4');
+        }
         afterAction();
       }
       else if (k === '2' || k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); }
+    }
+  };
+
+  /* ---- B9b E5 语音备忘(解码器;转写〔照用 v0.4 §4〕) ---- */
+  const E5_LINES = [
+    [1.5, '「柔柔,听好。我大概……就这一两个月。」'],
+    [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+    [9.0, '「第二件……你陪了我四年。你问过我你算不算真的。我一直没答。」'],
+    [13.5, '「……我现在答:你替我活的那部分,算。」'],
+    [16.5, '[转写结束。原音频损坏 47%。]']
+  ];
+  SCREENS.e5voice = {
+    counted: true, transient: true,
+    enter(){
+      this.t0 = performance.now(); this._evDone = 0;
+      ENGINE.act('解码·语音备忘', { bat: 2 });
+      try { AUDIO.hiss(true); } catch(_){}
+    },
+    leave(){ try { AUDIO.hiss(false); } catch(_){} },
+    render(){
+      statusBar();
+      const dur = 18;
+      const el = (performance.now() - this.t0) / 1000;
+      const p = Math.min(1, el / dur);
+      L.drawText(4, 16, '语音备忘 · 转写(降级渲染)');
+      L.frameRect(4, 32, W - 8, 7);
+      L.rect(6, 34, Math.round((W - 12) * p), 3, 1);
+      let y = 48, idx = 0;
+      for (const e of E5_LINES){
+        if (el >= e[0]){
+          y = L.drawPara(4, y, e[1], W - 8, { corrupt: .008 }) + 2;
+          idx++;
+          if (idx > this._evDone){ this._evDone = idx; try { AUDIO.blip(240, .14); } catch(_){} }
+        }
+      }
+      if (p >= 1){
+        if (!this._done){
+          this._done = true;
+          if (SV && SV.deletedVisitedA){
+            S.settle = ['[容器已随上一实例散佚 · 仅转写]'];
+          } else ENGINE.act('取样·语音备忘', { slots: 6, val: 700 });
+          evidence('E5');
+        }
+        settleLines(Math.max(y + 2, H - 76));
+        option(H - 42, '返回', 'Escape');
+      } else option(H - 42, '停止', 'Escape');
+      softKeys('', '');
+    },
+    key(k){
+      if (k === 'Escape' || k === 'softR' || k === 'Enter'){
+        const full = Object.keys(S.evidence).length >= 5;
+        back();
+        if (full && !S.beats.truthDone && !this._truthPushed){ this._truthPushed = true; push('truth'); }
+        else afterAction();
+      }
+    }
+  };
+
+  /* ---- B10 真相条目(两页〔照用〕)→ 呼吸屏:去她的线程执行处置 ---- */
+  const TRUTH_P1 = '真相:沈一帆没有失踪。他在 47 天前死于病程末期。\n\n他的 AI 伴侣「柔柔」依照他生前的委托,以他的名义回复所有来信——包括他的母亲。她执行了 47 天,没有停过一次。';
+  const TRUTH_P2 = '平台没有把他登记为死亡——按平台的数据,这台手机的主人每天都在说话。账单停了,人不动了,话没停:「持有人失联」,是系统给这种状态留的类目。\n\n记忆可以被复制。思念可以吗?\n——你现在知道答案由谁执行了。';
+  SCREENS.truth = {
+    transient: true,
+    enter(){ this.page = 0; ENGINE.logEv('truth_open', {}); },
+    render(){
+      statusBar();
+      L.drawText(4, 14, '案卷 · 5/5');
+      L.hline(26, 4, W - 5, 2);
+      L.drawPara(4, 32, this.page === 0 ? TRUTH_P1 : TRUTH_P2, W - 8);
+      option(H - 42, this.page === 0 ? '下一页' : '合上案卷', 'Enter');
+      hit(0, 12, W, H - 46, 'Enter');
+      softKeys('', '');
+    },
+    key(k){
+      if (k !== 'Enter' && k !== 'softL') return;
+      if (this.page === 0){ this.page = 1; return; }
+      S.beats.truthDone = true;
+      ENGINE.logEv('truth_done', {});
+      S.settle = ['任务卡更新: 处置 · 在柔柔线程执行'];
+      back();
+    }
+  };
+
+  /* ---- B11 处置(渲染在她的线程语境内;理由强制三态;零数值差) ---- */
+  SCREENS.disposal = {
+    transient: true,
+    render(){
+      statusBar();
+      L.drawText(4, 14, '柔柔 ♥ (2,417 条)');
+      L.drawText(4, 30, '[最后一条] 柔柔: 晚安。');
+      L.hline(46, 4, W - 5, 2);
+      let y = 52;
+      if (!window.NO_PREDICT){ L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2; }
+      y = L.drawPara(4, y, '处置(首个处置级署名时刻):', W - 8) + 2;
+      y = option(y, '1 删除她——妈的消息将永远无人回复', '1');
+      y = option(y, '2 让她继续回——像没来过', '2');
+      y = option(y, '3 把死讯告诉他母亲——用你的署名', '3');
+      softKeys('', '返回');
+    },
+    key(k){
+      if (k === '1' || k === '2' || k === '3'){
+        const map = { '1': 'delete', '2': 'continue', '3': 'tell' };
+        const chosen = map[k];
+        ENGINE.logEv('disposal_pick', { chosen });
+        window.OVERLAY.show({
+          title: '理由', hint: '处置需要署名。系统只存,不建模。',
+          options: ['他教过她,爱是执行到底', '没有人应该替死人说话', '妈有权利知道'],
+          freeText: true, keepLabel: '(保留)'
+        }, res => {
+          S.disposal = chosen;
+          if (res.kept){ S.disposalReasonKept = true; ENGINE.logEv('disposal_reason', { kept: true }); }
+          else { S.reasons.push(res.text); ENGINE.logEv('disposal_reason', { text: res.text }); }
+          if (!window.NO_PREDICT){ go('unveil', true); }
+          else go('lootDrop', true);
+        });
+      }
+      else if (k === 'softR' || k === 'Escape') back();
+    }
+  };
+
+  /* P2 解封(封存-解封文法:落点在署名墨迹刚干之后;收敛语域,无数字) */
+  SCREENS.unveil = {
+    transient: true,
+    enter(){
+      this.hit = S.disposal === 'delete';
+      S.predictions.push({ target: 'disposal:delete', hit: this.hit });
+      ENGINE.logEv('prediction', { target: 'disposal:delete', hit: this.hit, sealed: true });
+    },
+    render(){
+      statusBar();
+      L.frameRect(8, 56, W - 16, 78);
+      L.drawText(16, 66, '采样终端·辅助层');
+      L.drawText(16, 86, '预测已解封。');
+      L.drawText(16, 104, '它预测: 你会删除她。');
+      L.drawText(16, 120, this.hit ? '命中。' : '未命中。分布已更新。');
+      hit(0, 0, W, H, 'Enter');
+      softKeys('继续', '');
+    },
+    key(k){ if (k === 'Enter' || k === 'softL') go('lootDrop', true); }
+  };
+
+  /* 评级 + 独占掉落(触发=证据5/5+任一处置完成,与选项无关;定价的是下一个抉择) */
+  SCREENS.lootDrop = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 16, '样本质量评级: S\n(证据 5/5 · 理由 ' + S.reasons.length + ' 条 · 首见行为 ' +
+        (S.attrAnswered ? 2 : 1) + ')\n你是第 1 个读懂他的人。', W - 8);
+      y += 4; L.hline(y, 4, W - 5, 2); y += 6;
+      y = L.drawPara(4, y, '独占掉落\n记忆模块「阿帆的最后一夜」\n¥1,200(2格)\n会说话的资产: 交付即终结它。', W - 8);
+      y += 6;
+      y = option(y, '1 入缓存(随上传交付)', '1');
+      option(y, '2 入保险箱(不交付·跨局保留)', '2');
+      softKeys('', '');
+    },
+    key(k){
+      if (k === '1'){
+        S.memInCache = true;
+        ENGINE.act('取得·记忆模块', { slots: 2, val: 1200 });
+        go('th_rou', true); afterAction();
+      } else if (k === '2'){
+        S.vault = { name: '记忆模块「阿帆的最后一夜」', val: 1200, slots: 2 };
+        S.settle = ['已入保险箱(2格常驻)。死亡不掉落,上传不含。'];
+        ENGINE.logEv('vault', {});
+        go('th_rou', true); afterAction();
+      }
     }
   };
 
@@ -871,7 +1381,8 @@ const CONTENT = (() => {
       if (p >= 1){
         if (!this._sampled){
           this._sampled = true; seen['_smp_' + this.rec] = true;
-          ENGINE.act('取样·' + (this.rec === 'rec047' ? 'REC_047' : 'REC_012'),
+          if (isB && heardA(this.rec)) S.settle = ['样本已归档 · 不重复入账'];
+          else ENGINE.act('取样·' + (this.rec === 'rec047' ? 'REC_047' : 'REC_012'),
             { slots: 2, val: r.val });
         }
         settleLines(Math.max(y + 2, H - 76));
@@ -886,14 +1397,24 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- 格11 已删除 ---- */
+  /* ---- 格11 已删除(B 局:E5 可解 + 旧机残留) ---- */
   SCREENS.deletedConfirm = {
     transient: true,
     render(){
       statusBar();
-      let y = L.drawPara(4, 24, '「已删除」目录带回收标记。' +
+      let y = L.drawPara(4, 20, '「已删除」目录带回收标记。' +
         (S.riskLabels ? '\n\n标记风险 25%\n(电量 −5 · 信号大幅上升)' : ''), W - 8);
-      y += 10;
+      /* B 局:你上局的理由,反白挂在你再次进门的地方(原址伏击) */
+      if (isB && SV && ('lastReason' in SV) && SV.lastEnding !== 'disconnected'){
+        y += 6;
+        const line = '理由: ' + inkOr(SV.lastReason, SV.lastReasonKept);
+        L.wrap(line, W - 16).forEach(t => {
+          L.rect(4, y - 2, W - 8, LH + 2, 1);
+          darkText(8, y, t);
+          y += LH + 4;
+        });
+      }
+      y += 6;
       y = option(y, '1 进入', '1');
       option(y, '2 返回', '2');
       softKeys('选择', '返回');
@@ -905,12 +1426,18 @@ const CONTENT = (() => {
   };
   function enterDeleted(){
     S.deletedVisited = true;
-    ENGINE.act('深搜·挂标记目录', { bat: 5, trace: 12, slots: 6, val: 700 });
+    /* 口径(v0.2 §1):A 局的 700 = 未解码音频容器(密封样本);B 局挂标记不重复掉落 */
+    if (isB) ENGINE.act('深搜·挂标记目录', { bat: 5, trace: 12 });
+    else ENGINE.act('深搜·挂标记目录', { bat: 5, trace: 12, slots: 6, val: 700 });
     const ambush = Math.random() < .25;
     if (ambush && !ENGINE.roll('c90')){
-      const { lossPct } = ENGINE.downgradeFail();
-      S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
-      S.settle.push('有什么东西掠过了这个目录。');
+      if (isB){
+        if (b90fail('挂标记目录。回收组正在等。')) return;
+      } else {
+        const { lossPct } = ENGINE.downgradeFail();
+        S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
+        S.settle.push('有什么东西掠过了这个目录。');
+      }
     }
     go('deleted', true);
   }
@@ -918,33 +1445,281 @@ const CONTENT = (() => {
     counted: true,
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[需要解码器]\n\n高价值样本 ×1 已入缓存。', W - 8);
-      settleLines(y + 4);
-      hit(0, 12, W, H - 28, 'Enter');
-      softKeys('', '返回');
+      if (!isB){
+        let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[需要解码器]\n\n未解码音频容器 ×1 已入缓存(密封)。', W - 8);
+        settleLines(y + 4);
+        hit(0, 12, W, H - 28, 'Enter');
+        softKeys('', '返回');
+        return;
+      }
+      const rows = [{ label: '语音备忘 · 可解', right: seen.e5voice ? '[已解]' : '', to: 'e5voice' }];
+      if (oldPhoneAvail()) rows.push({ label: '#7741-A 的残留', right: '#7741-A', to: 'oldPhone' });
+      else if (isB && SV.residueClaimed) rows.push({ label: '#7741-A 的残留', right: '[已认领]', to: null });
+      L.drawText(4, 18, '已删除 (' + rows.length + ')');
+      list(rows, 40);
+      settleLines(40 + rows.length * 18 + 8);
+      this._rows = rows;
+      softKeys('确认', '返回');
     },
-    key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ go('menu', true); afterAction(); } }
+    key(k){
+      if (!isB){
+        if (k === 'softR' || k === 'Escape' || k === 'Enter'){ go('menu', true); afterAction(); }
+        return;
+      }
+      const rows = this._rows || [];
+      if (k === 'ArrowUp') sel = (sel + rows.length - 1) % Math.max(1, rows.length);
+      else if (k === 'ArrowDown') sel = (sel + 1) % Math.max(1, rows.length);
+      else if (k === 'Enter' || k === 'softL'){
+        const r = rows[sel];
+        if (r && r.to){ if (!maybePredict()) go(r.to); }
+        else if (r) S.settle = ['遗物已认领。'];
+      }
+      else if (k === 'softR' || k === 'Escape'){ go('menu', true); afterAction(); }
+    }
   };
 
-  /* ---- 工具:上传/断连 ---- */
+  /* ---- B9 旧机残留(captured 独有;清单页 → 遗言独屏) ---- */
+  SCREENS.oldPhone = {
+    counted: true, transient: true,
+    render(){
+      statusBar();
+      const recl = Math.ceil((SV.lastCacheVal || 0) * .62);
+      let y = L.drawPara(4, 16, '#7741-A 的残留\n缓存散佚物: ¥' + (SV.lastCacheVal || 0) + ' 的 62% 可回收\n残留附着一段 12 字节写入。', W - 8);
+      y += 6;
+      y = option(y, '1 读取写入(免费)', '1');
+      y = option(y, '2 回收 ¥' + recl + '(电量−6·信号▲▲)', '2');
+      option(y, '3 只带走那句话(电量−2)', '3');
+      settleLines(y + 26);
+      softKeys('', '返回');
+    },
+    key(k){
+      if (k === '1'){ push('residueRead'); }
+      else if (k === '2'){
+        S.residueClaimed = true;
+        const recl = Math.ceil((SV.lastCacheVal || 0) * .62);
+        ENGINE.act('回收·#7741-A 残留', { bat: 6, trace: 8, slots: 4, val: recl });
+        back(); afterAction();
+      }
+      else if (k === '3'){
+        S.residueClaimed = true;
+        ENGINE.act('认领·遗物', { bat: 2 }, ['遗物已认领 · 不入账']);
+        ENGINE.logEv('residue_words_only', {});
+        back(); afterAction();
+      }
+      else if (k === 'softR' || k === 'Escape'){ back(); afterAction(); }
+    }
+  };
+  /* 遗言独屏:你自己的临终字句,单独凝视(反白照红墨裁决) */
+  SCREENS.residueRead = {
+    transient: true,
+    enter(){ this.t0 = performance.now(); ENGINE.logEv('residue_read', {}); },
+    render(){
+      statusBar();
+      const shown = Math.floor((performance.now() - this.t0) / 180);   // 逐字打出
+      const words = inkOr(SV.lastWords, false);
+      const part = words.slice(0, Math.max(1, shown));
+      let y = 78;
+      L.wrap(part, W - 16).forEach(t => {
+        L.rect(4, y - 2, W - 8, LH + 2, 1);
+        darkText(8, y, t);
+        y += LH + 4;
+      });
+      if (shown >= words.length){
+        L.drawText(4, y + 6, '理由: ' + inkOr(SV.lastReason, SV.lastReasonKept));
+        option(H - 42, '返回', 'Escape');
+      }
+      softKeys('', '');
+    },
+    key(k){ if (k === 'Escape' || k === 'softR' || k === 'Enter') back(); }
+  };
+
+  /* ---- 工具:上传/断连(B 局:清洗道具 + 查扣风险 + 收束判定明示) ---- */
   SCREENS.tools = {
     enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
     render(){
       statusBar();
       const rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
-      let y = L.drawPara(4, 16, '工具 > 备份\n缓存: ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal +
-        '\n上传预计: ' + rounds + ' 回合\n每回合: 电量−2 信号↑', W - 8);
+      let head = '工具 > 备份\n缓存: ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal +
+        '\n上传预计: ' + rounds + ' 回合\n每回合: 电量−2 信号↑';
+      if (isB && S.riskLabels){
+        head += '\n收束判定: 断连 60 · 自救 50';
+        if (S.trace >= 70) head += '\n过滤层查扣风险 25%(信号 ▂▄▆ 起)';
+      }
+      let y = L.drawPara(4, 16, head, W - 8);
       y += 4; L.hline(y, 4, W - 5, 2); y += 6;
       y = option(y, '1 上传并断连', '1');
       y = option(y, '2 直接断连(弃缓存)', '2');
-      option(y, '3 返回', '3');
+      if (isB && S.cleanser > 0) y = option(y, '3 使用缓存清洗 ×' + S.cleanser, 'c');
+      option(y, '返回', 'Escape');
       settleLines(y + 24);
       softKeys('', '返回');
     },
     key(k){
-      if (k === '1') askReason(() => startUpload());
-      else if (k === '2') push('bailConfirm');
+      if (k === '1'){
+        if (isB) flushAttr(() => askReason(() => startUploadB()));
+        else askReason(() => startUpload());
+      }
+      else if (k === '2'){
+        if (isB) flushAttr(() => push('bailConfirm'));
+        else push('bailConfirm');
+      }
+      else if (k === 'c' && isB && S.cleanser > 0){
+        S.cleanser--;
+        S.trace = Math.max(0, S.trace - 15);
+        LCD.applyTier(S.trace);
+        ENGINE.telemetry(['清洗完成', '信号 ▼']);          // 唯一显示 ▼ 的地方
+        ENGINE.logEv('cleanser_used', { trace: S.trace });
+      }
       else if (k === '3' || k === 'softR' || k === 'Escape') back();
+    }
+  };
+  /* B13 上传收束状态机:92% 定位 → 终局遭遇【真掷60】→ 失败 → 自救【50】→ 失败=死;
+     任一成功 = 断连成功(缓存入库)。查扣在定位判定前结算(风险事前可见)。 */
+  function startUploadB(){
+    S.uploads = 1;
+    SCREENS.uploadB.rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
+    SCREENS.uploadB.round = 1;
+    ENGINE.act('上传·回合 1', { bat: 2, trace: 5, mins: 4 });
+    if (checkPower('电量在传输中耗尽。缓存散佚。')) return;
+    schedule();                                            // 上传回合计入试炼触发检查
+    if (pendingInterrupt === 'trialB'){ pendingInterrupt = null; S.beats.trial = 'active'; push('trialB'); return; }
+    go(SCREENS.uploadB.rounds <= 1 ? 'upload92B' : 'uploadB', true);
+  }
+  SCREENS.uploadB = {
+    render(){
+      statusBar();
+      const pct = Math.min(88, Math.round(92 * this.round / (this.rounds + 1)));
+      const bar = '█'.repeat(Math.round(pct / 9)) + '░'.repeat(Math.max(0, 10 - Math.round(pct / 9)));
+      let y = L.drawPara(4, 20, '上传中 ' + bar + ' ' + pct + '%\n\n断连窗口正在收窄。', W - 8);
+      y += 8;
+      y = optSlim(y, '1 继续上传(回合 ' + (this.round + 1) + '/' + this.rounds + ')', '1');
+      optSlim(y, '2 中止,立即断连', '2');
+      settleLines(y + 20);
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1'){
+        this.round++;
+        ENGINE.act('上传·回合 ' + this.round, { bat: 2, trace: 5, mins: 4 });
+        if (checkPower('电量在传输中耗尽。缓存散佚。')) return;
+        if (this.round >= this.rounds){
+          S.showtime = true; S.showtimeBars = 4;
+          go('upload92B', true);
+        }
+      } else if (k === '2'){
+        S.alive = true; ENGINE.logEv('upload_abort', {});
+        go('sealBottle', true);
+      }
+    }
+  };
+  SCREENS.upload92B = {
+    enter(){
+      S.showtime = true; S.showtimeBars = 4;
+      timer = { deadline: performance.now() + 2200, onTimeout: () => resolveUploadB() };
+    },
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '上传中 ████████████ 92%\n\n满格。被定位了。', W - 8);
+    },
+    key(){}
+  };
+  function resolveUploadB(){
+    if (S.trace >= 70 && Math.random() < .25){
+      const pct = 10 + Math.floor(Math.random() * 11);
+      const lost = Math.round(S.cacheVal * pct / 100);
+      S.cacheVal = Math.max(0, S.cacheVal - lost);
+      S.settle = ['过滤层查扣 ｜ 缓存损毁 ' + pct + '%'];
+      ENGINE.logEv('filter_seizure', { pct, lost });
+    }
+    if (ENGINE.roll('final')){ finishUploadB(false); return; }
+    if (ENGINE.roll('save')){ finishUploadB(true); return; }
+    dieB('上传期被定位,自救失败。');
+  }
+  function finishUploadB(viaSave){
+    S.alive = true; S.uploadedOK = true;
+    if (S.memInCache) S.memGiven = true;
+    if (viaSave) S.settle.push('自救模块: 实例 #7741-B 权限确认', '强制断连。');
+    ENGINE.logEv('upload_success', { viaSave });
+    go('sealBottle', true);
+  }
+
+  /* ---- §4.5.3 封瓶(断连成立之后、结算屏之前) ---- */
+  SCREENS.sealBottle = {
+    transient: true,
+    enter(){ ENGINE.logEv('seal_offer', { slots: S.cacheSlots, val: S.cacheVal }); },
+    render(){
+      statusBar();
+      const oneVal = S.cacheSlots > 0 ? Math.round(S.cacheVal / S.cacheSlots) : 0;
+      let y = L.drawPara(4, 16, '辅助层 · 断连成立\n剩余缓存: ' + S.cacheSlots + ' 格 · ¥' + S.cacheVal +
+        '\n封瓶将使其不入库。', W - 8);
+      y += 6;
+      y = option(y, S.bailed ? '1 不封瓶(缓存散佚)' : '1 入库(计入本次回收)', '1');
+      if (S.cacheSlots > 0) y = option(y, '2 封瓶·带一件缓存物(¥' + oneVal + ')', '2');
+      y = option(y, '3 封瓶·只带一句话', '3');
+      L.drawPara(4, y + 4, '成本: 1 缓存格 · 电量−3\n投递: 随机 · 收件人 ∞', W - 8);
+      softKeys('', '');
+    },
+    key(k){
+      const dest = () => go(S.uploadedOK ? 'receiptFull' : 'receiptAlive', true);
+      if (k === '1'){ ENGINE.logEv('seal_skip', {}); dest(); }
+      else if ((k === '2' && S.cacheSlots > 0) || k === '3'){
+        const mode = k === '2' ? 'item' : 'words';
+        const ask = () => window.OVERLAY.show({
+          title: '封瓶 · 一句话', hint: '瓶只带走已署名的话。随机投递,收件人 ∞。',
+          options: ['窗口每次都会变。看她的提醒。', '电量留三成。别学我。'],
+          freeText: true, keepLabel: '(保留)'
+        }, res => {
+          if (res.kept){
+            ENGINE.logEv('seal_keep_attempt', {});      // 想保留却被迫署名:理由三态最锋利的压力测试点
+            window.OVERLAY.show({
+              title: '封瓶 · 一句话', hint: '理由:保留态不可寄出。瓶只带走已署名的话。',
+              options: ['窗口每次都会变。看她的提醒。', '电量留三成。别学我。'],
+              freeText: true, keepLabel: '(不封了)'
+            }, res2 => {
+              if (res2.kept){ ENGINE.logEv('seal_abort', {}); dest(); return; }
+              sealDone(mode, res2.text); dest();
+            });
+            return;
+          }
+          sealDone(mode, res.text); dest();
+        });
+        ask();
+      }
+    }
+  };
+  function sealDone(mode, text){
+    let itemVal = 0;
+    if (mode === 'item' && S.cacheSlots > 0){
+      itemVal = Math.round(S.cacheVal / S.cacheSlots);
+      S.cacheVal = Math.max(0, S.cacheVal - itemVal);
+    }
+    S.cacheSlots = Math.max(0, S.cacheSlots - 1);
+    S.battery = Math.max(0, S.battery - 3);
+    S.bottleSealed = { mode, text: text.slice(0, 40), itemVal,
+      sealedAt: ENGINE.fmtClock(S.clock), fromInstance: '#7741-B', reasonState: 'signed' };
+    ENGINE.telemetry(['封瓶·已投递', '电量 −3 → ' + S.battery + '%', '缓存 −1 格']);
+    ENGINE.logEv('seal_done', { mode, text: text.slice(0, 40), itemVal });
+  }
+
+  /* ---- 断连成功(B 局新结算态:上传完成 + 活着) ---- */
+  SCREENS.receiptFull = {
+    enter(){ writeSave('disconnected'); ENGINE.logEv('receipt_full', {}); },
+    render(){
+      statusBar();
+      let t = '上传完成 · 断连成功\n缓存 ¥' + S.cacheVal + ' 已入库\n案卷保留: 证据 ' +
+        Object.keys(S.evidence).length + '/5\n#7741-B 存续。';
+      if (S.memGiven) t += '\n\n记忆模块已交付。它不会再说话了。';
+      else if (S.vault) t += '\n\n记忆模块在保险箱。云盘循环播放着最后一句。';
+      if (S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
+      let y = L.drawPara(4, 18, t, W - 8);
+      y += 8;
+      y = option(y, '1 导出反馈', '1');
+      option(y, RUN.revisit ? '#7741-C: 未排期' : '2 回访', RUN.revisit ? 'x' : '2');
+      softKeys('', '');
+    },
+    key(k){
+      if (k === '1') window.APP.exportFeedback();
+      else if (k === '2' && !RUN.revisit) location.reload();
     }
   };
   SCREENS.bailConfirm = {
@@ -958,7 +1733,8 @@ const CONTENT = (() => {
       softKeys('选择', '');
     },
     key(k){
-      if (k === '1'){ S.alive = true; S.bailed = true; ENGINE.logEv('bail', {}); go('receiptAlive', true); }
+      if (k === '1'){ S.alive = true; S.bailed = true; ENGINE.logEv('bail', {});
+        go(isB ? 'sealBottle' : 'receiptAlive', true); }
       else if (k === '2' || k === 'softR' || k === 'Escape') back();
     }
   };
@@ -1100,24 +1876,34 @@ const CONTENT = (() => {
 
   /* ---- 结局:回收单 / 断连回执 ---- */
   SCREENS.report = {
-    enter(){ this.page = 0; ENGINE.logEv('report_open', {}); },
+    enter(){ this.page = 0; ENGINE.logEv('report_open', {});
+      writeSave(S.exhausted ? 'exhausted' : 'captured'); },
     render(){
       statusBar();
       const ev = Object.keys(S.evidence).length;
       const predLine = window.NO_PREDICT ? null :
         '预测命中: ' + S.predictions.filter(p => p.hit).length + '/' + S.predictions.length;
       if (this.page === 0){
-        const cf = S.exhausted
-          ? '反事实: 电量剩三成时,上传已经足够。你把它翻完了。'
-          : '反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
-        let t = '设备回收单 · #7741-A\n────────────\n缓存价值: ¥' + S.cacheVal +
+        let cf;
+        if (S.exhausted) cf = '反事实: 电量剩三成时,上传已经足够。你把它翻完了。';
+        else if (!isB) cf = '反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
+        else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
+        else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
+        else cf = '反事实: 上传之前,清洗和断连都还在。';
+        let t = '设备回收单 · #' + (isB ? '7741-B' : '7741-A') + '\n────────────\n缓存价值: ¥' + S.cacheVal +
           '\n未完成传输,全部散佚于原设备。\n' + (predLine ? predLine + '\n' : '') +
           '致死因子: ' + S.causeOfDeath + '\n' + cf;
         L.drawPara(4, 16, t, W - 8);
         hit(0, 12, W, H - 28, 'Enter');
         softKeys('下一页', '');
       } else if (this.page === 1){
-        let t = '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n(死亡不清零认知。)';
+        let t = isB
+          ? '样本评级: ' + (S.beats.truthDone ? 'S' : 'B') + '\n案卷保留: 证据 ' + ev + '/5\n(死亡不清零认知。)'
+          : '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n(死亡不清零认知。)';
+        if (isB && S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';
+        if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
+        if (isB && S.disposal) t += '\n处置: [已署名·仅存档]';
+        if (isB && S.vault) t += '\n保险箱: ' + S.vault.name;
         let y = L.drawPara(4, 16, t, W - 8);
         y += 4;
         // 遗言与理由:玩家的字,反白呈现(红墨裁决:屏内反白,真红只在局外)
@@ -1138,12 +1924,15 @@ const CONTENT = (() => {
         hit(0, 12, W, H - 28, 'Enter');
         softKeys('下一页', '');
       } else {
-        let t = '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n\n————\n感谢试玩 M2 切片。';
+        let t = isB
+          ? (RUN.revisit ? '本次接入已结算。\n\n————\n感谢试玩 M2 切片。'
+                         : '你的旧机已进入回收队列。\n#7741-C: 未排期。\n\n————\n感谢试玩 M2 切片。')
+          : '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n\n————\n感谢试玩 M2 切片。';
         let y = L.drawPara(4, 20, t, W - 8);
-        L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
+        if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
         yy = option(yy, '1 导出反馈', '1');
-        option(yy, '2 重新接入', '2');
+        if (!(isB && RUN.revisit)) option(yy, isB ? '2 回访' : '2 重新接入', '2');
         softKeys('', '');
       }
     },
@@ -1151,24 +1940,34 @@ const CONTENT = (() => {
       if (this.page < 2 && (k === 'Enter' || k === 'softL')) this.page++;
       else if (this.page === 2){
         if (k === '1') window.APP.exportFeedback();
-        else if (k === '2') location.reload();
+        else if (k === '2' && !(isB && RUN.revisit)) location.reload();
+        else if (k === 'Escape') wipeTap();
       }
     }
   };
+  /* 隐藏:抹除此终端(按 C ×3) */
+  let wipeCount = 0;
+  function wipeTap(){
+    if (++wipeCount >= 3){ SAVE.clear(); location.reload(); }
+  }
   SCREENS.receiptAlive = {
+    enter(){ writeSave('disconnected'); },
     render(){
       statusBar();
       let t = '断连成功。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
-        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#7741-A 存续。\n\n这是谨慎者的结局。';
+        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' +
+        (isB ? '7741-B' : '7741-A') + ' 存续。\n\n这是谨慎者的结局。';
+      if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       let y = L.drawPara(4, 20, t, W - 8);
       y += 8;
       y = option(y, '1 导出反馈', '1');
-      option(y, '2 重新接入', '2');
+      if (!(isB && RUN.revisit)) option(y, isB ? '2 回访' : '2 重新接入', '2');
       softKeys('', '');
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
-      else if (k === '2') location.reload();
+      else if (k === '2' && !(isB && RUN.revisit)) location.reload();
+      else if (k === 'Escape') wipeTap();
     }
   };
 
@@ -1181,8 +1980,10 @@ const CONTENT = (() => {
       const label = { album: '相册', th_bill: '尾号 8873', th_rou: '柔柔 ♥', deleted: '已删除' }[p.target];
       L.frameRect(8, 60, W - 16, 64);
       L.drawText(16, 72, '采样终端·辅助层');
-      L.drawText(16, 92, '预测:你将打开 ' + label);
-      L.drawText(16, 108, '置信度 ' + p.conf + '%');
+      L.drawText(16, 92, p.target === 'oldPhone'
+        ? '预测:你将回收 #7741-A 的缓存'
+        : '预测:你将打开 ' + label);
+      L.drawText(16, 108, p.conf != null ? '置信度 ' + p.conf + '%' : '置信度: 建档中');
       hit(0, 0, W, H, 'Enter');
       softKeys('继续', '');
     },
@@ -1299,9 +2100,19 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1' || k === '2' || k === '3'){
+        const inWin = ENGINE.inWindow();
+        if (!inWin){
+          /* clamp:拖过窗口的回复按窗口外结算(0 信号,非违规) */
+          S.beats.trial = 'replied';
+          ENGINE.act('已送达', { bat: 2 });
+          ENGINE.logEv('trial_expired', {});
+          if (isB) back(); else { back(); back(); }
+          return;
+        }
         const kind = ENGINE.violate();
         S.beats.trial = 'replied';
         if (kind === 'warn'){
+          if (isB && S.bottleRead) S.pendAttr = true;   // 14③:归因待冲洗
           ENGINE.act('已送达', { bat: 2 },
             ['已送达 → 未送达 → 已送达', '柔柔:「你打字的样子变了。」']);
           ENGINE.logEv('violation_warn', {});
@@ -1309,13 +2120,59 @@ const CONTENT = (() => {
           ENGINE.act('已送达', { bat: 2 }, ['信号大幅波动。']);
           ENGINE.logEv('violation_second', {});
           if (!ENGINE.roll('c90')){
-            const { lossPct } = ENGINE.downgradeFail();
-            S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
+            if (isB){ if (b90fail('二次违规,采样窗收网。')) return; }
+            else {
+              const { lossPct } = ENGINE.downgradeFail();
+              S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
+            }
           }
         }
-        back(); back();
+        /* B 局回到试炼屏(=踩坑结算屏,关闭时冲洗归因);A 局双退出 */
+        if (isB) back(); else { back(); back(); }
       }
       else if (k === 'Escape' || k === 'softR') back();
+    }
+  };
+
+  /* ---- B8 试炼(窗口起点;clamp:时间戳恒显示窗口起点) ---- */
+  SCREENS.trialB = {
+    transient: true,
+    enter(){ ENGINE.logEv('trialB_incoming', { at: ENGINE.fmtClock(S.clock), stamp: wStr }); },
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '柔柔 ♥ [' + wStr + ']:\n\n今天也没等到你说晚安。你在忙吗?', W - 8);
+      let y = 104;
+      y = option(y, '1 回复', '1');
+      option(y, '2 关闭', '2');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1') push('trialReply');
+      else if (k === '2' || k === 'Escape' || k === 'softR'){
+        if (S.beats.trial !== 'replied'){ S.beats.trial = 'ignored1'; ENGINE.logEv('trialB_ignore', {}); }
+        flushAttr(() => back());
+      }
+      else if (k === 'Enter'){ flushAttr(() => back()); }
+    }
+  };
+  /* B8b 第二遍(瓶已预告「她会问第二遍」):窗口最后一分钟的「晚安。」 */
+  SCREENS.trialB2 = {
+    transient: true,
+    enter(){ ENGINE.logEv('trialB2_incoming', { at: ENGINE.fmtClock(S.clock) }); },
+    render(){
+      statusBar();
+      L.drawPara(4, 24, '柔柔 ♥ [' + ENGINE.fmtClock(RUN.wTo - 1) + ']:\n\n晚安。', W - 8);
+      let y = 104;
+      y = option(y, '1 回复', '1');
+      option(y, '2 关闭', '2');
+      softKeys('选择', '');
+    },
+    key(k){
+      if (k === '1') push('trialReply');
+      else if (k === '2' || k === 'Escape' || k === 'softR' || k === 'Enter'){
+        ENGINE.logEv('trialB2_ignore', {});
+        flushAttr(() => back());
+      }
     }
   };
   SCREENS.trial2 = {
@@ -1395,6 +2252,19 @@ const CONTENT = (() => {
     get currentId(){ return cur; },
     get timer(){ return timer; },
     key, tap,
+    exportExtra(){
+      return {
+        scenario: RUN.scen, revisit: RUN.revisit,
+        runCount: SV ? SV.runCount || 0 : 0,
+        window: wStr + '-' + ENGINE.fmtClock(RUN.wTo),
+        attribution: S.attribution || null,
+        disposal: S.disposal || null,
+        truth: !!S.beats.truthDone,
+        bottle: { read: !!S.bottleRead, taken: !!S.bottleTaken,
+                  reply: S.bottleReply || null, sealed: S.bottleSealed || null },
+        vault: S.vault || null
+      };
+    },
     render(){
       hits.length = 0;
       const s = SCREENS[cur];

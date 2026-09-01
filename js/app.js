@@ -146,7 +146,7 @@
   /* ---- 反馈导出(跑测记录表自动化) ---- */
   window.APP = {
     exportFeedback(){
-      const data = ENGINE.exportFeedback();
+      const data = ENGINE.exportFeedback(CONTENT.exportExtra ? CONTENT.exportExtra() : undefined);
       window.OVERLAY.text({
         title: '反馈数据', hint: '全选复制,发给开发者。感谢试玩。', value: data
       });
