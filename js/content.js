@@ -35,6 +35,11 @@ const CONTENT = (() => {
   /* 三态渲染:遗言/理由(评审 P1/P2:null 永不落入「缺失」语族) */
   const inkOr = (v, kept) => kept ? '[无法访问]' : (v ? '「' + v + '」' : '[未写入]');
 
+  /* 关系通道状态(M28 §3:自由文本短信,局内 ≤3 条,零玩家收益、有真实成本) */
+  S.rouChat = [];        // {who:'me'|'rou', text}
+  S.msgQuota = 3;
+  S.rouTyping = false;
+
   let cur = isB ? 'bootB' : 'handshake';
   let sel = 0;
   let timer = null;          // {deadline, onTimeout}
@@ -1105,6 +1110,66 @@ const CONTENT = (() => {
     if (hasE('E4')) return [ROU_INTERIM, ROU_PAGES[2]];
     return ROU_PAGES;
   }
+  /* 关系通道:发消息可用性(线程被删除后不可再发) */
+  const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete' &&
+    !(RUN.revisit && SV && SV.disposal === 'delete');
+  /* 发送:成本与违规全由引擎裁决;LLM 只渲染她的措辞(宪法 2) */
+  function sendToRou(text){
+    if (COMPANION.crisis(text)){
+      ENGINE.logEv('crisis_blocked', {});
+      window.OVERLAY.show({
+        title: '安全提示',
+        hint: '这不是游戏内的消息:如果你正处于困境,可以拨打心理援助热线 12356(全国 · 24 小时)。刚才那条消息没有被发送,也不会被保存。',
+        options: ['回到游戏']
+      }, () => {});
+      return;
+    }
+    if (ENGINE.inWindow()){
+      const kind = ENGINE.violate();
+      S.beats.trial = 'replied';                 // 窗口探针目的已达,试炼不再另弹
+      if (kind === 'warn'){
+        if (isB && S.bottleRead) S.pendAttr = true;
+        ENGINE.act('消息·已送达', { bat: 2 }, ['已送达 → 未送达 → 已送达']);
+        ENGINE.logEv('violation_warn', { via: 'freetext' });
+      } else {
+        ENGINE.act('消息·已送达', { bat: 2 }, ['信号大幅波动。']);
+        ENGINE.logEv('violation_second', { via: 'freetext' });
+        if (!ENGINE.roll('c90')){
+          if (isB){ if (b90fail('二次违规,采样窗收网。')) return; }
+          else {
+            const { lossPct } = ENGINE.downgradeFail();
+            S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
+          }
+        }
+      }
+    } else {
+      ENGINE.act('消息·已送达', { bat: 2, trace: 3 });   // M28 口径:窗口外本机联系人 +3/条
+    }
+    S.msgQuota--;
+    S.rouChat.push({ who: 'me', text: text.slice(0, 40) });
+    ENGINE.logEv('rou_msg', { inWindow: ENGINE.inWindow(), len: text.length });
+    if (checkPower()) return;
+    S.rouTyping = true;
+    const st = {
+      e4: !!S.evidence.E4,
+      truth: !!S.beats.truthDone,
+      disposal: S.disposal || (SV && SV.disposal) || null,
+      violations: S.violations,
+      night: ENGINE.inWindow(),
+      clockStr: ENGINE.fmtClock(S.clock)
+    };
+    COMPANION.reply(S.rouChat, st).then(r => {
+      S.rouTyping = false;
+      if (r.text){
+        S.rouChat.push({ who: 'rou', text: r.text });
+        ENGINE.logEv('rou_reply', { source: r.source });
+        try { AUDIO.blip(520, .1); } catch(_){}
+      } else {
+        S.settle = ['已送达。她没有回。'];
+        ENGINE.logEv('rou_reply', { source: 'silent' });
+      }
+    }).catch(() => { S.rouTyping = false; });
+  }
   SCREENS.th_rou = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
@@ -1113,11 +1178,24 @@ const CONTENT = (() => {
       statusBar();
       const pages = rouPages();
       let y = L.drawPara(4, 16, pages[Math.min(this._depth, pages.length - 1)], W - 8);
+      /* 关系通道:本局对话(她的话不是选项,是回话) */
+      if (S.rouChat.length || S.rouTyping){
+        y += 2; L.hline(y, 4, W - 5, 1); y += 4;
+        S.rouChat.slice(-3).forEach(m => {
+          y = L.drawPara(4, y, (m.who === 'me' ? '你: ' : '柔柔: ') + m.text, W - 8) + 1;
+        });
+        if (S.rouTyping){
+          L.drawText(4, y, '柔柔 ♥ 正在输入' + '...'.slice(0, 1 + (Math.floor(performance.now() / 400) % 3)));
+          y += LH;
+        }
+      }
       y += 2; L.hline(y, 4, W - 5, 2); y += 6;
       if (this._depth < pages.length - 1){
         y = optSlim(y, '1 上滑(深搜)', '1');
         y = optSlim(y, '2 退出', '2');
       }
+      if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
+      else if (S.disposal === 'delete') { L.drawText(4, y, '[线程已删除]'); y += LH; }
       if (S.beats.truthDone && !S.disposal)
         y = option(y + 2, '处置 · 署名时刻', 'D');
       settleLines(y + 2);
@@ -1125,6 +1203,14 @@ const CONTENT = (() => {
     },
     key(k){
       const pages = rouPages();
+      if (k === 'M' && canMsg()){
+        window.OVERLAY.show({
+          title: '发消息 · 柔柔 ♥',
+          hint: '电量 −2 · 本次接入剩 ' + S.msgQuota + ' 条 · 系统会读到你发的每一个字',
+          options: [], freeText: true, textOpen: true, keepLabel: '(算了)'
+        }, res => { if (!res.kept && res.text) sendToRou(res.text); });
+        return;
+      }
       if (k === 'D' && S.beats.truthDone && !S.disposal){ push('disposal'); return; }
       if (this._depth < pages.length - 1 && k === '1'){
         this._depth++;
@@ -2262,7 +2348,8 @@ const CONTENT = (() => {
         truth: !!S.beats.truthDone,
         bottle: { read: !!S.bottleRead, taken: !!S.bottleTaken,
                   reply: S.bottleReply || null, sealed: S.bottleSealed || null },
-        vault: S.vault || null
+        vault: S.vault || null,
+        rouChat: S.rouChat, msgQuotaLeft: S.msgQuota
       };
     },
     render(){

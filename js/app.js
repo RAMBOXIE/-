@@ -27,10 +27,15 @@
         ovlOpts.appendChild(b);
       });
       if (cfg.freeText){
-        const b = document.createElement('button');
-        b.textContent = '自由输入…';
-        b.onclick = () => { ovlText.style.display = 'block'; ovlText.focus(); };
-        ovlOpts.appendChild(b);
+        if (cfg.textOpen){                      // 关系通道:输入框直接展开
+          ovlText.style.display = 'block';
+          setTimeout(() => { try { ovlText.focus(); } catch(_){} }, 0);
+        } else {
+          const b = document.createElement('button');
+          b.textContent = '自由输入…';
+          b.onclick = () => { ovlText.style.display = 'block'; ovlText.focus(); };
+          ovlOpts.appendChild(b);
+        }
       }
       if (cfg.keepLabel){
         const b = document.createElement('button');
