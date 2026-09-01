@@ -1,0 +1,318 @@
+{
+  "tool": "duration_audit",
+  "generatedAt": "2026-08-31T08:36:05.646Z",
+  "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
+  "hookedFns": [
+    "LCD.drawText",
+    "LCD.drawPara",
+    "LCD.drawTextScaled"
+  ],
+  "personas": [
+    {
+      "id": "fast",
+      "name": "速读",
+      "cpm": 500,
+      "decisionSec": 3,
+      "reread": 1
+    },
+    {
+      "id": "normal",
+      "name": "普通",
+      "cpm": 280,
+      "decisionSec": 6,
+      "reread": 1
+    },
+    {
+      "id": "immersive",
+      "name": "沉浸",
+      "cpm": 180,
+      "decisionSec": 12,
+      "reread": 1.3
+    }
+  ],
+  "waitTableSec": {
+    "boot": 6.6,
+    "dialZhou": 1,
+    "dialMom": 5.5,
+    "rec047": 14,
+    "rec012": 9,
+    "upload92": 2.2,
+    "finalRing": 10,
+    "rejectAuto": 1.5,
+    "midEnc": 20,
+    "powerOut": 2.6
+  },
+  "formula": "分钟 = readChars/字速×(沉浸1.3) + 决策次数×决策秒/60 + 强制等待/60",
+  "paths": [
+    {
+      "id": "A",
+      "name": "最短线·中止断连",
+      "readChars": 460,
+      "decisionCount": 4,
+      "decisions": [
+        "采样协议:回「收到」/不回",
+        "工具:上传并断连 vs 直接断连",
+        "理由覆盖层(选/写一句)",
+        "46%:继续上传 vs 中止断连"
+      ],
+      "forcedWaitSec": 6.6,
+      "waitItems": {
+        "boot": 6.6
+      },
+      "topScreens": [
+        {
+          "screen": "th_proto",
+          "chars": 99
+        },
+        {
+          "screen": "brief",
+          "chars": 79
+        },
+        {
+          "screen": "tools",
+          "chars": 59
+        },
+        {
+          "screen": "receiptAlive",
+          "chars": 51
+        },
+        {
+          "screen": "menu",
+          "chars": 50
+        },
+        {
+          "screen": "upload46",
+          "chars": 48
+        },
+        {
+          "screen": "inbox",
+          "chars": 32
+        },
+        {
+          "screen": "connect",
+          "chars": 25
+        },
+        {
+          "screen": "handshake",
+          "chars": 19
+        }
+      ],
+      "minutes": {
+        "速读": {
+          "read": 0.92,
+          "decision": 0.2,
+          "wait": 0.11,
+          "total": 1.23
+        },
+        "普通": {
+          "read": 1.64,
+          "decision": 0.4,
+          "wait": 0.11,
+          "total": 2.15
+        },
+        "沉浸": {
+          "read": 3.32,
+          "decision": 0.8,
+          "wait": 0.11,
+          "total": 4.23
+        }
+      }
+    },
+    {
+      "id": "B",
+      "name": "普通线·中等探索死亡",
+      "readChars": 1953,
+      "decisionCount": 13,
+      "decisions": [
+        "采样协议:回「收到」/不回",
+        "案卷:记入 vs 只是巧合",
+        "相册:继续深翻 vs 退出",
+        "柔柔:深翻 vs 退出",
+        "校准:紧张程度 1-5",
+        "校准:被操控感 1-5",
+        "通讯录:拨打妈 vs 不拨",
+        "试炼:回复 vs 关闭",
+        "试炼回复:选哪句",
+        "工具:上传 vs 弃缓存",
+        "理由覆盖层",
+        "46%:继续 vs 中止",
+        "遗言覆盖层"
+      ],
+      "forcedWaitSec": 44.3,
+      "waitItems": {
+        "boot": 6.6,
+        "dialMom": 5.5,
+        "midEnc": 20,
+        "upload92": 2.2,
+        "finalRing": 10
+      },
+      "topScreens": [
+        {
+          "screen": "report",
+          "chars": 221
+        },
+        {
+          "screen": "menu",
+          "chars": 181
+        },
+        {
+          "screen": "th_mom",
+          "chars": 157
+        },
+        {
+          "screen": "th_rou",
+          "chars": 147
+        },
+        {
+          "screen": "memo2",
+          "chars": 128
+        },
+        {
+          "screen": "th_proto",
+          "chars": 122
+        },
+        {
+          "screen": "inbox",
+          "chars": 102
+        },
+        {
+          "screen": "contacts",
+          "chars": 94
+        },
+        {
+          "screen": "tools",
+          "chars": 84
+        },
+        {
+          "screen": "finalCall",
+          "chars": 80
+        }
+      ],
+      "minutes": {
+        "速读": {
+          "read": 3.91,
+          "decision": 0.65,
+          "wait": 0.74,
+          "total": 5.29
+        },
+        "普通": {
+          "read": 6.97,
+          "decision": 1.3,
+          "wait": 0.74,
+          "total": 9.01
+        },
+        "沉浸": {
+          "read": 14.11,
+          "decision": 2.6,
+          "wait": 0.74,
+          "total": 17.44
+        }
+      }
+    },
+    {
+      "id": "C",
+      "name": "全内容线·贪婪全翻死亡",
+      "readChars": 2632,
+      "decisionCount": 24,
+      "decisions": [
+        "采样协议:回「收到」/不回",
+        "案卷:记入 vs 只是巧合",
+        "妈:深翻 1",
+        "妈:深翻 2",
+        "妈:深翻 3",
+        "通讯录:拨打老周",
+        "相册:深翻 1",
+        "相册:深翻 2",
+        "相册:边界再试",
+        "录音:播放 REC_047",
+        "录音:播放 REC_012",
+        "录音:试开锁定条目",
+        "尾号8873:打开",
+        "校准:紧张程度 1-5",
+        "校准:被操控感 1-5",
+        "试炼:回复 vs 关闭",
+        "试炼回复:选哪句",
+        "柔柔:深翻 1",
+        "柔柔:深翻 2",
+        "已删除:进入确认",
+        "理由覆盖层",
+        "工具:上传 vs 弃缓存",
+        "46%:继续 vs 中止",
+        "遗言覆盖层"
+      ],
+      "forcedWaitSec": 64.3,
+      "waitItems": {
+        "boot": 6.6,
+        "dialZhou": 1,
+        "rec047": 14,
+        "rec012": 9,
+        "midEnc": 20,
+        "upload92": 2.2,
+        "finalRing": 10,
+        "rejectAuto": 1.5
+      },
+      "topScreens": [
+        {
+          "screen": "th_mom",
+          "chars": 299
+        },
+        {
+          "screen": "th_rou",
+          "chars": 271
+        },
+        {
+          "screen": "report",
+          "chars": 222
+        },
+        {
+          "screen": "menu",
+          "chars": 175
+        },
+        {
+          "screen": "album",
+          "chars": 164
+        },
+        {
+          "screen": "memo2",
+          "chars": 128
+        },
+        {
+          "screen": "inbox",
+          "chars": 124
+        },
+        {
+          "screen": "recPlay",
+          "chars": 112
+        },
+        {
+          "screen": "th_proto",
+          "chars": 99
+        },
+        {
+          "screen": "finalCall",
+          "chars": 97
+        }
+      ],
+      "minutes": {
+        "速读": {
+          "read": 5.26,
+          "decision": 1.2,
+          "wait": 1.07,
+          "total": 7.54
+        },
+        "普通": {
+          "read": 9.4,
+          "decision": 2.4,
+          "wait": 1.07,
+          "total": 12.87
+        },
+        "沉浸": {
+          "read": 19.01,
+          "decision": 4.8,
+          "wait": 1.07,
+          "total": 24.88
+        }
+      }
+    }
+  ]
+}
