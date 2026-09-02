@@ -40,6 +40,7 @@ const WAIT = {
   finalRing:  10,    // 终局来电铃声,按玩家 10s 反应(接/拒时间,不再计入决策)
   rejectAuto: 1.5,   // 拒接后 1500ms 自动接通
   midEnc:     20,    // 中段遭遇(90s/30s 倒计时下),按玩家 20s 内选完(不再计入决策)
+  holdDisc:   1.5,   // 断连长按仪式
   powerOut:   2.6    // 力竭黑屏 2600ms(三条路径均未触发,表留作扩展)
 };
 
@@ -143,6 +144,9 @@ function bootFull(io){
   advance(1700);                       // t=4.7s:自动进 connect
   expect('connect');
   for (let i = 0; i < 200 && CONTENT.currentId === 'connect'; i++) frame();
+  expect('preDeath');
+  frame();
+  KF('Enter');
   expect('brief');
   frame();
   KF('Enter');
@@ -153,7 +157,7 @@ function bootFull(io){
 const PATHS = [
   {
     id: 'A', name: '最短线·中止断连',
-    waits: ['boot'],
+    waits: ['boot', 'holdDisc'],
     decisions: [
       '采样协议:回「收到」/不回',
       '工具:上传并断连 vs 直接断连',
@@ -168,7 +172,8 @@ const PATHS = [
       KF('Escape'); expect('menu');
       KF('6'); expect('tools');
       KF('1'); expect('upload46');               // 理由覆盖层自动作答 → 上传回合1
-      KF('2'); expect('receiptAlive');           // 中止,立即断连
+      KF('2'); expect('holdDisc');               // 断连仪式(键盘退化:Enter 一击)
+      KF('Enter'); expect('receiptAlive');
       frame();
     }
   },
@@ -366,7 +371,7 @@ const PATHS = [
       attribution: null, vault: null, residueClaimed: false, disposal: null,
       memGiven: false, predsA: [], predsB: []
     },
-    waits: ['bootB', 'e5voice', 'residue', 'upload92'],
+    waits: ['bootB', 'e5voice', 'residue', 'upload92', 'holdDisc'],
     decisions: [
       '任务卡:主目标',
       '漂流瓶:取走', '漂流瓶:致谢', '漂流瓶:关闭方式',
@@ -444,7 +449,8 @@ const PATHS = [
       KF('6'); expect('tools');
       KF('c'); frame();
       KF('1'); expect('upload92B');
-      advance(2400); expect('sealBottle');
+      advance(2400); expect('holdDisc');
+      KF('Enter'); expect('sealBottle');
       KF('3'); expect('receiptFull');
       frame();
     }

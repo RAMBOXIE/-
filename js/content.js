@@ -70,7 +70,11 @@ const CONTENT = (() => {
       dt = d.join('');
     }
     L.drawText(20, 0, dt, { corrupt: L.R.corrupt * .5 });
-    L.drawText(96, 0, clk, { corrupt: L.R.corrupt * .5 });
+    /* 90 档死线具象化:回收进程倒计时与时钟交替占位(苏丹卡式「攥在手里的死线」) */
+    if (S.hunt && (Math.floor(performance.now() / 2000) % 2 === 1))
+      L.drawText(96, 0, '回收·' + S.hunt.steps, { corrupt: .06 });
+    else
+      L.drawText(96, 0, clk, { corrupt: L.R.corrupt * .5 });
     const pct = S.battery + '%';
     L.drawBattery(W - 22, 1, ENGINE.batSegs(), L.R.batJitter);
     L.drawText(W - 25 - L.textWidth(pct), 0, pct);
@@ -312,7 +316,12 @@ const CONTENT = (() => {
       disposal: isB ? (S.disposal || base.disposal || null) : null,
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
-      predsB: isB ? S.predictions : (base.predsB || [])
+      predsB: isB ? S.predictions : (base.predsB || []),
+      history: (base.history || []).concat([{
+        inst: '#7741-' + String.fromCharCode(65 + (base.runCount || 0)),
+        ending, kind: S.uploadedOK ? 'uploaded' : ending,
+        cacheVal: S.cacheVal, ev: Object.keys(S.evidence).length
+      }])
     });
   }
   function checkPower(cause){
@@ -325,9 +334,26 @@ const CONTENT = (() => {
     }
     return false;
   }
+  /* 回收进程(90 档被动死线;登记为 M2 数值增项:hunt_steps=4,判定走既有 c90 表) */
+  function huntTick(){
+    if (S.dead || S.alive || S.showtime) return false;
+    if (!S.hunt && S.trace >= 90){
+      S.hunt = { steps: 4 };
+      S.settle.push('回收进程已出发。');
+      ENGINE.logEv('hunt_start', { trace: S.trace });
+      return false;
+    }
+    if (S.hunt){
+      if (S.hunt.grace){ delete S.hunt.grace; return false; }   // 面对当轮不再扣步
+      S.hunt.steps--;
+      if (S.hunt.steps <= 0){ push('huntArrive'); return true; }
+    }
+    return false;
+  }
   function afterAction(){
     schedule();
     if (checkPower()) return true;
+    if (huntTick()) return true;
     if (pendingInterrupt){
       const t = pendingInterrupt; pendingInterrupt = null;
       if (t === 'midEnc'){ ENGINE.setClock(2, 52); S.beats.midEnc = true; push('midEnc1'); return true; }
@@ -433,11 +459,13 @@ const CONTENT = (() => {
         darkText(8, y, '未指定收件人 (1)');
         y += LH + 6;
         if (SV.bottleSealed) { L.drawText(4, y, '漂流瓶 · 投递中 · 尚未被拾起'); y += LH; }
+        y = optSlim(y + 2, '档案', 'A');
         option(H - 42, '接入', 'Enter');
       }
-      hit(0, 0, W, H - 46, 'Enter');
+      hit(0, 0, W, H - 70, 'Enter');
     },
     key(k){
+      if (k === 'A'){ push('archive'); return; }
       if (k === 'Enter' || k === 'softL'){
         if ((performance.now() - this.t0) < 1000) return;
         go(RUN.revisit ? 'inbox' : 'goalB', true);
@@ -593,9 +621,36 @@ const CONTENT = (() => {
       L.rect(bx + 2, 104, Math.round((bw - 4) * pct / 100), 5, 1);
       L.drawText(cxof(pct + '%'), 118, pct + '%');
       L.drawText(cxof('点屏幕操作 · 上滑翻阅 · 右滑返回'), H - 44, '点屏幕操作 · 上滑翻阅 · 右滑返回');
-      if (pct >= 100 && this.p > 130) go('brief', true);
+      if (pct >= 100 && this.p > 130) go('preDeath', true);
     },
     key(){}
+  };
+
+  /* ---- 前人之死(教学=尸体,不是说明书):#6404-C 的回收单一瞥 ---- */
+  SCREENS.preDeath = {
+    transient: true,
+    enter(){ ENGINE.logEv('predeath', {}); },
+    render(){
+      statusBar();
+      let y = 16;
+      L.drawText(4, y, '设备回收单 · #6404-C'); y += LH;
+      L.drawText(4, y, '(第 3 次接入)'); y += LH + 2;
+      L.hline(y, 4, W - 5, 2); y += 6;
+      y = L.drawPara(4, y, '缓存价值: ¥1,570\n未完成传输,全部散佚。\n致死因子: 上传第 2 回合,信号触顶。', W - 8);
+      y += 4;
+      /* 他的遗言(反白)——备忘二那三条,是他死前写给你的 */
+      const lw = '遗言: 「留三成。我自己没做到。」';
+      L.wrap(lw, W - 16).forEach(t => {
+        L.rect(4, y - 2, W - 8, LH + 2, 1);
+        darkText(8, y, t);
+        y += LH + 4;
+      });
+      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
+      L.drawText(4, y, '下一个接入者: 你');
+      option(H - 42, '#7741-A 激活 · 接入', 'Enter');
+      hit(0, 0, W, H - 46, 'Enter');
+    },
+    key(k){ if (k === 'Enter' || k === 'softL') go('brief', true); }
   };
 
   /* ---- 任务备忘(目标先亮起) ---- */
@@ -1694,7 +1749,7 @@ const CONTENT = (() => {
         }
       } else if (k === '2'){
         S.alive = true; ENGINE.logEv('upload_abort', {});
-        go('sealBottle', true);
+        goHold('sealBottle');
       }
     }
   };
@@ -1724,10 +1779,61 @@ const CONTENT = (() => {
   function finishUploadB(viaSave){
     S.alive = true; S.uploadedOK = true;
     if (S.memInCache) S.memGiven = true;
-    if (viaSave) S.settle.push('自救模块: 实例 #7741-B 权限确认', '强制断连。');
     ENGINE.logEv('upload_success', { viaSave });
-    go('sealBottle', true);
+    if (viaSave){
+      /* 自救=系统强制拉出,没有仪式的资格 */
+      S.settle.push('自救模块: 实例 #7741-B 权限确认', '强制断连。');
+      go('sealBottle', true);
+    } else {
+      goHold('sealBottle');       // 判定通过=窗口打开,亲手拔线
+    }
   }
+
+  /* ---- 断连仪式:按住 1.5 秒亲手拔线(掰卡时刻;键盘 Enter 为退化路径) ---- */
+  const HOLDD = { dest: 'receiptAlive' };
+  function goHold(dest){ HOLDD.dest = dest; go('holdDisc', true); }
+  SCREENS.holdDisc = {
+    transient: true,
+    enter(){ this._fired = false; this._tried = false; ENGINE.logEv('disc_hold_enter', {}); },
+    render(){
+      statusBar();
+      const cx = Math.round(W / 2), cy = 112, R0 = 26;
+      const h = window.HOLD;
+      const inBtn = h && h.active &&
+        (h.x - cx) * (h.x - cx) + (h.y - cy) * (h.y - cy) <= (R0 + 12) * (R0 + 12);
+      const p = inBtn ? Math.min(1, (performance.now() - h.t0) / 1500) : 0;
+      if (h && !h.active && this._tried && !this._fired) this._hint = '还连着。';
+      if (inBtn) this._tried = true;
+      L.drawText(cxof('断连窗口已打开'), 24, '断连窗口已打开');
+      /* 信号随拔线逐格熄灭 */
+      const bars = Math.max(0, Math.ceil((1 - p) * 4));
+      for (let b = 0; b < 4; b++){
+        const bh = 4 + b * 4, bx = cx - 14 + b * 8;
+        if (b < bars) L.rect(bx, 58 - bh, 5, bh, 1);
+        else L.hline(57, bx, bx + 4, 1);
+      }
+      L.disc(cx, cy, R0, 1);
+      if (p > 0) L.ring(cx, cy, R0 + 6 + Math.round(p * 4), 2);
+      darkText(cx - 14, cy - 7, '断连');
+      L.drawText(cxof(p > 0 ? '不要松手' : '按住不放'), 152, p > 0 ? '不要松手' : '按住不放');
+      if (p > 0){
+        L.frameRect(28, 168, W - 56, 8);
+        L.rect(30, 170, Math.round((W - 60) * p), 4, 1);
+      } else if (this._hint){
+        L.drawText(cxof(this._hint), 170, this._hint);
+      }
+      hit(cx - R0 - 12, cy - R0 - 12, (R0 + 12) * 2, (R0 + 12) * 2, 'noop');
+      softKeys('', '');
+      if (p >= 1 && !this._fired){ this._fired = true; this.fire(); }
+    },
+    fire(){
+      try { AUDIO.blip(180, .5); } catch(_){}
+      ENGINE.telemetry(['断连·已执行']);
+      ENGINE.logEv('disc_hold_done', {});
+      go(HOLDD.dest, true);
+    },
+    key(k){ if (k === 'Enter') this.fire(); }        // 键盘退化:一击执行
+  };
 
   /* ---- §4.5.3 封瓶(断连成立之后、结算屏之前) ---- */
   SCREENS.sealBottle = {
@@ -1800,12 +1906,14 @@ const CONTENT = (() => {
       let y = L.drawPara(4, 18, t, W - 8);
       y += 8;
       y = option(y, '1 导出反馈', '1');
-      option(y, RUN.revisit ? '#7741-C: 未排期' : '2 回访', RUN.revisit ? 'x' : '2');
+      y = option(y, RUN.revisit ? '#7741-C: 未排期' : '2 回访', RUN.revisit ? 'x' : '2');
+      option(y, '3 档案', '3');
       softKeys('', '');
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
       else if (k === '2' && !RUN.revisit) location.reload();
+      else if (k === '3') push('archive');
     }
   };
   SCREENS.bailConfirm = {
@@ -1820,7 +1928,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){ S.alive = true; S.bailed = true; ENGINE.logEv('bail', {});
-        go(isB ? 'sealBottle' : 'receiptAlive', true); }
+        goHold(isB ? 'sealBottle' : 'receiptAlive'); }
       else if (k === '2' || k === 'softR' || k === 'Escape') back();
     }
   };
@@ -1851,7 +1959,7 @@ const CONTENT = (() => {
         go('upload92', true);
       } else if (k === '2'){
         S.alive = true; ENGINE.logEv('upload_abort', {});
-        go('receiptAlive', true);
+        goHold('receiptAlive');
       }
     }
   };
@@ -1946,6 +2054,77 @@ const CONTENT = (() => {
     L.drawText(W - 4 - L.textWidth(String(s)), 14, String(s));
   }
 
+  /* ---- 回收进程抵达:最后一下由玩家亲手按(躲不掉,但必须你按) ---- */
+  SCREENS.huntArrive = {
+    transient: true,
+    enter(){ ENGINE.logEv('hunt_arrive', {}); },
+    render(){
+      statusBar();
+      L.drawTextScaled(cxof('他们到了', 2), 62, '他们到了', 2, { corrupt: .02 });
+      L.drawPara(4, 104, '回收进程已抵达接入点。', W - 8, { corrupt: .015 });
+      option(H - 60, '面对', 'Enter');
+      softKeys('', '');
+    },
+    key(k){
+      if (k !== 'Enter' && k !== 'softL') return;      // 其他键无效:必须亲手按
+      if (ENGINE.roll('c90')){
+        S.hunt = { steps: 5, grace: true };                          // 扑空,重新定位
+        ENGINE.act('特征比对·不匹配', { bat: 2 }, ['进程掠过了你。']);
+        ENGINE.logEv('hunt_miss', {});
+        back(); afterAction();
+      } else {
+        ENGINE.logEv('hunt_hit', {});
+        if (isB){
+          S.hunt = null;
+          if (b90fail('回收进程锁定接入点。')) return;
+          S.hunt = { steps: 5, grace: true };
+          back(); afterAction();
+        } else {
+          const { lossPct } = ENGINE.downgradeFail();   // 教学局降档表
+          S.hunt = { steps: 5, grace: true };
+          ENGINE.act('特征比对·命中', { bat: 2 },
+            ['电量 −20 → ' + S.battery + '%', '缓存损毁 ' + lossPct + '%', '这一次,它只是擦过。']);
+          back(); afterAction();
+        }
+      }
+    }
+  };
+
+  /* ---- 档案(局外层:失败也在充值,余额看得见) ---- */
+  const ENDING_NAMES = { captured: '被捕获', exhausted: '力竭', disconnected: '断连', uploaded: '断连成功' };
+  SCREENS.archive = {
+    transient: true,
+    enter(){ ENGINE.logEv('archive_open', {}); },
+    render(){
+      statusBar();
+      const sv = SAVE.load() || {};
+      const evNames = { E1: '秒回避实', E2: '最后的照片', E3: '停摆的账单', E4: '第2417条', E5: '语音备忘' };
+      const evs = new Set([...(sv.evidence || []), ...Object.keys(S.evidence)]);
+      let y = 16;
+      L.drawText(4, y, '档案 · 采样终端'); y += LH;
+      L.hline(y, 4, W - 5, 2); y += 5;
+      y = L.drawPara(4, y, '案卷 ' + evs.size + '/5: ' +
+        Object.keys(evNames).map(id => (evs.has(id) ? '■' : '□') + evNames[id]).join(' '), W - 8);
+      const clues = Object.assign({}, sv.clues, S.clues);
+      L.drawText(4, y, '规则线索 ' + ((clues.ruleShape ? 1 : 0) + (clues.ruleParam ? 1 : 0)) + '/2'); y += LH + 2;
+      const hist = sv.history || [];
+      L.drawText(4, y, '接入史 (' + hist.length + '):'); y += LH;
+      hist.slice(-3).forEach(h => {
+        L.drawText(10, y, h.inst + ' ' + (ENDING_NAMES[h.kind] || h.kind) + ' ¥' + (h.cacheVal || 0));
+        y += LH;
+      });
+      if (!hist.length){ L.drawText(10, y, '(首次接入,进行中)'); y += LH; }
+      const kinds = new Set(hist.map(h => h.kind));
+      L.drawText(4, y, '已见结局 ' + kinds.size + '/4'); y += LH;
+      L.drawText(4, y, '漂流瓶: ' + (S.bottleSealed || sv.bottleSealed ? '投递中 · 尚未被拾起' : '未封')); y += LH;
+      const v = S.vault || sv.vault;
+      L.drawText(4, y, '保险箱: ' + (v ? v.name : '空(2格常驻)')); y += LH;
+      option(H - 42, '返回', 'Escape');
+      softKeys('', '返回');
+    },
+    key(k){ if (k === 'Escape' || k === 'softR' || k === 'Enter') back(); }
+  };
+
   /* ---- 力竭(电量归零) ---- */
   SCREENS.powerOut = {
     transient: true,
@@ -2018,7 +2197,8 @@ const CONTENT = (() => {
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
         yy = option(yy, '1 导出反馈', '1');
-        if (!(isB && RUN.revisit)) option(yy, isB ? '2 回访' : '2 重新接入', '2');
+        if (!(isB && RUN.revisit)) yy = option(yy, isB ? '2 回访' : '2 重新接入', '2');
+        option(yy, '3 档案', '3');
         softKeys('', '');
       }
     },
@@ -2027,6 +2207,7 @@ const CONTENT = (() => {
       else if (this.page === 2){
         if (k === '1') window.APP.exportFeedback();
         else if (k === '2' && !(isB && RUN.revisit)) location.reload();
+        else if (k === '3') push('archive');
         else if (k === 'Escape') wipeTap();
       }
     }
@@ -2047,12 +2228,14 @@ const CONTENT = (() => {
       let y = L.drawPara(4, 20, t, W - 8);
       y += 8;
       y = option(y, '1 导出反馈', '1');
-      if (!(isB && RUN.revisit)) option(y, isB ? '2 回访' : '2 重新接入', '2');
+      if (!(isB && RUN.revisit)) y = option(y, isB ? '2 回访' : '2 重新接入', '2');
+      option(y, '3 档案', '3');
       softKeys('', '');
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
       else if (k === '2' && !(isB && RUN.revisit)) location.reload();
+      else if (k === '3') push('archive');
       else if (k === 'Escape') wipeTap();
     }
   };

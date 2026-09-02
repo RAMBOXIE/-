@@ -117,12 +117,25 @@
   const zone = document.getElementById('tapzone');
   const cvs = document.getElementById('lcd');
   let pd = null;   // {x,y,t}
+  /* 长按状态(断连仪式用):LCD 逻辑坐标 + 起按时刻;content 在 render 里轮询 */
+  window.HOLD = { active: false, x: 0, y: 0, t0: 0 };
+  function holdStart(e){
+    const r = cvs.getBoundingClientRect();
+    window.HOLD = {
+      active: true,
+      x: (e.clientX - r.left) / r.width * LCD.W,
+      y: (e.clientY - r.top) / r.height * LCD.H,
+      t0: performance.now()
+    };
+  }
   zone.addEventListener('pointerdown', e => {
     window.AUDIO.ensure();
     pd = { x: e.clientX, y: e.clientY, t: performance.now() };
+    holdStart(e);
     e.preventDefault();
   });
   zone.addEventListener('pointerup', e => {
+    window.HOLD.active = false;
     if (!pd) return;
     const dx = e.clientX - pd.x, dy = e.clientY - pd.y;
     const dt = performance.now() - pd.t;
@@ -139,7 +152,7 @@
     }
     e.preventDefault();
   });
-  zone.addEventListener('pointercancel', () => { pd = null; });
+  zone.addEventListener('pointercancel', () => { pd = null; window.HOLD.active = false; });
 
   addEventListener('keydown', e => {
     const map = { ArrowUp:1, ArrowDown:1, Enter:1, Escape:1,
