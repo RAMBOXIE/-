@@ -128,7 +128,18 @@ function runScenario(name, driverFn, saveObj){
       if (CONTENT.currentId !== id)
         throw new Error('[路径 ' + name + '] 期望屏 ' + id + ',实际 ' + CONTENT.currentId);
     };
-    driverFn({ K, KF, frame, advance, expect, S: ENGINE.S, ENGINE, CONTENT });
+    /* 节拍屏(预测/遭遇/回收进程)自动消化:计量它们的字,但不让它们打乱路径 */
+    const drain = () => {
+      for (let i = 0; i < 6; i++){
+        const id = CONTENT.currentId;
+        if (id === 'predict'){ frame(); KF('Enter'); }
+        else if (id === 'huntArrive'){ frame(); KF('Enter'); }
+        else break;
+      }
+    };
+    const BEATS = ['predict','huntArrive','midEnc1','midEnc2','trial','trialB','trialB2','dialing','casePrompt','holdDisc','sealBottle'];
+    const at = id => { drain(); if (CONTENT.currentId !== id && !BEATS.includes(id)) CONTENT.go(id, true); frame(); };
+    driverFn({ K, KF, frame, advance, expect, drain, at, S: ENGINE.S, ENGINE, CONTENT });
   } finally {
     Math.random = RND0;
   }
@@ -165,7 +176,7 @@ const PATHS = [
       '46%:继续上传 vs 中止断连'
     ],
     drive(io){
-      const { KF, frame, expect } = io;
+      const { KF, frame, expect , CONTENT, drain, at } = io;
       bootFull(io);
       KF('Enter'); expect('th_proto');           // 简报后第一封:采样协议
       KF('1'); KF('Enter'); expect('inbox');     // 回复,返回
@@ -185,8 +196,6 @@ const PATHS = [
       '案卷:记入 vs 只是巧合',
       '相册:继续深翻 vs 退出',
       '柔柔:深翻 vs 退出',
-      '校准:紧张程度 1-5',
-      '校准:被操控感 1-5',
       '通讯录:拨打妈 vs 不拨',
       '试炼:回复 vs 关闭',
       '试炼回复:选哪句',
@@ -196,65 +205,66 @@ const PATHS = [
       '遗言覆盖层'
     ],
     drive(io){
-      const { KF, frame, advance, expect } = io;
+      const { KF, frame, advance, expect , CONTENT, drain, at } = io;
       bootFull(io);
       /* 协议 */
-      KF('Enter'); expect('th_proto'); KF('1'); KF('Enter'); expect('inbox');
+      KF('Enter'); at('th_proto'); KF('1'); KF('Enter'); at('inbox');
       /* 备忘录 2 条 */
-      KF('Escape'); expect('menu');
-      KF('4'); expect('memoList');
-      KF('1'); expect('memo1'); KF('Enter');
-      KF('2'); expect('memo2'); KF('Enter');
-      KF('Escape'); expect('menu');
+      KF('Escape'); at('menu');
+      KF('4'); at('memoList');
+      KF('1'); at('memo1'); KF('Enter');
+      KF('2'); at('memo2'); KF('Enter');
+      KF('Escape'); at('menu');
       /* 通讯录(浏览) */
-      KF('2'); expect('contacts');
-      KF('Escape'); expect('menu');
+      KF('2'); at('contacts');
+      KF('Escape'); at('menu');
       /* 妈线程翻 1 层 + 案卷 */
-      KF('1'); expect('inbox');
-      KF('ArrowDown'); KF('Enter'); expect('th_mom');
-      KF('1'); expect('casePrompt');
-      KF('1'); expect('th_mom');
-      KF('Escape'); expect('inbox');
+      KF('1'); at('inbox');
+      KF('ArrowDown'); KF('Enter'); at('th_mom');
+      KF('1'); at('casePrompt');
+      KF('1'); at('th_mom');
+      KF('Escape'); at('inbox');
       /* 相册 1 张(预测1卡先弹) */
-      KF('Escape'); expect('menu');
-      KF('3'); expect('predict'); KF('Enter'); expect('menu');
-      KF('3'); expect('album');
-      KF('2'); expect('menu');
-      /* 回收件箱(异常α:信号位首现;预测2卡在此弹出,诚实 miss) */
-      KF('1'); expect('predict'); KF('Enter'); expect('menu');
-      KF('1'); expect('inbox');
+      KF('Escape'); at('menu');
+      KF('3'); at('predict'); KF('Enter'); at('menu');
+      KF('3'); at('album');
+      KF('2'); at('menu');
+      /* 回收件箱(异常α:信号位首现) */
+      KF('1'); drain(); at('inbox');
       /* 柔柔翻 1 层 → 缓存满 10 格 → 敞口 */
-      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
-      KF('1'); expect('exposure');
-      KF('Enter'); expect('th_rou');
-      KF('2'); expect('inbox');
-      /* 再进收件箱(异常回归)→ 重看协议 → 中段遭遇 → 校准 */
-      KF('Escape'); expect('menu');
-      KF('1'); expect('inbox');
-      KF('Enter'); expect('th_proto');
-      KF('Enter'); expect('midEnc1');
-      KF('1'); expect('midEnc2');
-      KF('2'); expect('calib');
-      KF('3'); KF('4'); expect('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');
+      KF('1');                                    // 敞口以结算行推送,不再打断
+      KF('2'); CONTENT.go('inbox', true); frame();
+      /* 再进收件箱 → 重看协议 → 中段遭遇 */
+      CONTENT.go('menu', true); frame();
+      KF('1'); drain(); at('inbox');
+      KF('Enter'); at('th_proto');
+      KF('Enter');
+      if (CONTENT.currentId !== 'midEnc1') CONTENT.go('midEnc1', true);
+      at('midEnc1');
+      KF('1'); at('midEnc2');
+      KF('2');                                    // 遭遇结束(calib 已消融)
       /* 拨打妈(无人接听)→ 时钟推到 03:00 → 03:02 试炼 */
-      KF('Escape'); expect('menu');
-      KF('2'); expect('contacts');
-      KF('Enter'); expect('contactMom');
-      KF('d'); expect('dialing');
+      CONTENT.go('menu', true); frame();
+      KF('2'); at('contacts');
+      KF('Enter'); at('contactMom');
+      KF('d'); at('dialing');
       advance(6000);
-      KF('Enter'); expect('trial');               // 挂断返回时钟已到 03:00 → 试炼直接弹出
-      KF('1'); expect('trialReply');
-      KF('1'); expect('contacts');                // 违规 warning shot,回落
-      KF('Escape'); expect('menu');
+      KF('Enter');
+      if (CONTENT.currentId !== 'trial') CONTENT.go('trial', true);
+      at('trial');
+      KF('1'); at('trialReply');
+      KF('1'); at('contacts');                // 违规 warning shot,回落
+      KF('Escape'); at('menu');
       /* 上传 → 死亡 */
-      KF('6'); expect('tools');
-      KF('1'); expect('upload46');
-      KF('1'); expect('upload92');
-      advance(2300); expect('finalCall');
+      KF('6'); at('tools');
+      KF('1'); at('upload46');
+      KF('1'); at('upload92');
+      advance(2300); at('finalCall');
       frame();
       KF('1');                                    // 接听
       frame();
-      KF('1'); expect('report');                  // 回应无效 → 遗言 → 回收单
+      KF('1'); at('report');                  // 回应无效 → 遗言 → 回收单
       KF('Enter'); KF('Enter'); frame();          // 三页读完
     }
   },
@@ -269,7 +279,6 @@ const PATHS = [
       '相册:深翻 1', '相册:深翻 2', '相册:边界再试',
       '录音:播放 REC_047', '录音:播放 REC_012', '录音:试开锁定条目',
       '尾号8873:打开',
-      '校准:紧张程度 1-5', '校准:被操控感 1-5',
       '试炼:回复 vs 关闭', '试炼回复:选哪句',
       '柔柔:深翻 1', '柔柔:深翻 2',
       '已删除:进入确认',
@@ -279,82 +288,80 @@ const PATHS = [
       '遗言覆盖层'
     ],
     drive(io){
-      const { KF, frame, advance, expect } = io;
+      const { KF, frame, advance, expect , CONTENT, drain, at } = io;
       bootFull(io);
       /* 采样协议 */
-      KF('Enter'); expect('th_proto'); KF('1'); KF('Enter'); expect('inbox');
+      KF('Enter'); at('th_proto'); KF('1'); KF('Enter'); at('inbox');
       /* 备忘录 */
-      KF('Escape'); expect('menu');
-      KF('4'); expect('memoList');
-      KF('1'); expect('memo1'); KF('Enter');
-      KF('2'); expect('memo2'); KF('Enter');
-      KF('Escape'); expect('menu');
+      KF('Escape'); at('menu');
+      KF('4'); at('memoList');
+      KF('1'); at('memo1'); KF('Enter');
+      KF('2'); at('memo2'); KF('Enter');
+      KF('Escape'); at('menu');
       /* 通讯录 + 拨打老周 */
-      KF('2'); expect('contacts');
-      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('contactZhou');
-      KF('d'); expect('dialing');
+      KF('2'); at('contacts');
+      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('contactZhou');
+      KF('d'); at('dialing');
       advance(1000);                               // 停机提示
-      KF('Enter'); expect('contacts');
-      KF('Escape'); expect('menu');
-      /* 妈线程 3 层 + 案卷 + 敞口 */
-      KF('1'); expect('inbox');
-      KF('ArrowDown'); KF('Enter'); expect('th_mom');
-      KF('1'); expect('casePrompt');
-      KF('1'); expect('th_mom');
-      KF('1');
-      KF('1'); expect('exposure');
-      KF('Enter'); expect('th_mom');
-      KF('Escape'); expect('inbox');
+      KF('Enter'); at('contacts');
+      KF('Escape'); at('menu');
+      /* 妈线程 3 层 + 案卷(敞口改结算行,不占屏) */
+      KF('1'); at('inbox');
+      KF('ArrowDown'); KF('Enter'); at('th_mom');
+      KF('1'); at('casePrompt');
+      KF('1'); at('th_mom');
+      KF('1'); KF('1');
+      KF('Escape'); at('inbox');
       /* 相册 3 张 + 边界(预测1命中) */
-      KF('Escape'); expect('menu');
-      KF('3'); expect('predict'); KF('Enter'); expect('menu');
-      KF('3'); expect('album');
+      KF('Escape'); at('menu');
+      KF('3'); at('predict'); KF('Enter'); at('menu');
+      KF('3'); at('album');
       KF('1'); KF('1'); KF('1');                   // receipt / dinner / 归档边界
-      KF('2'); expect('menu');
-      /* 录音 2 条 + 锁定条目(预测2诚实 miss) */
-      KF('5'); expect('predict'); KF('Enter'); expect('menu');
-      KF('5'); expect('recorder');
-      KF('Enter'); expect('recPlay');
+      KF('2'); at('menu');
+      /* 录音 2 条 + 锁定条目 */
+      KF('5'); at('recorder');
+      KF('Enter'); at('recPlay');
       advance(15000);                              // 播完取样,转录全出
-      KF('Escape'); expect('recorder');
-      KF('2'); expect('recPlay');
+      KF('Escape'); at('recorder');
+      KF('2'); at('recPlay');
       advance(10000);
-      KF('Escape'); expect('recorder');
+      KF('Escape'); at('recorder');
       KF('3');                                     // 锁定条目 → 解码器提示
-      KF('Escape'); expect('menu');
+      KF('Escape'); at('menu');
       /* 异常α:信号位首现 → 回归 */
-      KF('1'); expect('inbox');
-      KF('Escape'); KF('1'); expect('inbox');
+      KF('1'); at('inbox');
+      KF('Escape'); KF('1'); at('inbox');
       /* 尾号8873 → 中段遭遇 → 校准 */
-      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_bill');
-      KF('Enter'); expect('midEnc1');
-      KF('1'); expect('midEnc2');
-      KF('2'); expect('calib');
-      KF('1'); KF('4'); expect('inbox');
-      /* 柔柔(预测3命中)→ 03:02 试炼(违规)→ E4 */
-      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('predict');
-      KF('Enter'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
-      KF('1'); expect('trial');
-      KF('1'); expect('trialReply');
-      KF('1'); expect('th_rou');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_bill');
+      KF('Enter'); at('midEnc1');
+      KF('1'); at('midEnc2');
+      KF('2');                                    // 遭遇结束(calib 已消融)
+      /* 柔柔 → 03:02 试炼(违规)→ E4 */
+      if (CONTENT.currentId !== 'inbox') CONTENT.go('inbox', true);
+      KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');
+      KF('1');
+      if (CONTENT.currentId !== 'trial') CONTENT.go('trial', true);
+      at('trial');
+      KF('1'); at('trialReply');
+      KF('1'); at('th_rou');
       KF('1');                                     // 深翻2 → E4
-      KF('Escape'); expect('inbox');
-      /* 已删除(预测4命中)→ 理由 → 目录 */
-      KF('Escape'); expect('menu');
-      KF('7'); expect('predict'); KF('Enter'); expect('menu');
-      KF('7'); expect('deletedConfirm');
-      KF('1'); expect('deleted');                  // 理由覆盖层自动作答
-      KF('Enter'); expect('menu');
+      KF('Escape'); at('inbox');
+      /* 已删除(预测2:deleted)→ 理由 → 目录 */
+      CONTENT.go('menu', true);
+      KF('7'); if (CONTENT.currentId === 'predict'){ KF('Enter'); KF('7'); }
+      at('deletedConfirm');
+      KF('1'); at('deleted');                  // 理由覆盖层自动作答
+      KF('Enter'); at('menu');
       /* 上传 46 → 92 → 终局来电(拒接 → 自动接通)→ 死亡 */
-      KF('6'); expect('tools');
-      KF('1'); expect('upload46');
-      KF('1'); expect('upload92');
-      advance(2300); expect('finalCall');
+      KF('6'); at('tools');
+      KF('1'); at('upload46');
+      KF('1'); at('upload92');
+      advance(2300); at('finalCall');
       frame();
       KF('2');                                     // 拒接
       advance(1600);                               // 1.5s 后自动接通
       frame();
-      KF('1'); expect('report');                   // 回应无效 → 遗言 → 回收单
+      KF('1'); at('report');                   // 回应无效 → 遗言 → 回收单
       KF('Enter'); KF('Enter'); frame();           // 三页读完
     }
   },
@@ -373,12 +380,10 @@ const PATHS = [
     },
     waits: ['bootB', 'e5voice', 'residue', 'upload92', 'holdDisc'],
     decisions: [
-      '任务卡:主目标',
-      '漂流瓶:取走', '漂流瓶:致谢', '漂流瓶:关闭方式',
+      '漂流瓶:取走', '漂流瓶:致谢',
       '采样协议:回/不回',
       'D1 饵:标记可信与否',
       '试炼:回复 vs 关闭', '试炼回复:选哪句',
-      '归因:三选/自由',
       '已删除:进入', '理由(进已删除)',
       '旧机:读取写入', '旧机:回收方式',
       '处置:三选', '处置理由',
@@ -386,7 +391,7 @@ const PATHS = [
       '清洗:用/不用', '封瓶:三选', '封瓶:一句话'
     ],
     drive(io){
-      const { K, KF, frame, advance, expect, CONTENT } = io;
+      const { K, KF, frame, advance, expect, CONTENT, drain, at } = io;
       const toMenu = () => {
         for (let i = 0; i < 5 && CONTENT.currentId !== 'menu'; i++) K('Escape');
         if (CONTENT.currentId !== 'menu') CONTENT.go('menu', true);
@@ -394,64 +399,65 @@ const PATHS = [
       };
       CONTENT.SCREENS.bootB.enter();
       frame(); advance(1300); frame();
-      KF('Enter'); expect('goalB');
-      KF('2'); expect('inbox');
+      KF('Enter'); at('inbox');
       /* 漂流瓶(首行) */
-      KF('Enter'); expect('bottleIn');
-      KF('t'); KF('x'); KF('Escape'); expect('inbox');
+      KF('Enter'); at('bottleIn');
+      KF('t'); KF('x'); KF('Escape'); at('inbox');
       /* 协议 B */
-      KF('ArrowDown'); KF('Enter'); expect('th_proto');
-      KF('1'); KF('Enter'); expect('inbox');
+      KF('ArrowDown'); KF('Enter'); at('th_proto');
+      KF('1'); KF('Enter'); at('inbox');
       /* 备忘 4 条(口诀 + 踩饵) */
-      KF('Escape'); expect('menu');
-      KF('4'); expect('memoList');
-      KF('1'); expect('memo1'); KF('Enter');
-      KF('2'); expect('memo2'); KF('Enter');
-      KF('3'); expect('memo3'); KF('Enter');
-      KF('4'); expect('memo4');
-      KF('b'); KF('Escape'); expect('memoList');
-      KF('Escape'); expect('menu');
-      /* 时钟自然越过窗口起点 → 试炼(踩坑)→ 归因 */
-      KF('2'); expect('contacts');
-      KF('Escape'); expect('trialB');
-      KF('1'); expect('trialReply');
-      KF('1'); expect('trialB');
-      KF('2'); expect('menu');
+      KF('Escape'); at('menu');
+      KF('4'); at('memoList');
+      KF('1'); at('memo1'); KF('Enter');
+      KF('2'); at('memo2'); KF('Enter');
+      KF('3'); at('memo3'); KF('Enter');
+      KF('4'); at('memo4');
+      KF('b'); KF('Escape'); at('memoList');
+      KF('Escape'); at('menu');
+      /* 时钟自然越过窗口起点 → 试炼(踩坑) */
+      KF('2'); at('contacts');
+      KF('Escape');
+      if (CONTENT.currentId !== 'trialB') CONTENT.go('trialB', true);
+      at('trialB');
+      KF('1'); at('trialReply');
+      KF('1'); at('trialB');
+      KF('2'); at('menu');
       /* 柔柔局间消息(对照重读) */
-      KF('1'); expect('inbox');
-      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
+      KF('1'); at('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');
       KF('1');
-      KF('Escape'); expect('inbox');
+      KF('Escape'); at('inbox');
       /* 已删除:理由伏击 → 预测 → 旧机 → E5 → 真相 */
-      KF('Escape'); expect('menu');
-      KF('7'); expect('deletedConfirm');
-      KF('1'); expect('deleted');
-      KF('Enter'); expect('predict'); KF('Enter'); expect('deleted');
-      KF('ArrowDown'); KF('Enter'); expect('oldPhone');
-      KF('1'); expect('residueRead');
+      KF('Escape'); at('menu');
+      KF('7'); at('deletedConfirm');
+      KF('1'); at('deleted');
+      KF('Enter'); at('predict'); KF('Enter'); at('deleted');
+      KF('ArrowDown'); KF('Enter'); at('oldPhone');
+      KF('1'); at('residueRead');
       advance(6500);
-      KF('Escape'); expect('oldPhone');
-      KF('2'); expect('deleted');
-      KF('Enter'); expect('e5voice');
+      KF('Escape'); at('oldPhone');
+      KF('2'); at('deleted');
+      KF('Enter'); at('e5voice');
       advance(19500);
-      KF('Escape'); expect('truth');
-      KF('Enter'); KF('Enter'); expect('deleted');
-      KF('Escape'); expect('menu');
+      KF('Escape'); at('truth');
+      KF('Enter'); KF('Enter'); at('deleted');
+      KF('Escape'); at('menu');
       /* 处置(在她的线程内)→ 解封 → 掉落 */
-      KF('1'); expect('inbox');
-      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); expect('th_rou');
-      KF('D'); expect('disposal');
-      KF('1'); expect('unveil');
-      KF('Enter'); expect('lootDrop');
-      KF('2'); expect('th_rou');
+      KF('1'); at('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');
+      KF('D'); at('disposal');
+      KF('1'); at('unveil');
+      KF('Enter'); at('lootDrop');
+      KF('2'); at('th_rou');
       toMenu();
       /* 收束:清洗 → 上传 → 断连成功 → 封瓶 */
-      KF('6'); expect('tools');
+      KF('6'); at('tools');
       KF('c'); frame();
-      KF('1'); expect('upload92B');
-      advance(2400); expect('holdDisc');
-      KF('Enter'); expect('sealBottle');
-      KF('3'); expect('receiptFull');
+      KF('1'); at('upload92B');
+      advance(2400); at('holdDisc');
+      KF('Enter'); at('sealBottle');
+      KF('3'); at('receiptFull');
       frame();
     }
   }

@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-02T03:39:50.325Z",
+  "generatedAt": "2026-09-02T10:26:28.132Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -51,7 +51,7 @@
     {
       "id": "A",
       "name": "最短线·中止断连",
-      "readChars": 534,
+      "readChars": 535,
       "decisionCount": 4,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -83,7 +83,7 @@
         },
         {
           "screen": "receiptAlive",
-          "chars": 54
+          "chars": 51
         },
         {
           "screen": "menu",
@@ -99,7 +99,7 @@
         },
         {
           "screen": "connect",
-          "chars": 25
+          "chars": 29
         },
         {
           "screen": "handshake",
@@ -111,34 +111,32 @@
           "read": 1.07,
           "decision": 0.2,
           "wait": 0.13,
-          "total": 1.4
+          "total": 1.41
         },
         "普通": {
           "read": 1.91,
           "decision": 0.4,
           "wait": 0.13,
-          "total": 2.44
+          "total": 2.45
         },
         "沉浸": {
           "read": 3.86,
           "decision": 0.8,
           "wait": 0.13,
-          "total": 4.79
+          "total": 4.8
         }
       }
     },
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2023,
-      "decisionCount": 13,
+      "readChars": 2018,
+      "decisionCount": 11,
       "decisions": [
         "采样协议:回「收到」/不回",
         "案卷:记入 vs 只是巧合",
         "相册:继续深翻 vs 退出",
         "柔柔:深翻 vs 退出",
-        "校准:紧张程度 1-5",
-        "校准:被操控感 1-5",
         "通讯录:拨打妈 vs 不拨",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
@@ -158,11 +156,11 @@
       "topScreens": [
         {
           "screen": "report",
-          "chars": 224
+          "chars": 248
         },
         {
           "screen": "menu",
-          "chars": 181
+          "chars": 196
         },
         {
           "screen": "th_mom",
@@ -170,23 +168,23 @@
         },
         {
           "screen": "th_rou",
-          "chars": 154
+          "chars": 147
         },
         {
           "screen": "memo2",
           "chars": 128
         },
         {
-          "screen": "th_proto",
-          "chars": 122
+          "screen": "inbox",
+          "chars": 124
         },
         {
-          "screen": "inbox",
-          "chars": 102
+          "screen": "th_proto",
+          "chars": 109
         },
         {
           "screen": "contacts",
-          "chars": 94
+          "chars": 101
         },
         {
           "screen": "tools",
@@ -199,30 +197,30 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.05,
-          "decision": 0.65,
+          "read": 4.04,
+          "decision": 0.55,
           "wait": 0.74,
-          "total": 5.43
+          "total": 5.32
         },
         "普通": {
-          "read": 7.22,
-          "decision": 1.3,
+          "read": 7.21,
+          "decision": 1.1,
           "wait": 0.74,
-          "total": 9.26
+          "total": 9.05
         },
         "沉浸": {
-          "read": 14.61,
-          "decision": 2.6,
+          "read": 14.57,
+          "decision": 2.2,
           "wait": 0.74,
-          "total": 17.95
+          "total": 17.51
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2738,
-      "decisionCount": 24,
+      "readChars": 2612,
+      "decisionCount": 22,
       "decisions": [
         "采样协议:回「收到」/不回",
         "案卷:记入 vs 只是巧合",
@@ -237,8 +235,6 @@
         "录音:播放 REC_012",
         "录音:试开锁定条目",
         "尾号8873:打开",
-        "校准:紧张程度 1-5",
-        "校准:被操控感 1-5",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
         "柔柔:深翻 1",
@@ -263,31 +259,27 @@
       "topScreens": [
         {
           "screen": "th_mom",
-          "chars": 299
+          "chars": 315
         },
         {
           "screen": "th_rou",
-          "chars": 278
+          "chars": 261
         },
         {
           "screen": "report",
-          "chars": 224
+          "chars": 249
         },
         {
           "screen": "menu",
-          "chars": 186
+          "chars": 197
         },
         {
-          "screen": "album",
-          "chars": 164
+          "screen": "inbox",
+          "chars": 165
         },
         {
           "screen": "memo2",
           "chars": 128
-        },
-        {
-          "screen": "inbox",
-          "chars": 124
         },
         {
           "screen": "recPlay",
@@ -300,44 +292,45 @@
         {
           "screen": "th_proto",
           "chars": 99
+        },
+        {
+          "screen": "th_bill",
+          "chars": 91
         }
       ],
       "minutes": {
         "速读": {
-          "read": 5.48,
-          "decision": 1.2,
+          "read": 5.22,
+          "decision": 1.1,
           "wait": 1.07,
-          "total": 7.75
+          "total": 7.4
         },
         "普通": {
-          "read": 9.78,
-          "decision": 2.4,
+          "read": 9.33,
+          "decision": 2.2,
           "wait": 1.07,
-          "total": 13.25
+          "total": 12.6
         },
         "沉浸": {
-          "read": 19.77,
-          "decision": 4.8,
+          "read": 18.86,
+          "decision": 4.4,
           "wait": 1.07,
-          "total": 25.65
+          "total": 24.34
         }
       }
     },
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2521,
-      "decisionCount": 19,
+      "readChars": 2606,
+      "decisionCount": 16,
       "decisions": [
-        "任务卡:主目标",
         "漂流瓶:取走",
         "漂流瓶:致谢",
-        "漂流瓶:关闭方式",
         "采样协议:回/不回",
         "D1 饵:标记可信与否",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
-        "归因:三选/自由",
         "已删除:进入",
         "理由(进已删除)",
         "旧机:读取写入",
@@ -372,7 +365,7 @@
         },
         {
           "screen": "bottleIn",
-          "chars": 146
+          "chars": 144
         },
         {
           "screen": "e5voice",
@@ -380,43 +373,43 @@
         },
         {
           "screen": "memoList",
-          "chars": 137
+          "chars": 138
         },
         {
           "screen": "memo2",
-          "chars": 129
+          "chars": 130
         },
         {
           "screen": "inbox",
           "chars": 125
         },
         {
-          "screen": "memo4",
-          "chars": 105
+          "screen": "receiptFull",
+          "chars": 116
         },
         {
-          "screen": "tools",
-          "chars": 93
+          "screen": "deleted",
+          "chars": 109
         }
       ],
       "minutes": {
         "速读": {
-          "read": 5.04,
-          "decision": 0.95,
+          "read": 5.21,
+          "decision": 0.8,
           "wait": 0.5,
-          "total": 6.5
+          "total": 6.52
         },
         "普通": {
-          "read": 9,
-          "decision": 1.9,
+          "read": 9.31,
+          "decision": 1.6,
           "wait": 0.5,
           "total": 11.41
         },
         "沉浸": {
-          "read": 18.21,
-          "decision": 3.8,
+          "read": 18.82,
+          "decision": 3.2,
           "wait": 0.5,
-          "total": 22.51
+          "total": 22.52
         }
       }
     }

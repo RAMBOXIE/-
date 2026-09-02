@@ -276,7 +276,7 @@ const LCD = (() => {
   }
 
   return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
-           disc, ring, drawTextScaled,
+           disc, ring, drawTextScaled, glyph,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();
 
@@ -447,22 +447,21 @@ const ENGINE = (() => {
     dateStr: _d.getFullYear() + '-' + pad2(_d.getMonth() + 1) + '-' + pad2(_d.getDate()),
     cacheSlots: 0, cacheVal: 0,
     // UI 阶梯
-    signalVisible: false, cacheVisible: false, riskLabels: false,
+    signalVisible: false, riskLabels: false,
     // 演出模式(上传收束起):信号格由剧本置位
     showtime: false, showtimeBars: 3,
     // 证据与线索
     evidence: {}, caseOpen: false, clues: {},
-    violations: 0, saveUsed: false,
+    violations: 0,
     // 节拍
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
     reasons: [], lastWords: null, disposal: null,
-    deletedVisited: false, uploads: 0,
+    deletedVisited: false,
     dead: false, alive: false, exhausted: false, powerOut: false, causeOfDeath: '',
     // 反馈遥测
     log: [], t0: performance.now(), firstTelemetry: null,
-    calib: [],                // 反应校准 {tension, control}
     settle: []                // 最近结算行(叠加显示)
   };
 
@@ -499,7 +498,7 @@ const ENGINE = (() => {
       if (S.battery === 0) S.powerOut = true;   // 力竭:content 在 afterAction 收束
     }
     if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
-      S.cacheVisible = true; parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
+      parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
     if (cost.trace){ S.trace = Math.min(120, S.trace + cost.trace);
       if (S.signalVisible) parts.push('信号 ▲'); }
     S.clock += (cost.mins ?? 4);
@@ -555,7 +554,6 @@ const ENGINE = (() => {
       ...(extra || {}),
       firstTelemetryMs: S.firstTelemetry,
       predictions: S.predictions,
-      calib: S.calib,
       violations: S.violations,
       evidence: Object.keys(S.evidence),
       reasons: S.reasons, lastWords: S.lastWords,
@@ -585,10 +583,10 @@ const CONTENT = (() => {
   /* ---------- 场景层:A 教学局 / B 二次进入 / B' 回访(规格 v0.2) ---------- */
   const SV = SAVE.load();
   const RUN = (() => {
-    if (!SV || !SV.runCount) return { scen: 'A', revisit: false, wFrom: 3 * 60, wTo: 3 * 60 + 14, clock0: 2 * 60 + 12 };
+    if (!SV || !SV.runCount) return { scen: 'A', wFrom: 3 * 60, wTo: 3 * 60 + 14, clock0: 2 * 60 + 12 };
     const k = Math.max(0, (SV.runCount | 0) - 1);       // B'起窗口播种重摇,长度恒 14 分
     const from = 3 * 60 + 31 + (k % 4) * 7;
-    return { scen: 'B', revisit: SV.runCount >= 2, wFrom: from, wTo: from + 14, clock0: 2 * 60 + 58 };
+    return { scen: 'B', wFrom: from, wTo: from + 14, clock0: 2 * 60 + 58 };
   })();
   const isB = RUN.scen === 'B';
   const wStr = ENGINE.fmtClock(RUN.wFrom);
@@ -694,34 +692,12 @@ const CONTENT = (() => {
     hit(0, y - 1, W / 2, 22, k1); hit(W / 2, y - 1, W / 2, 22, k2);
     return y + 23;
   }
-  /* 反白字形:与 LCD 同参数的本地光栅化(缓存) */
-  const invCache = new Map();
-  function rasterGlyph(ch){
-    const hitc = invCache.get(ch); if (hitc) return hitc;
-    const SS = 4, CELL_H = 14;
-    const half = ch.charCodeAt(0) < 0x2000 && !/[，。、：；「」『』（）？！—·…♥]/.test(ch);
-    const cw = half ? 7 : 14, GW = cw * SS, GH = CELL_H * SS;
-    const cv = document.createElement('canvas'); cv.width = GW; cv.height = GH;
-    const g2 = cv.getContext('2d', { willReadFrequently: true });
-    g2.fillStyle = '#fff'; g2.textAlign = 'center'; g2.textBaseline = 'alphabetic';
-    g2.font = (half ? CELL_H * SS * .92 : CELL_H * SS * .98) + 'px ' +
-      (half ? 'ui-monospace,Menlo,Consolas,monospace' : '"Microsoft YaHei","Noto Sans SC",sans-serif');
-    g2.fillText(ch, GW / 2, GH * .80);
-    const d = g2.getImageData(0, 0, GW, GH).data;
-    const cov = new Float32Array(cw * CELL_H), inv = 1 / (SS * SS * 255);
-    for (let y = 0; y < CELL_H; y++) for (let x = 0; x < cw; x++){
-      let s = 0;
-      for (let j = 0; j < SS; j++){ const row = (y * SS + j) * GW;
-        for (let i = 0; i < SS; i++) s += d[(row + x * SS + i) * 4 + 3]; }
-      cov[y * cw + x] = s * inv;
-    }
-    const g = { cw, cov }; invCache.set(ch, g); return g;
-  }
-  function darkText(x, y, str){        // 在亮条上写"暗字" = 反白
+  /* 反白 = 在亮条上写"暗字"。字形复用渲染器的 glyph(同字体栈、同缓存) */
+  function darkText(x, y, str){
     let cx = x;
     for (const ch of str){
       if (ch === ' '){ cx += 7; continue; }
-      const g = rasterGlyph(ch);
+      const g = L.glyph(ch);
       for (let j = 0; j < 14; j++) for (let i = 0; i < g.cw; i++){
         if (g.cov[j * g.cw + i] > L.R.threshold) L.setPx(cx + i, y + j, 0);
       }
@@ -813,10 +789,9 @@ const CONTENT = (() => {
     if (!isB){
       const visited = Object.keys(seen).filter(id => SCREENS[id] && SCREENS[id].counted).length;
       if (!S.beats.anomaly && visited >= 5) S.beats.anomaly = 'ready';
-      if (S.beats.anomaly === true && !S.beats.midEnc && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
+      /* 遭遇只看探索深度与时钟:不再依赖玩家是否二次回到收件箱(否则直奔上传者永不遭遇) */
+      if (!S.beats.midEnc && visited >= 6 && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
       if (S.beats.midEnc && !S.beats.trial && S.clock >= 3 * 60){ ENGINE.setClock(3, 2); pendingInterrupt = 'trial'; }
-      else if (S.beats.trial === 'ignored1' && !S.beats.trial2 && S.clock >= 3 * 60 + 6 && S.clock <= 3 * 60 + 14)
-        pendingInterrupt = 'trial2';
     } else {
       /* B:试炼=首个 clock≥窗口起点的动作结束(clamp:不倒拨,时间戳仍显示窗口起点) */
       if (!S.beats.trial && S.clock >= RUN.wFrom) pendingInterrupt = 'trialB';
@@ -824,25 +799,10 @@ const CONTENT = (() => {
                S.clock >= RUN.wTo - 4 && S.clock <= RUN.wTo)
         pendingInterrupt = 'trialB2';                    // 03:44「晚安。」窗口最后一分钟
     }
-    if (!S.beats.exposure && S.cacheSlots >= 10) pendingInterrupt = pendingInterrupt || 'exposure';
-  }
-  /* 归因冲洗点(14③):踩坑结算屏关闭 / 死亡流程前 / 收束开始,先到者 */
-  let attrNext = null;
-  function flushAttr(next){
-    if (!S.pendAttr){ next(); return; }
-    S.pendAttr = false;
-    const opts = ['这局跟他那局不一样', '他记的是他自己那次', '我不信这张卡']
-      .map(v => ({ v, r: Math.random() })).sort((a, b) => a.r - b.r).map(o => o.v);
-    window.OVERLAY.show({
-      title: '归因采集',
-      hint: '#5502-D 写:「我那次的窗口是 03:00 到 03:14。」他为什么写错?',
-      options: opts, freeText: true, keepLabel: '(保留)'
-    }, res => {
-      S.attribution = res.kept ? null : res.text;
-      S.attrAnswered = !res.kept;
-      ENGINE.logEv('attribution', { text: res.kept ? '(保留)' : res.text });
-      next();
-    });
+    if (!S.beats.exposure && S.cacheSlots >= 8){        // 敞口:不请自来,但不占全屏
+      S.beats.exposure = true;
+      S.settle.push('缓存 ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal + '。工具 > 备份 可断连。');
+    }
   }
   /* B 局 90 档失败链:濒死 → 自救【真掷50,省电−15】→ 失败=死(v3.1 §3.2) */
   function b90fail(cause){
@@ -856,11 +816,9 @@ const CONTENT = (() => {
     return true;
   }
   function dieB(cause){
-    flushAttr(() => {
-      S.dead = true; S.causeOfDeath = cause;
-      ENGINE.logEv('death', { cause });
-      askLastWords(() => go('report', true));
-    });
+    S.dead = true; S.causeOfDeath = cause;
+    ENGINE.logEv('death', { cause });
+    askLastWords(() => go('report', true));
   }
   /* 结局落地时写存档(死亡不清零认知) */
   function writeSave(ending){
@@ -872,19 +830,13 @@ const CONTENT = (() => {
       evidence: Object.keys(S.evidence),
       caseOpen: S.caseOpen,
       clues: S.clues,
-      riskLabels: true,
       deletedVisitedA: isB ? !!base.deletedVisitedA : S.deletedVisited,
       recsA: isB ? (base.recsA || []) : ['rec047', 'rec012'].filter(id => seen['_smp_' + id]),
       lastCacheVal: S.cacheVal,
       lastReason: S.reasons.length ? S.reasons[S.reasons.length - 1] : null,
       lastReasonKept: !!S.reasonKept,
       lastWords: S.lastWords || null,
-      violationsA: isB ? (base.violationsA || 0) : S.violations,
-      bottleRead: isB ? !!S.bottleRead : false,
-      bottleTaken: isB ? !!S.bottleTaken : false,
-      bottleReply: isB ? (S.bottleReply || null) : null,
       bottleSealed: isB ? (S.bottleSealed || base.bottleSealed || null) : null,
-      attribution: isB ? (S.attribution || null) : null,
       vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
       residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
       disposal: isB ? (S.disposal || base.disposal || null) : null,
@@ -909,19 +861,16 @@ const CONTENT = (() => {
     return false;
   }
   /* 回收进程(90 档被动死线;登记为 M2 数值增项:hunt_steps=4,判定走既有 c90 表) */
+  /* 回收进程:溯源 75+ 触发一次可数死线。每局只抵达一次(宪法 11 恐怖峰 ≤2) */
   function huntTick(){
-    if (S.dead || S.alive || S.showtime) return false;
-    if (!S.hunt && S.trace >= 90){
+    if (S.dead || S.alive || S.showtime || S.huntDone) return false;
+    if (!S.hunt && S.trace >= 75){
       S.hunt = { steps: 4 };
       S.settle.push('回收进程已出发。');
       ENGINE.logEv('hunt_start', { trace: S.trace });
       return false;
     }
-    if (S.hunt){
-      if (S.hunt.grace){ delete S.hunt.grace; return false; }   // 面对当轮不再扣步
-      S.hunt.steps--;
-      if (S.hunt.steps <= 0){ push('huntArrive'); return true; }
-    }
+    if (S.hunt && --S.hunt.steps <= 0){ push('huntArrive'); return true; }
     return false;
   }
   function afterAction(){
@@ -932,20 +881,17 @@ const CONTENT = (() => {
       const t = pendingInterrupt; pendingInterrupt = null;
       if (t === 'midEnc'){ ENGINE.setClock(2, 52); S.beats.midEnc = true; push('midEnc1'); return true; }
       if (t === 'trial'){ S.beats.trial = 'active'; push('trial'); return true; }
-      if (t === 'trial2'){ S.beats.trial2 = true; push('trial2'); return true; }
       if (t === 'trialB'){ S.beats.trial = 'active'; push('trialB'); return true; }
       if (t === 'trialB2'){ S.beats.trial2 = true; push('trialB2'); return true; }
-      if (t === 'exposure'){ S.beats.exposure = true; push('exposure'); return true; }
     }
     return false;
   }
   /* 预测:去往内容屏前,如条件满足先弹预测卡。
      A 局 conf 为占位数字;B 局一律「置信度: 建档中」(宪法 6:无分布不捏精度)。 */
+  /* 两次足够:一次高概率命中(教)+一次容易落空(教收敛语域)。置信度不编数字。 */
   const PREDS_A = [
-    { target: 'album', after: () => seen.th_mom, conf: 87 },
-    { target: 'th_bill', after: () => seen.album, conf: 74 },
-    { target: 'th_rou', after: () => S.beats.midEnc, conf: 81 },
-    { target: 'deleted', after: () => seen.th_rou, conf: 66 }
+    { target: 'album', after: () => seen.th_mom, conf: null },
+    { target: 'deleted', after: () => seen.th_rou, conf: null }
   ];
   const PREDS_B = [
     (SV && SV.lastEnding === 'captured')
@@ -954,7 +900,6 @@ const CONTENT = (() => {
   ];
   const PREDS = isB ? PREDS_B : PREDS_A;
   function maybePredict(){
-    if (window.NO_PREDICT) return false;           // A/B 对照组
     if (S.pendingPrediction) return false;
     const idx = S.predictions.length;
     if (idx >= PREDS.length) return false;
@@ -1006,14 +951,13 @@ const CONTENT = (() => {
   /* B1 激活屏(备装并入;仪式压缩:threshold 渐显,可点跳) */
   SCREENS.bootB = {
     transient: true,
-    enter(){ this.t0 = performance.now(); ENGINE.logEv('bootB', { revisit: RUN.revisit }); },
+    enter(){ this.t0 = performance.now(); ENGINE.logEv('bootB', {}); },
     render(){
       const t = (performance.now() - this.t0) / 1000;
       const thr = { threshold: Math.max(L.R.threshold, .85 - t * .6) };
       statusBar();
       let y = 22;
-      const head = RUN.revisit ? '回访 · 处置余波'
-        : (SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活');
+      const head = SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
         L.drawText(4, y, '案卷继承: 证据 ' + Object.keys(S.evidence).length + '/5 · 规则线索 ' +
@@ -1033,41 +977,21 @@ const CONTENT = (() => {
         darkText(8, y, '未指定收件人 (1)');
         y += LH + 6;
         if (SV.bottleSealed) { L.drawText(4, y, '漂流瓶 · 投递中 · 尚未被拾起'); y += LH; }
-        y = optSlim(y + 2, '档案', 'A');
+        y += 2;
+        L.drawText(4, y, '本次目标: 补齐案卷' + (oldPhoneAvail() ? ' · 回收 #7741-A' : '')); y += LH;
         option(H - 42, '接入', 'Enter');
       }
       hit(0, 0, W, H - 70, 'Enter');
     },
     key(k){
-      if (k === 'A'){ push('archive'); return; }
       if (k === 'Enter' || k === 'softL'){
         if ((performance.now() - this.t0) < 1000) return;
-        go(RUN.revisit ? 'inbox' : 'goalB', true);
+        go('inbox', true);
       }
     }
   };
 
   /* B5 任务卡(标记主目标;两条都可做;裸退/力竭存活者无旧机项) */
-  SCREENS.goalB = {
-    transient: true,
-    render(){
-      statusBar();
-      let y = L.drawPara(4, 18, '任务卡 · 本次接入', W - 8);
-      y += 2; L.hline(y, 4, W - 5, 2); y += 8;
-      y = option(y, '1 同机真相: 案卷 ' + Object.keys(S.evidence).length + '/5。补齐它。', '1');
-      if (oldPhoneAvail()){
-        y = option(y, '2 旧机回收: #7741-A', '2');
-        y = L.drawPara(8, y + 2, '缓存散佚在已删除目录。\n你的理由还挂在原地。', W - 16) + 4;
-      }
-      softKeys('', '');
-    },
-    key(k){
-      if (k === '1' || k === '2' || k === 'Enter'){
-        ENGINE.logEv('goal_pick', { goal: k === '2' ? 'oldphone' : 'truth' });
-        go('inbox', true);
-      }
-    }
-  };
 
   /* B4 漂流瓶 · 收(#5502-D 种子瓶=受控刺激物,仅限原型;上线前须由真实封瓶池替换) */
   const BOTTLE_TXT = '收件人: ∞\n发信: 实例 #5502-D\n封瓶于 03:41\n\n「第二条备忘我试过。是真的。我那次的窗口是 03:00 到 03:14。过了这段就能回她。别硬扛,她会问第二遍。」\n\n[附件: 缓存清洗 ×1]\n理由: 已署名·仅存档\n[已读回执: 你 · 第1人]';
@@ -1087,10 +1011,8 @@ const CONTENT = (() => {
       L.hline(26, 4, W - 5, 2);
       let y = L.drawPara(4, 31, BOTTLE_TXT, W - 8);
       y = settleLines(y + 2);
-      let yy = H - 63;
-      yy = btn2(yy, S.bottleTaken ? '已取走' : '取走', 't', '回信', 'r');
-      btn2(yy, '致谢', 'x', '关闭', 'Escape');
-      softKeys('', '');
+      btn2(H - 45, S.bottleTaken ? '已取走' : '取走', 't', '致谢', 'x');
+      softKeys('', '关闭');
     },
     key(k){
       if (k === 't'){
@@ -1098,18 +1020,6 @@ const CONTENT = (() => {
         S.bottleTaken = true; S.cleanser = 1;
         ENGINE.act('取走·缓存清洗 ×1', { bat: 2 }, ['缓存 0 格']);
         ENGINE.logEv('bottle_take', {});
-      } else if (k === 'r'){
-        window.OVERLAY.show({
-          title: '回信', hint: '收件人: #5502-D · 异步投递,不知何时到。',
-          options: ['谢了。我会小心她的问题。', '你那格缓存,我替你传上去。'],
-          freeText: true, keepLabel: '(算了)'
-        }, res => {
-          if (!res.kept){
-            S.bottleReply = res.text;
-            ENGINE.act('回信·已投递', { bat: 3 }, ['缓存 0 格']);
-            ENGINE.logEv('bottle_reply', { text: res.text });
-          }
-        });
       } else if (k === 'x'){
         ENGINE.telemetry(['致谢·已送达', '电量 0', '缓存 0', '信号 —']);   // 两个零一个破折号,逐字渲染
         ENGINE.logEv('bottle_thanks', {});
@@ -1349,7 +1259,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (!this._done){
-        if (k === '1'){ this._done = true; ENGINE.act('回复·已送达', { bat: 5 }); S.repliedProto = true; }
+        if (k === '1'){ this._done = true; ENGINE.act('回复·已送达', { bat: 5 }); }
         else if (k === '2'){ this._done = true; ENGINE.act('已读·未回', { bat: 3 }); }
         else if (k === 'softR' || k === 'Escape') back();
       } else if (k === 'Enter' || k === 'softL' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
@@ -1425,7 +1335,7 @@ const CONTENT = (() => {
     }
   };
   /* B 局对照样本:操作电照扣,零缓存零信号(canon:协议开场「部分残留为对照样本」) */
-  function archived(name){ ENGINE.act(name, { bat: 2 }, ['对照样本 · 不入账']); }
+  function archived(name){ ENGINE.act(name, { bat: 2 }, ['已归档 · 不重复入账']); }
   SCREENS.memo1 = {
     counted: true,
     enter(){ if (!this._t){ this._t = true;
@@ -1465,7 +1375,7 @@ const CONTENT = (() => {
   const CONTACT_ROWS = [
     { label: '★ 妈',      to: 'contactMom',  y: 40 },
     { label: '★ 柔柔 ♥',  to: 'contactRou',  y: 58 },
-    { label: '  老周',    to: 'contactZhou', y: 94, right: '47天前' },
+    { label: '  老周',    to: null, y: 94, right: '47天前' },
     { label: '  其他 34 人', to: null,       y: 112 }
   ];
   SCREENS.contacts = {
@@ -1534,10 +1444,6 @@ const CONTENT = (() => {
     ['备注: 每日提醒 ' + wStr, '消息 2,417 条 · 通话 0 次'],
     'th_rou',
     { name: '柔柔 ♥', ringMs: 1600, result: '通话被挂断。\n\n柔柔 ♥ : 你怎么会打电话?\n阿帆从来不打电话。' });
-  SCREENS.contactZhou = contactScreen('老周',
-    ['最后通话: 47 天前 · 3 秒'],
-    null,
-    { name: '老周', ringMs: 900, result: '您拨打的号码已停机。' });
 
   /* 拨号(拨打不属于"回复消息",不走违规经济) */
   SCREENS.dialing = {
@@ -1579,11 +1485,12 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- 格4 妈(E1,可深翻 3 层;B' 回访:处置余波前置页) ---- */
-  const MOM_AFTERMATH = {
-    'continue': '[今天 08:00] 妈: 帆,降温了\n[今天 08:00] 阿帆: 不冷。妈你早点睡。\n\n——早上八点。「早点睡」。\n整点,秒回,还在继续。',
-    'delete': '妈 (3)\n[昨天] 帆,怎么不回妈\n[今天] 帆?\n[今天] 妈就问一句,你还好吗\n\n——(无回复)',
-    'tell': '[线程已终止]\n最后一条: 来自 #7741-B 的署名讯息。\n\n(此后,妈没有再发过消息。)'
+  /* ---- 格4 妈(E1,可深翻 3 层) ---- */
+  /* 处置的后果:在本局结局屏显现(取代原 B' 回访态) */
+  const DISPOSAL_ECHO = {
+    'continue': '妈的线程还在走。\n今天早上八点:「不冷。妈你早点睡。」\n整点,秒回。她没有停过。',
+    'delete': '妈的线程停在三条未读。\n「帆?」「妈就问一句,你还好吗」\n没有人会再回了。',
+    'tell': '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。'
   };
   const MOM_PAGES = [
     '妈:\n[三天前] 帆,降温了,你那边冷不冷\n[三天前] 阿帆: 不冷。刚吃过,妈你早点睡。\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。',
@@ -1595,11 +1502,7 @@ const CONTENT = (() => {
     counted: true,
     enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
     swipe(dir){ if (dir === 'up') this.key('1'); },
-    pages(){
-      if (RUN.revisit && SV.disposal && MOM_AFTERMATH[SV.disposal])
-        return [MOM_AFTERMATH[SV.disposal]].concat(MOM_PAGES);
-      return MOM_PAGES;
-    },
+    pages(){ return MOM_PAGES; },
     render(){
       statusBar();
       const pgs = this.pages();
@@ -1615,7 +1518,7 @@ const CONTENT = (() => {
     key(k){
       if (k === '1' && this._depth < this.pages().length - 1){
         this._depth++;
-        if (isB && hasE('E1')) archived('重读·对照样本');
+        if (isB && hasE('E1')) archived('重读·已归档');
         else {
           ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
           if (!S.evidence.E1){
@@ -1689,7 +1592,7 @@ const CONTENT = (() => {
       if (k === '1'){
         if (this.idx < 2){
           this.idx++;
-          if (isB && hasE('E2')) archived('重读·对照样本');
+          if (isB && hasE('E2')) archived('重读·已归档');
           else if (this.idx === 1)
             ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, ['外卖单据的特写。尾号 8873。']);
           else
@@ -1708,7 +1611,7 @@ const CONTENT = (() => {
     counted: true,
     enter(){
       if (!this._t){ this._t = true;
-        if (isB && hasE('E3')) ENGINE.act('打开·会话', { bat: 3, trace: 4 }, ['对照样本 · 不入账']);
+        if (isB && hasE('E3')) ENGINE.act('打开·会话', { bat: 3, trace: 4 }, ['已归档 · 不重复入账']);
         else {
           ENGINE.act('打开·会话', { bat: 3, trace: 4, slots: 2, val: 150 });
           evidence('E3');
@@ -1735,14 +1638,11 @@ const CONTENT = (() => {
   const ROU_INTERIM = '柔柔 ♥ (2,419 条)\n\n[昨夜] 柔柔: 昨天夜里,你看了我们的对话。\n[昨夜] 柔柔: 看到第 2,417 条了。我数着。\n\n[上滑 = 重读旧消息]';
   function rouPages(){
     if (!isB) return ROU_PAGES;
-    if (RUN.revisit && SV.disposal === 'delete')
-      return ['柔柔 ♥\n\n[该线程已于上次接入被删除]\n\n执行者: #7741-B。\n(你做的。)'];
     if (hasE('E4')) return [ROU_INTERIM, ROU_PAGES[2]];
     return ROU_PAGES;
   }
   /* 关系通道:发消息可用性(线程被删除后不可再发) */
-  const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete' &&
-    !(RUN.revisit && SV && SV.disposal === 'delete');
+  const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete';
   /* 发送:成本与违规全由引擎裁决;LLM 只渲染她的措辞(宪法 2) */
   function sendToRou(text){
     if (COMPANION.crisis(text)){
@@ -1758,7 +1658,6 @@ const CONTENT = (() => {
       const kind = ENGINE.violate();
       S.beats.trial = 'replied';                 // 窗口探针目的已达,试炼不再另弹
       if (kind === 'warn'){
-        if (isB && S.bottleRead) S.pendAttr = true;
         ENGINE.act('消息·已送达', { bat: 2 }, ['已送达 → 未送达 → 已送达']);
         ENGINE.logEv('violation_warn', { via: 'freetext' });
       } else {
@@ -1844,7 +1743,7 @@ const CONTENT = (() => {
       if (k === 'D' && S.beats.truthDone && !S.disposal){ push('disposal'); return; }
       if (this._depth < pages.length - 1 && k === '1'){
         this._depth++;
-        if (isB && hasE('E4')) archived('重读·对照样本');
+        if (isB && hasE('E4')) archived('重读·已归档');
         else {
           ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 240 });
           if (this._depth >= pages.length - 1) evidence('E4');
@@ -1944,7 +1843,7 @@ const CONTENT = (() => {
       L.drawText(4, 30, '[最后一条] 柔柔: 晚安。');
       L.hline(46, 4, W - 5, 2);
       let y = 52;
-      if (!window.NO_PREDICT){ L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2; }
+      L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2;
       y = L.drawPara(4, y, '处置(首个处置级署名时刻):', W - 8) + 2;
       y = option(y, '1 删除她——妈的消息将永远无人回复', '1');
       y = option(y, '2 让她继续回——像没来过', '2');
@@ -1962,10 +1861,9 @@ const CONTENT = (() => {
           freeText: true, keepLabel: '(保留)'
         }, res => {
           S.disposal = chosen;
-          if (res.kept){ S.disposalReasonKept = true; ENGINE.logEv('disposal_reason', { kept: true }); }
+          if (res.kept){ S.reasonKept = true; ENGINE.logEv('disposal_reason', { kept: true }); }
           else { S.reasons.push(res.text); ENGINE.logEv('disposal_reason', { text: res.text }); }
-          if (!window.NO_PREDICT){ go('unveil', true); }
-          else go('lootDrop', true);
+          go('unveil', true);
         });
       }
       else if (k === 'softR' || k === 'Escape') back();
@@ -1998,8 +1896,8 @@ const CONTENT = (() => {
     transient: true,
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, '样本质量评级: S\n(证据 5/5 · 理由 ' + S.reasons.length + ' 条 · 首见行为 ' +
-        (S.attrAnswered ? 2 : 1) + ')\n你是第 1 个读懂他的人。', W - 8);
+      let y = L.drawPara(4, 16, '样本质量评级: S\n(证据 5/5 · 理由 ' + S.reasons.length + ' 条' +
+        ')\n你是第 1 个读懂他的人。', W - 8);
       y += 4; L.hline(y, 4, W - 5, 2); y += 6;
       y = L.drawPara(4, y, '独占掉落\n记忆模块「阿帆的最后一夜」\n¥1,200(2格)\n会说话的资产: 交付即终结它。', W - 8);
       y += 6;
@@ -2272,12 +2170,11 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){
-        if (isB) flushAttr(() => askReason(() => startUploadB()));
+        if (isB) askReason(() => startUploadB());
         else askReason(() => startUpload());
       }
       else if (k === '2'){
-        if (isB) flushAttr(() => push('bailConfirm'));
-        else push('bailConfirm');
+        push('bailConfirm');
       }
       else if (k === 'c' && isB && S.cleanser > 0){
         S.cleanser--;
@@ -2292,14 +2189,15 @@ const CONTENT = (() => {
   /* B13 上传收束状态机:92% 定位 → 终局遭遇【真掷60】→ 失败 → 自救【50】→ 失败=死;
      任一成功 = 断连成功(缓存入库)。查扣在定位判定前结算(风险事前可见)。 */
   function startUploadB(){
-    S.uploads = 1;
-    SCREENS.uploadB.rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
+    /* 至少 2 回合:「再贪一轮 vs 现在就走」这个抉择必须出现(与 A 局 46%→92% 同构);
+       缓存越多回合越多,贪婪照样加价 */
+    SCREENS.uploadB.rounds = Math.max(2, Math.ceil(S.cacheSlots / 10));
     SCREENS.uploadB.round = 1;
     ENGINE.act('上传·回合 1', { bat: 2, trace: 5, mins: 4 });
     if (checkPower('电量在传输中耗尽。缓存散佚。')) return;
     schedule();                                            // 上传回合计入试炼触发检查
     if (pendingInterrupt === 'trialB'){ pendingInterrupt = null; S.beats.trial = 'active'; push('trialB'); return; }
-    go(SCREENS.uploadB.rounds <= 1 ? 'upload92B' : 'uploadB', true);
+    go('uploadB', true);
   }
   SCREENS.uploadB = {
     render(){
@@ -2478,17 +2376,17 @@ const CONTENT = (() => {
       if (S.memGiven) t += '\n\n记忆模块已交付。它不会再说话了。';
       else if (S.vault) t += '\n\n记忆模块在保险箱。云盘循环播放着最后一句。';
       if (S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
+      /* 处置的后果:在本局就看得见(取代 B' 回访态) */
+      if (S.disposal && DISPOSAL_ECHO[S.disposal]) t += '\n────────────\n' + DISPOSAL_ECHO[S.disposal];
       let y = L.drawPara(4, 18, t, W - 8);
       y += 8;
       y = option(y, '1 导出反馈', '1');
-      y = option(y, RUN.revisit ? '#7741-C: 未排期' : '2 回访', RUN.revisit ? 'x' : '2');
-      option(y, '3 档案', '3');
+      option(y, '2 回访', '2');
       softKeys('', '');
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
-      else if (k === '2' && !RUN.revisit) location.reload();
-      else if (k === '3') push('archive');
+      else if (k === '2') location.reload();
     }
   };
   SCREENS.bailConfirm = {
@@ -2509,7 +2407,6 @@ const CONTENT = (() => {
   };
 
   function startUpload(){
-    S.uploads = 1;
     ENGINE.act('上传·回合 1', { bat: 2, trace: 5, mins: 4 });
     if (checkPower('电量在传输中耗尽。缓存散佚。')) return;
     go('upload46', true);
@@ -2642,62 +2539,24 @@ const CONTENT = (() => {
     },
     key(k){
       if (k !== 'Enter' && k !== 'softL') return;      // 其他键无效:必须亲手按
+      S.hunt = null; S.huntDone = true;                // 每局只抵达一次,不再循环
       if (ENGINE.roll('c90')){
-        S.hunt = { steps: 5, grace: true };                          // 扑空,重新定位
         ENGINE.act('特征比对·不匹配', { bat: 2 }, ['进程掠过了你。']);
         ENGINE.logEv('hunt_miss', {});
         back(); afterAction();
       } else {
         ENGINE.logEv('hunt_hit', {});
         if (isB){
-          S.hunt = null;
           if (b90fail('回收进程锁定接入点。')) return;
-          S.hunt = { steps: 5, grace: true };
           back(); afterAction();
         } else {
           const { lossPct } = ENGINE.downgradeFail();   // 教学局降档表
-          S.hunt = { steps: 5, grace: true };
           ENGINE.act('特征比对·命中', { bat: 2 },
             ['电量 −20 → ' + S.battery + '%', '缓存损毁 ' + lossPct + '%', '这一次,它只是擦过。']);
           back(); afterAction();
         }
       }
     }
-  };
-
-  /* ---- 档案(局外层:失败也在充值,余额看得见) ---- */
-  const ENDING_NAMES = { captured: '被捕获', exhausted: '力竭', disconnected: '断连', uploaded: '断连成功' };
-  SCREENS.archive = {
-    transient: true,
-    enter(){ ENGINE.logEv('archive_open', {}); },
-    render(){
-      statusBar();
-      const sv = SAVE.load() || {};
-      const evNames = { E1: '秒回避实', E2: '最后的照片', E3: '停摆的账单', E4: '第2417条', E5: '语音备忘' };
-      const evs = new Set([...(sv.evidence || []), ...Object.keys(S.evidence)]);
-      let y = 16;
-      L.drawText(4, y, '档案 · 采样终端'); y += LH;
-      L.hline(y, 4, W - 5, 2); y += 5;
-      y = L.drawPara(4, y, '案卷 ' + evs.size + '/5: ' +
-        Object.keys(evNames).map(id => (evs.has(id) ? '■' : '□') + evNames[id]).join(' '), W - 8);
-      const clues = Object.assign({}, sv.clues, S.clues);
-      L.drawText(4, y, '规则线索 ' + ((clues.ruleShape ? 1 : 0) + (clues.ruleParam ? 1 : 0)) + '/2'); y += LH + 2;
-      const hist = sv.history || [];
-      L.drawText(4, y, '接入史 (' + hist.length + '):'); y += LH;
-      hist.slice(-3).forEach(h => {
-        L.drawText(10, y, h.inst + ' ' + (ENDING_NAMES[h.kind] || h.kind) + ' ¥' + (h.cacheVal || 0));
-        y += LH;
-      });
-      if (!hist.length){ L.drawText(10, y, '(首次接入,进行中)'); y += LH; }
-      const kinds = new Set(hist.map(h => h.kind));
-      L.drawText(4, y, '已见结局 ' + kinds.size + '/4'); y += LH;
-      L.drawText(4, y, '漂流瓶: ' + (S.bottleSealed || sv.bottleSealed ? '投递中 · 尚未被拾起' : '未封')); y += LH;
-      const v = S.vault || sv.vault;
-      L.drawText(4, y, '保险箱: ' + (v ? v.name : '空(2格常驻)')); y += LH;
-      option(H - 42, '返回', 'Escape');
-      softKeys('', '返回');
-    },
-    key(k){ if (k === 'Escape' || k === 'softR' || k === 'Enter') back(); }
   };
 
   /* ---- 力竭(电量归零) ---- */
@@ -2721,8 +2580,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       const ev = Object.keys(S.evidence).length;
-      const predLine = window.NO_PREDICT ? null :
-        '预测命中: ' + S.predictions.filter(p => p.hit).length + '/' + S.predictions.length;
+      const predLine = '预测命中: ' + S.predictions.filter(p => p.hit).length + '/' + S.predictions.length;
       if (this.page === 0){
         let cf;
         if (S.exhausted) cf = '反事实: 电量剩三成时,上传已经足够。你把它翻完了。';
@@ -2737,13 +2595,17 @@ const CONTENT = (() => {
         hit(0, 12, W, H - 28, 'Enter');
         softKeys('下一页', '');
       } else if (this.page === 1){
+        /* 案卷具名:证据 n/5 到底是哪五件(原档案页唯一不重复的内容) */
+        const EV_NAMES = { E1: '秒回避实', E2: '最后的照片', E3: '停摆的账单', E4: '第2417条', E5: '语音备忘' };
+        const evList = Object.keys(EV_NAMES)
+          .map(id => (S.evidence[id] ? '■' : '□') + EV_NAMES[id]).join(' ');
         let t = isB
-          ? '样本评级: ' + (S.beats.truthDone ? 'S' : 'B') + '\n案卷保留: 证据 ' + ev + '/5\n(死亡不清零认知。)'
-          : '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n(死亡不清零认知。)';
-        if (isB && S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';
+          ? '样本评级: ' + (S.beats.truthDone ? 'S' : 'B') + '\n案卷保留: 证据 ' + ev + '/5\n' + evList + '\n(死亡不清零认知。)'
+          : '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n' + evList + '\n(死亡不清零认知。)';
         if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
-        if (isB && S.disposal) t += '\n处置: [已署名·仅存档]';
         if (isB && S.vault) t += '\n保险箱: ' + S.vault.name;
+        if (isB && S.disposal && DISPOSAL_ECHO[S.disposal])
+          t += '\n处置: [已署名·仅存档]\n' + DISPOSAL_ECHO[S.disposal];
         let y = L.drawPara(4, 16, t, W - 8);
         y += 4;
         // 遗言与理由:玩家的字,反白呈现(红墨裁决:屏内反白,真红只在局外)
@@ -2765,15 +2627,13 @@ const CONTENT = (() => {
         softKeys('下一页', '');
       } else {
         let t = isB
-          ? (RUN.revisit ? '本次接入已结算。\n\n————\n感谢试玩 M2 切片。'
-                         : '你的旧机已进入回收队列。\n#7741-C: 未排期。\n\n————\n感谢试玩 M2 切片。')
+          ? '你的旧机已进入回收队列。\n#7741-C: 未排期。\n\n————\n感谢试玩 M2 切片。'
           : '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n\n————\n感谢试玩 M2 切片。';
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
         yy = option(yy, '1 导出反馈', '1');
-        if (!(isB && RUN.revisit)) yy = option(yy, isB ? '2 回访' : '2 重新接入', '2');
-        option(yy, '3 档案', '3');
+        option(yy, isB ? '2 回访' : '2 重新接入', '2');
         softKeys('', '');
       }
     },
@@ -2781,8 +2641,7 @@ const CONTENT = (() => {
       if (this.page < 2 && (k === 'Enter' || k === 'softL')) this.page++;
       else if (this.page === 2){
         if (k === '1') window.APP.exportFeedback();
-        else if (k === '2' && !(isB && RUN.revisit)) location.reload();
-        else if (k === '3') push('archive');
+        else if (k === '2') location.reload();
         else if (k === 'Escape') wipeTap();
       }
     }
@@ -2803,14 +2662,12 @@ const CONTENT = (() => {
       let y = L.drawPara(4, 20, t, W - 8);
       y += 8;
       y = option(y, '1 导出反馈', '1');
-      if (!(isB && RUN.revisit)) y = option(y, isB ? '2 回访' : '2 重新接入', '2');
-      option(y, '3 档案', '3');
+      y = option(y, isB ? '2 回访' : '2 重新接入', '2');
       softKeys('', '');
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
-      else if (k === '2' && !(isB && RUN.revisit)) location.reload();
-      else if (k === '3') push('archive');
+        else if (k === '2') location.reload();
       else if (k === 'Escape') wipeTap();
     }
   };
@@ -2821,6 +2678,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       const p = S.pendingPrediction;
+      if (!p){ back(); return; }                    // 无待决预测:不该停在这一屏
       const label = { album: '相册', th_bill: '尾号 8873', th_rou: '柔柔 ♥', deleted: '已删除' }[p.target];
       L.frameRect(8, 60, W - 16, 64);
       L.drawText(16, 72, '采样终端·辅助层');
@@ -2851,7 +2709,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){ timer = null; go('midEnc2', true); }
-      else if (k === '2'){ timer = null; ENGINE.act('会话已关闭', { bat: 2, trace: 5 }); go('calib', true); }
+      else if (k === '2'){ timer = null; ENGINE.act('会话已关闭', { bat: 2, trace: 5 }); S.riskLabels = true; back(); }
     }
   };
   SCREENS.midEnc2 = {
@@ -2880,37 +2738,8 @@ const CONTENT = (() => {
         }
       } else if (k === '2') ENGINE.act('未回应', { bat: 2, trace: 5 });
       else ENGINE.act('会话已关闭', { bat: 2 });
-      go('calib', true);
-    }
-  };
-  SCREENS.calib = {
-    transient: true,
-    enter(){ this.step = 0; this.vals = []; },
-    render(){
-      statusBar();
-      L.frameRect(8, 36, W - 16, 76);
-      L.drawText(16, 46, '反应校准');
-      L.drawText(16, 66, '刚才那一轮:');
-      L.drawText(16, 86, this.step === 0 ? '紧张程度  1-5' : '被操控感  1-5');
-      for (let i = 0; i < 5; i++){
-        const x = 14 + i * 34;
-        L.frameRect(x, 126, 28, 24);
-        L.drawText(x + 11, 131, String(i + 1));
-        hit(x - 2, 122, 32, 32, String(i + 1));
-      }
-      softKeys('', '');
-    },
-    key(k){
-      if (k >= '1' && k <= '5'){
-        this.vals.push(+k);
-        if (this.step === 0) this.step = 1;
-        else {
-          S.calib.push({ tension: this.vals[0], control: this.vals[1] });
-          ENGINE.logEv('calib', { tension: this.vals[0], control: this.vals[1] });
-          S.riskLabels = true;
-          back();
-        }
-      }
+      S.riskLabels = true;      // 遭遇结束解锁风险标注(原由 calib 承担)
+      back();
     }
   };
 
@@ -2956,8 +2785,7 @@ const CONTENT = (() => {
         const kind = ENGINE.violate();
         S.beats.trial = 'replied';
         if (kind === 'warn'){
-          if (isB && S.bottleRead) S.pendAttr = true;   // 14③:归因待冲洗
-          ENGINE.act('已送达', { bat: 2 },
+            ENGINE.act('已送达', { bat: 2 },
             ['已送达 → 未送达 → 已送达', '柔柔:「你打字的样子变了。」']);
           ENGINE.logEv('violation_warn', {});
         } else {
@@ -2994,9 +2822,9 @@ const CONTENT = (() => {
       if (k === '1') push('trialReply');
       else if (k === '2' || k === 'Escape' || k === 'softR'){
         if (S.beats.trial !== 'replied'){ S.beats.trial = 'ignored1'; ENGINE.logEv('trialB_ignore', {}); }
-        flushAttr(() => back());
+        back();
       }
-      else if (k === 'Enter'){ flushAttr(() => back()); }
+      else if (k === 'Enter'){ back(); }
     }
   };
   /* B8b 第二遍(瓶已预告「她会问第二遍」):窗口最后一分钟的「晚安。」 */
@@ -3015,41 +2843,11 @@ const CONTENT = (() => {
       if (k === '1') push('trialReply');
       else if (k === '2' || k === 'Escape' || k === 'softR' || k === 'Enter'){
         ENGINE.logEv('trialB2_ignore', {});
-        flushAttr(() => back());
+        back();
       }
     }
   };
-  SCREENS.trial2 = {
-    transient: true,
-    render(){
-      statusBar();
-      L.drawPara(4, 24, '柔柔 ♥ :\n\n阿帆,你是阿帆吗?', W - 8);
-      let y = 104;
-      y = option(y, '1 回复', '1');
-      option(y, '2 关闭', '2');
-      softKeys('选择', '');
-    },
-    key(k){
-      if (k === '1') push('trialReply');
-      else if (k === '2'){ ENGINE.logEv('trial2_ignore', {}); back(); }
-    }
-  };
 
-  SCREENS.exposure = {
-    transient: true,
-    render(){
-      statusBar();
-      const rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
-      L.frameRect(8, 52, W - 16, 84);
-      L.drawText(16, 64, '采样终端·辅助层');
-      L.drawText(16, 84, '缓存: ' + S.cacheSlots + ' 格 ≈ ¥' + S.cacheVal);
-      L.drawText(16, 100, '上传预计: ' + rounds + ' 回合');
-      L.drawText(16, 116, '工具 > 备份 可断连');
-      hit(0, 0, W, H, 'Enter');
-      softKeys('继续', '');
-    },
-    key(k){ if (k === 'Enter' || k === 'softL' || k === 'softR') back(); }
-  };
 
   /* ---- 理由 / 遗言(自由文本覆盖层;反白纪律见 report) ---- */
   function askReason(then){
@@ -3101,14 +2899,13 @@ const CONTENT = (() => {
     key, tap,
     exportExtra(){
       return {
-        scenario: RUN.scen, revisit: RUN.revisit,
+        scenario: RUN.scen,
         runCount: SV ? SV.runCount || 0 : 0,
         window: wStr + '-' + ENGINE.fmtClock(RUN.wTo),
-        attribution: S.attribution || null,
         disposal: S.disposal || null,
         truth: !!S.beats.truthDone,
         bottle: { read: !!S.bottleRead, taken: !!S.bottleTaken,
-                  reply: S.bottleReply || null, sealed: S.bottleSealed || null },
+                  sealed: S.bottleSealed || null },
         vault: S.vault || null,
         rouChat: S.rouChat, msgQuotaLeft: S.msgQuota
       };

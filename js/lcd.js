@@ -192,6 +192,6 @@ const LCD = (() => {
   }
 
   return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
-           disc, ring, drawTextScaled,
+           disc, ring, drawTextScaled, glyph,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();

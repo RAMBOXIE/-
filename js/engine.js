@@ -13,22 +13,21 @@ const ENGINE = (() => {
     dateStr: _d.getFullYear() + '-' + pad2(_d.getMonth() + 1) + '-' + pad2(_d.getDate()),
     cacheSlots: 0, cacheVal: 0,
     // UI 阶梯
-    signalVisible: false, cacheVisible: false, riskLabels: false,
+    signalVisible: false, riskLabels: false,
     // 演出模式(上传收束起):信号格由剧本置位
     showtime: false, showtimeBars: 3,
     // 证据与线索
     evidence: {}, caseOpen: false, clues: {},
-    violations: 0, saveUsed: false,
+    violations: 0,
     // 节拍
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
     reasons: [], lastWords: null, disposal: null,
-    deletedVisited: false, uploads: 0,
+    deletedVisited: false,
     dead: false, alive: false, exhausted: false, powerOut: false, causeOfDeath: '',
     // 反馈遥测
     log: [], t0: performance.now(), firstTelemetry: null,
-    calib: [],                // 反应校准 {tension, control}
     settle: []                // 最近结算行(叠加显示)
   };
 
@@ -65,7 +64,7 @@ const ENGINE = (() => {
       if (S.battery === 0) S.powerOut = true;   // 力竭:content 在 afterAction 收束
     }
     if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
-      S.cacheVisible = true; parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
+      parts.splice(1, 0, '缓存 +' + (cost.val || 0) + '(' + cost.slots + '格)'); }
     if (cost.trace){ S.trace = Math.min(120, S.trace + cost.trace);
       if (S.signalVisible) parts.push('信号 ▲'); }
     S.clock += (cost.mins ?? 4);
@@ -121,7 +120,6 @@ const ENGINE = (() => {
       ...(extra || {}),
       firstTelemetryMs: S.firstTelemetry,
       predictions: S.predictions,
-      calib: S.calib,
       violations: S.violations,
       evidence: Object.keys(S.evidence),
       reasons: S.reasons, lastWords: S.lastWords,
