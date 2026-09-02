@@ -5,7 +5,7 @@ python - << 'PY'
 import io, re
 html = io.open('index.html', encoding='utf-8').read()
 def inline(m):
-    return '<script>\n' + io.open(m.group(1), encoding='utf-8').read() + '\n</script>'
+    return '<script>\n' + io.open(m.group(1).split('?')[0], encoding='utf-8').read() + '\n</script>'
 full = re.sub(r'<script src="([^"]+)"></script>', inline, html)
 io.open('dist/escape-ai.html', 'w', encoding='utf-8', newline='\n').write(full)
 # Artifact 版:去外壳标签,保留 <style> 与 <body> 内容

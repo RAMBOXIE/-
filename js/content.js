@@ -620,7 +620,8 @@ const CONTENT = (() => {
       L.frameRect(bx, 102, bw, 9);
       L.rect(bx + 2, 104, Math.round((bw - 4) * pct / 100), 5, 1);
       L.drawText(cxof(pct + '%'), 118, pct + '%');
-      L.drawText(cxof('点屏幕操作 · 上滑翻阅 · 右滑返回'), H - 44, '点屏幕操作 · 上滑翻阅 · 右滑返回');
+      L.drawText(cxof('点屏幕上的选项操作'), H - 58, '点屏幕上的选项操作');
+      L.drawText(cxof('上滑深搜 · 右滑返回'), H - 42, '上滑深搜 · 右滑返回');
       if (pct >= 100 && this.p > 130) go('preDeath', true);
     },
     key(){}
@@ -2514,6 +2515,9 @@ const CONTENT = (() => {
     if (k === 'swipeLeft') return;
     if (s.key) s.key(k);
   }
+
+  /* 初始屏的 enter 没有人会替你调(go 只管切换)——开机动画的表在这里起 */
+  { const s0 = SCREENS[cur]; if (s0 && s0.enter) s0.enter(); }
 
   /* ---------- 对外 ---------- */
   return {

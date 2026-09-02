@@ -132,6 +132,8 @@
     window.AUDIO.ensure();
     pd = { x: e.clientX, y: e.clientY, t: performance.now() };
     holdStart(e);
+    /* 捕获指针:手指拖出屏幕外松手时 pointerup 仍回到 zone,防长按状态悬挂 */
+    try { zone.setPointerCapture(e.pointerId); } catch(_){}
     e.preventDefault();
   });
   zone.addEventListener('pointerup', e => {

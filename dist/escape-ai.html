@@ -15,7 +15,7 @@
   html,body{margin:0;background:#0a0c0b;color:var(--ink);
     font:13px/1.6 ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei",monospace;
     -webkit-font-smoothing:antialiased;min-height:100%}
-  .wrap{display:flex;align-items:flex-start;justify-content:center;padding:16px 8px 40px}
+  .wrap{display:flex;align-items:center;justify-content:center;padding:12px 8px;min-height:100dvh}
 
   .device{width:min(688px,100vw - 16px);padding:20px clamp(12px,4vw,36px) 20px;border-radius:16px;
     background:linear-gradient(180deg,var(--shell) 0%,var(--shell-2) 100%);
@@ -35,8 +35,8 @@
   .chin{margin-top:12px;text-align:center;font-size:10px;letter-spacing:.5em;color:#39413e}
 
   /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
-  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-    background:rgba(5,10,8,.88);z-index:9}
+  .overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
+    padding-top:9vh;background:rgba(5,10,8,.88);z-index:9}   /* 上对齐:iOS 软键盘弹出时输入框不被盖住 */
   .overlay.on{display:flex}
   .sheet{width:min(430px,92vw);background:#0c1512;border:1px solid #234;border-color:#1f3a31;
     border-radius:8px;padding:20px 18px}
@@ -1194,7 +1194,8 @@ const CONTENT = (() => {
       L.frameRect(bx, 102, bw, 9);
       L.rect(bx + 2, 104, Math.round((bw - 4) * pct / 100), 5, 1);
       L.drawText(cxof(pct + '%'), 118, pct + '%');
-      L.drawText(cxof('点屏幕操作 · 上滑翻阅 · 右滑返回'), H - 44, '点屏幕操作 · 上滑翻阅 · 右滑返回');
+      L.drawText(cxof('点屏幕上的选项操作'), H - 58, '点屏幕上的选项操作');
+      L.drawText(cxof('上滑深搜 · 右滑返回'), H - 42, '上滑深搜 · 右滑返回');
       if (pct >= 100 && this.p > 130) go('preDeath', true);
     },
     key(){}
@@ -3089,6 +3090,9 @@ const CONTENT = (() => {
     if (s.key) s.key(k);
   }
 
+  /* 初始屏的 enter 没有人会替你调(go 只管切换)——开机动画的表在这里起 */
+  { const s0 = SCREENS[cur]; if (s0 && s0.enter) s0.enter(); }
+
   /* ---------- 对外 ---------- */
   return {
     get current(){ return SCREENS[cur]; },
@@ -3259,6 +3263,8 @@ const CONTENT = (() => {
     window.AUDIO.ensure();
     pd = { x: e.clientX, y: e.clientY, t: performance.now() };
     holdStart(e);
+    /* 捕获指针:手指拖出屏幕外松手时 pointerup 仍回到 zone,防长按状态悬挂 */
+    try { zone.setPointerCapture(e.pointerId); } catch(_){}
     e.preventDefault();
   });
   zone.addEventListener('pointerup', e => {

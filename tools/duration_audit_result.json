@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-02T03:34:14.149Z",
+  "generatedAt": "2026-09-02T03:39:50.325Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -221,7 +221,7 @@
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2741,
+      "readChars": 2738,
       "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -271,7 +271,7 @@
         },
         {
           "screen": "report",
-          "chars": 227
+          "chars": 224
         },
         {
           "screen": "menu",
@@ -310,16 +310,16 @@
           "total": 7.75
         },
         "普通": {
-          "read": 9.79,
+          "read": 9.78,
           "decision": 2.4,
           "wait": 1.07,
-          "total": 13.26
+          "total": 13.25
         },
         "沉浸": {
-          "read": 19.8,
+          "read": 19.77,
           "decision": 4.8,
           "wait": 1.07,
-          "total": 25.67
+          "total": 25.65
         }
       }
     },
