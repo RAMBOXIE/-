@@ -645,7 +645,7 @@ const CONTENT = (() => {
     }
     L.drawText(20, 0, dt, { corrupt: L.R.corrupt * .5 });
     /* 90 档死线具象化:回收进程倒计时与时钟交替占位(苏丹卡式「攥在手里的死线」) */
-    if (S.hunt && (Math.floor(performance.now() / 2000) % 2 === 1))
+    if (S.hunt && !S.dead && !S.alive && (Math.floor(performance.now() / 2000) % 2 === 1))
       L.drawText(96, 0, '回收·' + S.hunt.steps, { corrupt: .06 });
     else
       L.drawText(96, 0, clk, { corrupt: L.R.corrupt * .5 });
@@ -2406,7 +2406,7 @@ const CONTENT = (() => {
       ENGINE.logEv('disc_hold_done', {});
       go(HOLDD.dest, true);
     },
-    key(k){ if (k === 'Enter') this.fire(); }        // 键盘退化:一击执行
+    key(k){ if (k === 'Enter' && !this._fired){ this._fired = true; this.fire(); } }   // 键盘退化:一击执行
   };
 
   /* ---- §4.5.3 封瓶(断连成立之后、结算屏之前) ---- */
