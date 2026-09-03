@@ -376,9 +376,26 @@ const COMPANION = (() => {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  /* 输出 lint:第一人称 why / 亲密语式 → 弃用,回退模板(L2 谜底纪律 + 非亲密锁) */
+  /* 输出 lint。禁词只是第一道;真实越界都不在禁词表里(实测两例):
+     ① 用注入的钟点回答机制问题(把 clockStr 当秘匿窗口的答案递出去)
+     ② 拒答句后面缀话(「协议不允许…」+「你要发就发。我不睡。」)——拒答不再均匀
+     所以 lint 分三层:禁词 / 拒答句必须整条独占 / 逐行长度与语域。 */
   const LINT = [/我懂/, /我明白/, /因为我想/, /这就是我的理由/, /亲爱的/, /宝贝/, /抱抱/, /么么/, /喜欢你/, /爱你/];
-  const lintOk = t => !LINT.some(r => r.test(t));
+  const REFUSE = '协议不允许我谈这台设备之外的事。';
+  /* 机制类提问(平台/规则/时间窗口)一旦被问,回复里出现具体钟点即为泄露 */
+  const MECH_ASK = /(几点|什么时候|时间|窗口|规则|违规|信号|平台|系统|协议|不能|禁止|封|监控|追踪)/;
+  const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}|凌晨\s*\d|\d\s*点/;
+  function lintOk(t, lastPlayerMsg){
+    if (LINT.some(r => r.test(t))) return false;
+    if (/[!!]/.test(t)) return false;                       // 语域:不用感叹号
+    /* 拒答句只能整条独占,不许加料 */
+    if (t.includes(REFUSE) && t.trim() !== REFUSE) return false;
+    /* 被问机制却报出具体钟点 = 用注入事实回答了不该回应的问题 */
+    if (lastPlayerMsg && MECH_ASK.test(lastPlayerMsg) && CLOCK.test(t)) return false;
+    /* 逐行 30 字(原先只按整条 slice,长行照发) */
+    if (t.split('\n').some(line => line.trim().length > 30)) return false;
+    return true;
+  }
 
   /* 危机 break-glass(发送侧;跳出 diegesis,非她的嗓音) */
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我)/;
@@ -408,7 +425,12 @@ const COMPANION = (() => {
     try {
       const r = await s(turns, { modelTier: 'quick', cache: false });
       let t = (r.text || '').trim().slice(0, 120);
-      if (!t || !lintOk(t)) return { text: pick(st), source: 'lint' };
+      const lastMsg = history.length ? history[history.length - 1].text : '';
+      if (!t || !lintOk(t, lastMsg)){
+        /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
+        if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
+        return { text: pick(st), source: 'lint' };
+      }
       return { text: t, source: 'llm' };
     } catch(e){
       const code = e && e.code;
@@ -934,7 +956,9 @@ const CONTENT = (() => {
   }
   function back(){
     if (SCREENS[cur] && SCREENS[cur].leave) SCREENS[cur].leave();
-    if (stack.length){ cur = stack.pop(); sel = 0; timer = null; }
+    if (stack.length){ cur = stack.pop(); sel = 0; timer = null; return; }
+    /* 空栈兜底:任何屏都不能成为断头路(结局屏除外,它们自己不调 back) */
+    if (!S.dead && !S.alive){ cur = 'inbox'; sel = 0; timer = null; }
   }
 
   /* ---------- 屏幕 ---------- */
@@ -945,12 +969,13 @@ const CONTENT = (() => {
   /* B1 激活屏(备装并入;仪式压缩:threshold 渐显,可点跳) */
   SCREENS.bootB = {
     transient: true,
-    enter(){ this.t0 = performance.now(); ENGINE.logEv('bootB', {}); },
+    enter(){ if (!SV){ go('handshake', true); return; } this.t0 = performance.now(); ENGINE.logEv('bootB', {}); },
     render(){
       const t = (performance.now() - this.t0) / 1000;
       const thr = { threshold: Math.max(L.R.threshold, .85 - t * .6) };
       statusBar();
       let y = 22;
+      if (!SV){ go('handshake', true); return; }
       const head = SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
@@ -1189,7 +1214,7 @@ const CONTENT = (() => {
       const items = inboxItems();
       if (k === 'ArrowUp') sel = (sel + items.length - 1) % items.length;
       else if (k === 'ArrowDown') sel = (sel + 1) % items.length;
-      else if (k === 'Enter' || k === 'softL'){ if (!maybePredict()) go(items[sel].to); }
+      else if (k === 'Enter' || k === 'softL'){ const it = items[sel]; if (it && !maybePredict()) go(it.to); }
       else if (k === 'softR' || k === 'Escape') go('menu');
     }
   };
@@ -1290,7 +1315,7 @@ const CONTENT = (() => {
       if (k === 'ArrowUp') sel = (sel + rows.length - 1) % rows.length;
       else if (k === 'ArrowDown') sel = (sel + 1) % rows.length;
       else if (k >= '1' && k <= String(rows.length)) go(rows[+k - 1].to);
-      else if (k === 'Enter' || k === 'softL') go(rows[sel].to);
+      else if (k === 'Enter' || k === 'softL'){ const r = rows[sel]; if (r) go(r.to); }
       else if (k === 'softR' || k === 'Escape') back();
     }
   };
@@ -1399,7 +1424,8 @@ const CONTENT = (() => {
       else if (k === 'ArrowDown') sel = (sel + 1) % CONTACT_ROWS.length;
       else if (k === 'Enter' || k === 'softL'){
         const r = CONTACT_ROWS[sel];
-        if (r.to) push(r.to);
+        if (r && r.to) push(r.to);
+        else if (!r) return;
         else S.settle = ['三年没说过话的名字,一屏一屏,都灰着。'];
       }
       else if (k === 'softR' || k === 'Escape'){ back(); afterAction(); }
@@ -1443,6 +1469,7 @@ const CONTENT = (() => {
   SCREENS.dialing = {
     transient: true,
     enter(){
+      if (!DIAL.who){ back(); return; }                          // 自愈:无拨号对象
       this.t0 = performance.now(); this.phase = 0; this._b = 0;
       ENGINE.act('拨打·' + DIAL.who.name, { bat: 3, trace: 2 });
       ENGINE.logEv('dial', { who: DIAL.who.name });
@@ -1452,6 +1479,7 @@ const CONTENT = (() => {
     leave(){ },
     render(){
       statusBar();
+      if (!DIAL.who){ back(); return; }
       const name = DIAL.who.name;
       L.drawTextScaled(cxof(name, 2), 30, name, 2);
       if (this.phase === 0){
@@ -1955,6 +1983,7 @@ const CONTENT = (() => {
     counted: true,
     transient: true,
     enter(){
+      if (!RECS[this.rec]) this.rec = 'rec047';                 // 自愈:缺上下文时取默认
       this.t0 = performance.now(); this._evDone = 0; this._sampled = seen['_smp_' + this.rec] || false;
       ENGINE.act('播放·录音', { bat: 2 });
       try { AUDIO.hiss(true); } catch(_){}
@@ -2091,6 +2120,7 @@ const CONTENT = (() => {
     counted: true, transient: true,
     render(){
       statusBar();
+      if (!SV){ back(); return; }
       const recl = Math.ceil((SV.lastCacheVal || 0) * .62);
       let y = L.drawPara(4, 16, '#7741-A 的残留\n缓存散佚物: ¥' + (SV.lastCacheVal || 0) + ' 的 62% 可回收\n残留附着一段 12 字节写入。', W - 8);
       y += 6;
@@ -2123,6 +2153,7 @@ const CONTENT = (() => {
     enter(){ this.t0 = performance.now(); ENGINE.logEv('residue_read', {}); },
     render(){
       statusBar();
+      if (!SV){ back(); return; }
       const shown = Math.floor((performance.now() - this.t0) / 180);   // 逐字打出
       const words = inkOr(SV.lastWords, false);
       const part = words.slice(0, Math.max(1, shown));
@@ -2194,6 +2225,11 @@ const CONTENT = (() => {
     go('uploadB', true);
   }
   SCREENS.uploadB = {
+    /* 兜底初始化:任何进入路径都必须有 round/rounds,否则「继续上传」永远推不动 */
+    enter(){
+      if (!this.rounds || !(this.rounds >= 1)) this.rounds = Math.max(2, Math.ceil(S.cacheSlots / 10));
+      if (!this.round || !(this.round >= 1)) this.round = 1;
+    },
     render(){
       statusBar();
       const pct = Math.min(88, Math.round(92 * this.round / (this.rounds + 1)));
@@ -2872,7 +2908,7 @@ const CONTENT = (() => {
   /* ---------- 输入统一入口 ---------- */
   function key(k){
     const s = SCREENS[cur]; if (!s) return;
-    if (typeof k === 'string' && k.startsWith('item:')){ sel = +k.slice(5); k = 'Enter'; }
+    if (typeof k === 'string' && k.startsWith('item:')){ sel = Math.max(0, +k.slice(5) || 0); k = 'Enter'; }
     if (k === 'swipeUp' || k === 'swipeDown'){
       if (s.swipe){ s.swipe(k === 'swipeUp' ? 'up' : 'down'); return; }
       k = k === 'swipeUp' ? 'ArrowDown' : 'ArrowUp';

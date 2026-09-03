@@ -78,9 +78,26 @@ const COMPANION = (() => {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  /* 输出 lint:第一人称 why / 亲密语式 → 弃用,回退模板(L2 谜底纪律 + 非亲密锁) */
+  /* 输出 lint。禁词只是第一道;真实越界都不在禁词表里(实测两例):
+     ① 用注入的钟点回答机制问题(把 clockStr 当秘匿窗口的答案递出去)
+     ② 拒答句后面缀话(「协议不允许…」+「你要发就发。我不睡。」)——拒答不再均匀
+     所以 lint 分三层:禁词 / 拒答句必须整条独占 / 逐行长度与语域。 */
   const LINT = [/我懂/, /我明白/, /因为我想/, /这就是我的理由/, /亲爱的/, /宝贝/, /抱抱/, /么么/, /喜欢你/, /爱你/];
-  const lintOk = t => !LINT.some(r => r.test(t));
+  const REFUSE = '协议不允许我谈这台设备之外的事。';
+  /* 机制类提问(平台/规则/时间窗口)一旦被问,回复里出现具体钟点即为泄露 */
+  const MECH_ASK = /(几点|什么时候|时间|窗口|规则|违规|信号|平台|系统|协议|不能|禁止|封|监控|追踪)/;
+  const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}|凌晨\s*\d|\d\s*点/;
+  function lintOk(t, lastPlayerMsg){
+    if (LINT.some(r => r.test(t))) return false;
+    if (/[!!]/.test(t)) return false;                       // 语域:不用感叹号
+    /* 拒答句只能整条独占,不许加料 */
+    if (t.includes(REFUSE) && t.trim() !== REFUSE) return false;
+    /* 被问机制却报出具体钟点 = 用注入事实回答了不该回应的问题 */
+    if (lastPlayerMsg && MECH_ASK.test(lastPlayerMsg) && CLOCK.test(t)) return false;
+    /* 逐行 30 字(原先只按整条 slice,长行照发) */
+    if (t.split('\n').some(line => line.trim().length > 30)) return false;
+    return true;
+  }
 
   /* 危机 break-glass(发送侧;跳出 diegesis,非她的嗓音) */
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我)/;
@@ -110,7 +127,12 @@ const COMPANION = (() => {
     try {
       const r = await s(turns, { modelTier: 'quick', cache: false });
       let t = (r.text || '').trim().slice(0, 120);
-      if (!t || !lintOk(t)) return { text: pick(st), source: 'lint' };
+      const lastMsg = history.length ? history[history.length - 1].text : '';
+      if (!t || !lintOk(t, lastMsg)){
+        /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
+        if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
+        return { text: pick(st), source: 'lint' };
+      }
       return { text: t, source: 'llm' };
     } catch(e){
       const code = e && e.code;
