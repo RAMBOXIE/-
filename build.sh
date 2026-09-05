@@ -13,5 +13,9 @@ style = re.search(r'<style>.*?</style>', full, re.S).group(0)
 body = re.search(r'<body>(.*)</body>', full, re.S).group(1)
 art = '<title>逃离AI</title>\n' + style + '\n' + body
 io.open('dist/artifact.html', 'w', encoding='utf-8', newline='\n').write(art)
-print('escape-ai.html', len(full), '| artifact.html', len(art))
+# 可直接部署的静态站(Netlify / 任何静态托管)
+import os
+os.makedirs('dist/site', exist_ok=True)
+io.open('dist/site/index.html', 'w', encoding='utf-8', newline='\n').write(full)
+print('escape-ai.html', len(full), '| artifact.html', len(art), '| dist/site/index.html', len(full))
 PY

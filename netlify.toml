@@ -1,0 +1,24 @@
+# 部署:预构建产物直接发布(不在 Netlify 上跑构建)
+#   本地  bash build.sh   →  dist/site/index.html
+#   上线  netlify deploy --dir=dist/site --functions=netlify/functions --prod
+[build]
+  publish = "dist/site"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# 关系通道代理未配 ANTHROPIC_API_KEY 时返回 501,前端永久降级到手写模板池,
+# 游戏其余部分不受影响。配好 key 后无需改代码,重新部署即可生效。
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-store"

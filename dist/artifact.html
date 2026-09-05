@@ -416,22 +416,49 @@ const COMPANION = (() => {
 
   /* 她的回复。history: [{who:'me'|'rou', text}](本局,页面持有;能力无记忆)。
      返回 {text|null, source: 'llm'|'pool'|'lint'|'silent'}。text=null → 「她没有回」。 */
+  /* 后端代理:静态托管(Netlify)时替代平台能力。人格核在服务端,这里只送玩家的话与状态。
+     未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。 */
+  let proxyOff = false;
+  async function viaProxy(history, st){
+    if (proxyOff || typeof fetch !== 'function') return null;
+    try {
+      const r = await fetch('/.netlify/functions/rou', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ history: history.slice(-8), st })
+      });
+      if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
+      if (r.status === 429) return { silent: true };          // 限流 = 她没有回
+      if (!r.ok) return null;
+      const j = await r.json();
+      return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
+    } catch(_){ proxyOff = true; return null; }
+  }
+  /* 门禁:平台能力与后端代理的返回走同一道 lint */
+  function gate(raw, history, st){
+    const t = (raw || '').trim().slice(0, 120);
+    const lastMsg = history.length ? history[history.length - 1].text : '';
+    if (!t || !lintOk(t, lastMsg)){
+      /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
+      if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
+      return { text: pick(st), source: 'lint' };
+    }
+    return { text: t, source: 'llm' };
+  }
+
   async function reply(history, st){
     const s = await ensure();
-    if (!s) return { text: pick(st), source: 'pool' };
+    if (!s){
+      const p = await viaProxy(history, st);                  // 没有平台能力:试后端代理
+      if (p && p.silent) return { text: null, source: 'silent' };
+      if (p) return gate(p.text, history, st);
+      return { text: pick(st), source: 'pool' };
+    }
     const turns = [{ role: 'user', content: CORE + '\n\n' + stateLines(st) }];
     history.slice(-8).forEach(m =>
       turns.push({ role: m.who === 'me' ? 'user' : 'assistant', content: m.text }));
     try {
       const r = await s(turns, { modelTier: 'quick', cache: false });
-      let t = (r.text || '').trim().slice(0, 120);
-      const lastMsg = history.length ? history[history.length - 1].text : '';
-      if (!t || !lintOk(t, lastMsg)){
-        /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
-        if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
-        return { text: pick(st), source: 'lint' };
-      }
-      return { text: t, source: 'llm' };
+      return gate(r.text, history, st);
     } catch(e){
       const code = e && e.code;
       if (code === 'not_granted' || code === 'sampling_disabled' ||
