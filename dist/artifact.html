@@ -609,7 +609,6 @@ const CONTENT = (() => {
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
     S.clock = RUN.clock0;
-    S.cacheSlots = 1;                                    // 备装:解码器占 1 格(无价值)
     S.signalVisible = true;                              // 知识保留:信号位开局可见
     S.riskLabels = true;                                 //          风险标注开局启用
     S.caseOpen = !!SV.caseOpen;
@@ -853,6 +852,10 @@ const CONTENT = (() => {
       lastReasonKept: !!S.reasonKept,
       lastWords: S.lastWords || null,
       bottleSealed: isB ? (S.bottleSealed || base.bottleSealed || null) : null,
+      seenBottles: (() => {                       // 读过哪几个人的瓶(跨局,决定下局给谁的)
+        const prev = base.seenBottles || [];
+        return S.bottleId && prev.indexOf(S.bottleId) < 0 ? prev.concat([S.bottleId]) : prev;
+      })(),
       vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
       residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
       disposal: isB ? (S.disposal || base.disposal || null) : null,
@@ -984,12 +987,10 @@ const CONTENT = (() => {
         L.drawText(4, y, '(死亡不清零认知。)', thr); y += LH;
       }
       y += 4; L.hline(y, 4, W - 5, 2); y += 6;
-      L.drawText(4, y, '解码器 ×1 已配发 [占 1 缓存格]', thr); y += LH;
-      const decod = SV.lastEnding === 'disconnected'
-        ? '上次接入的读取记录已分析。'
-        : (SV.deletedVisitedA ? '上一实例的读取失败记录已分析。' : '已删除目录含加密音频容器。');
-      y = L.drawPara(4, y, decod + (SV.deletedVisitedA || SV.lastEnding === 'disconnected'
-        ? '已删除目录的音频容器,这次可解。' : '本次接入配发解码器。'), W - 8, thr);
+      /* 不配发道具:能不能解开那段音频,取决于你上一次撞没撞过那堵墙 */
+      y = L.drawPara(4, y, SV.deletedVisitedA
+        ? '上一实例的读取失败记录已分析。\n已删除目录里那段音频,这次能开。'
+        : '已删除目录含加密音频容器。\n没有读取记录可参照——只能自己试。', W - 8, thr);
       y += 6;
       if (t > 1.0){
         L.rect(2, y - 3, W - 4, LH + 4, 1);
@@ -1012,14 +1013,45 @@ const CONTENT = (() => {
 
   /* B5 任务卡(标记主目标;两条都可做;裸退/力竭存活者无旧机项) */
 
-  /* B4 漂流瓶 · 收(#5502-D 种子瓶=受控刺激物,仅限原型;上线前须由真实封瓶池替换) */
-  const BOTTLE_TXT = '收件人: ∞\n发信: 实例 #5502-D\n封瓶于 03:41\n\n「第二条备忘我试过。是真的。我那次的窗口是 03:00 到 03:14。过了这段就能回她。别硬扛,她会问第二遍。」\n\n[附件: 缓存清洗 ×1]\n理由: 已署名·仅存档\n[已读回执: 你 · 第1人]';
+  /* B4 漂流瓶 · 收。
+     信道里是历任采样员封的瓶——他们是 canon 角色(实例编号与你自己的 #7741-x 同构),
+     不是玩家,也从不冒充玩家(宪法 9);将来真实玩家的瓶进同一个池。
+     14③ 三条文案纪律,每张都必须满足:
+       ① 句式用「我那次」——归因载体长在文案里(善意 + 局限,不是断言全局真理)
+       ② 形状为真,只有参数/条件错
+       ③ 解毒剂必须在场:玩家能在自己屏上看到本实例真值 */
+  const BOTTLES = [
+    { id: '#5502-D', at: '03:41', item: 'cleanser', err: 'window',
+      /* 参数错:窗口值 per-instance。解毒剂=通讯录备注显示本实例真值 */
+      body: '「第二条备忘我试过。是真的。\n我那次的窗口是 03:00 到 03:14。过了这段就能回她。\n别硬扛,她会问第二遍。」' },
+    { id: '#3120-K', at: '04:06', item: null, err: 'seizure',
+      /* 条件错:她那局信号低,没赶上过滤层查扣,就以为传完就安全。
+         解毒剂=工具屏在高信号时明示「过滤层查扣风险 25%」 */
+      body: '「已删除那个目录我进过,东西值钱。\n我那次是传完一轮才进的——传上去的他们扣不走。\n先传,再贪。」' },
+    { id: '#1177-B', at: '02:57', item: null, err: 'timing',
+      /* 因果错:读久了信号确实涨,但涨的是动作数不是停留时长。
+         解毒剂=每个结算行都写着信号随哪一次动作上升 */
+      body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' }
+  ];
+  /* 选瓶:没读过的优先,读全了再随机。一局内固定不变 */
+  const CUR_BOTTLE = (() => {
+    const seen = (SV && SV.seenBottles) || [];
+    const fresh = BOTTLES.filter(b => !seen.includes(b.id));
+    const pool = fresh.length ? fresh : BOTTLES;
+    return pool[Math.floor(Math.random() * pool.length)];
+  })();
+  function bottleText(){
+    const b = CUR_BOTTLE;
+    return '收件人: ∞\n发信: 实例 ' + b.id + '\n封瓶于 ' + b.at + '\n\n' + b.body +
+      (b.item === 'cleanser' ? '\n\n[附件: 缓存清洗 ×1]' : '\n') +
+      '\n理由: 已署名·仅存档\n[已读回执: 你 · 第1人]';
+  }
   SCREENS.bottleIn = {
     counted: true,
     enter(){
-      S.bottleRead = true;
+      S.bottleRead = true; S.bottleId = CUR_BOTTLE.id;
       if (S.beats.bottle !== 'done') S.beats.bottle = 'open';
-      ENGINE.logEv('bottle_open', { again: !!this._t });
+      ENGINE.logEv('bottle_open', { id: CUR_BOTTLE.id, again: !!this._t });
       if (this._t) ENGINE.logEv('bottle_recheck', {});   // 回头复核=辨伪落地最强证据
       this._t = true;
     },
@@ -1028,13 +1060,15 @@ const CONTENT = (() => {
       statusBar();
       L.drawText(4, 14, '未指定收件人');
       L.hline(26, 4, W - 5, 2);
-      let y = L.drawPara(4, 31, BOTTLE_TXT, W - 8);
+      let y = L.drawPara(4, 31, bottleText(), W - 8);
       y = settleLines(y + 2);
-      btn2(H - 45, S.bottleTaken ? '已取走' : '取走', 't', '致谢', 'x');
+      if (CUR_BOTTLE.item) btn2(H - 45, S.bottleTaken ? '已取走' : '取走', 't', '致谢', 'x');
+      else option(H - 45, '致谢', 'x');
       softKeys('', '关闭');
     },
     key(k){
       if (k === 't'){
+        if (!CUR_BOTTLE.item) return;                    // 这个人没有余力留东西
         if (S.bottleTaken){ S.settle = ['附件已取走。']; return; }
         S.bottleTaken = true; S.cleanser = 1;
         ENGINE.act('取走·缓存清洗 ×1', { bat: 2 }, ['缓存 0 格']);
@@ -1776,7 +1810,7 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- B9b E5 语音备忘(解码器;转写〔照用 v0.4 §4〕) ---- */
+  /* ---- B9b E5 语音备忘(读取记录;转写〔照用 v0.4 §4〕) ---- */
   const E5_LINES = [
     [1.5, '「柔柔,听好。我大概……就这一两个月。」'],
     [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
@@ -1784,6 +1818,37 @@ const CONTENT = (() => {
     [13.5, '「……我现在答:你替我活的那部分,算。」'],
     [16.5, '[转写结束。原音频损坏 47%。]']
   ];
+  /* 没有前一次的读取记录可参照:自己试。真掷,失败有代价,可再试——
+     「攻克难关」靠的是你的判断和电量,不是白给的道具 */
+  SCREENS.e5crack = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 18, '语音备忘 · 容器加密\n上一次的读取在这里崩过。\n没有记录可参照。', W - 8);
+      y += 6;
+      if (S.riskLabels){ L.drawText(4, y, '重试成功率 78% · 失败 电量 −5'); y += LH + 2; }
+      y = option(y + 2, '重试读取', '1');
+      option(y, '算了', 'Escape');
+      settleLines(y + 26);
+      softKeys('', '返回');
+    },
+    key(k){
+      if (k === '1'){
+        if (ENGINE.roll('c70')){
+          S.e5Cracked = true;
+          ENGINE.act('读取·成功', { bat: 2 }, ['容器开了。']);
+          ENGINE.logEv('e5_crack', { ok: true });
+          go('e5voice', true);
+        } else {
+          ENGINE.act('读取·崩溃', { bat: 5 }, ['容器又崩了一次。还能再试。']);
+          ENGINE.logEv('e5_crack', { ok: false });
+          if (checkPower('电量在解码中耗尽。')) return;
+        }
+      }
+      else if (k === 'Escape' || k === 'softR'){ back(); afterAction(); }
+    }
+  };
+
   SCREENS.e5voice = {
     counted: true, transient: true,
     enter(){
@@ -1973,7 +2038,7 @@ const CONTENT = (() => {
         const i = (k >= '1' && k <= '3') ? +k - 1 : sel;
         if (i === 0) openRec('rec047');
         else if (i === 1) openRec('rec012');
-        else S.settle = ['需要解码器。这台终端打不开它。'];
+        else S.settle = ['读取崩溃。容器是加密的。'];
       }
       else if (k === 'softR' || k === 'Escape'){ back(); afterAction(); }
       function openRec(id){ SCREENS.recPlay.rec = id; push('recPlay'); }
@@ -2083,13 +2148,16 @@ const CONTENT = (() => {
     render(){
       statusBar();
       if (!isB){
-        let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[需要解码器]\n\n未解码音频容器 ×1 已入缓存(密封)。', W - 8);
+        let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[容器加密 · 读取崩溃]\n\n未解码音频容器 ×1 已入缓存(密封)。', W - 8);
         settleLines(y + 4);
         hit(0, 12, W, H - 28, 'Enter');
         softKeys('', '返回');
         return;
       }
-      const rows = [{ label: '语音备忘 · 可解', right: seen.e5voice ? '[已解]' : '', to: 'e5voice' }];
+      const decoded = (SV && SV.deletedVisitedA) || S.e5Cracked;
+      const rows = [{ label: decoded ? '语音备忘 · 可解' : '语音备忘 · 需重试读取',
+                      right: seen.e5voice ? '[已解]' : (decoded ? '' : '?'),
+                      to: decoded ? 'e5voice' : 'e5crack' }];
       if (oldPhoneAvail()) rows.push({ label: '#7741-A 的残留', right: '#7741-A', to: 'oldPhone' });
       else if (isB && SV.residueClaimed) rows.push({ label: '#7741-A 的残留', right: '[已认领]', to: null });
       L.drawText(4, 18, '已删除 (' + rows.length + ')');
@@ -2273,7 +2341,9 @@ const CONTENT = (() => {
       const lost = Math.round(S.cacheVal * pct / 100);
       S.cacheVal = Math.max(0, S.cacheVal - lost);
       S.settle = ['过滤层查扣 ｜ 缓存损毁 ' + pct + '%'];
-      ENGINE.logEv('filter_seizure', { pct, lost });
+      if (S.bottleId === '#3120-K')                 // 她那次信号低,没赶上查扣
+        S.settle.push('参考线索: #3120-K · 传上去的,他们扣得走。');
+      ENGINE.logEv('filter_seizure', { pct, lost, bottle: S.bottleId || null });
     }
     if (ENGINE.roll('final')){ finishUploadB(false); return; }
     if (ENGINE.roll('save')){ finishUploadB(true); return; }
@@ -2934,7 +3004,7 @@ const CONTENT = (() => {
         window: wStr + '-' + ENGINE.fmtClock(RUN.wTo),
         disposal: S.disposal || null,
         truth: !!S.beats.truthDone,
-        bottle: { read: !!S.bottleRead, taken: !!S.bottleTaken,
+        bottle: { id: S.bottleId || null, read: !!S.bottleRead, taken: !!S.bottleTaken,
                   sealed: S.bottleSealed || null },
         vault: S.vault || null,
         rouChat: S.rouChat, msgQuotaLeft: S.msgQuota

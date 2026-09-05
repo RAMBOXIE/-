@@ -461,6 +461,77 @@ const PATHS = [
       frame();
     }
   }
+  ,
+  {
+    id: 'E', name: '剧本B·A浅局线继承(要自己撬容器)',
+    save: {                                        // A 局没进过已删除:B 局没有读取记录可参照
+      runCount: 1, lastEnding: 'captured',
+      evidence: ['E1', 'E2'], caseOpen: true,
+      clues: { ruleShape: true }, riskLabels: true,
+      deletedVisitedA: false, recsA: [],
+      lastCacheVal: 980, lastReason: '够了,活着出去', lastReasonKept: false,
+      lastWords: '票是假的', seenBottles: ['#5502-D'],
+      bottleSealed: null, vault: null, residueClaimed: false, disposal: null,
+      memGiven: false, predsA: [], predsB: [], history: []
+    },
+    waits: ['bootB', 'e5voice', 'residue', 'upload92', 'holdDisc'],
+    decisions: [
+      '漂流瓶:致谢', '漂流瓶:关闭',
+      '采样协议:回/不回',
+      'D1 饵:标记可信与否',
+      '柔柔:补挖 1', '柔柔:补挖 2',
+      '已删除:进入', '理由(进已删除)',
+      '容器:重试读取', '旧机:读取写入', '旧机:回收方式',
+      '处置:三选', '处置理由', '掉落归属',
+      '封瓶:三选', '封瓶:一句话'
+    ],
+    drive(io){
+      const { K, KF, frame, advance, at, drain, CONTENT, S, ENGINE } = io;
+      CONTENT.SCREENS.bootB.enter();
+      frame(); advance(1300); frame();
+      KF('Enter'); at('inbox');
+      KF('Enter'); at('bottleIn');                 // 首行:瓶(这局是没附件的那张)
+      KF('x'); KF('Escape'); at('inbox');
+      KF('ArrowDown'); KF('Enter'); at('th_proto');
+      KF('1'); KF('Enter'); at('inbox');
+      /* 备忘 4 条 */
+      at('menu'); KF('4'); at('memoList');
+      KF('1'); at('memo1'); KF('Enter');
+      KF('2'); at('memo2'); KF('Enter');
+      KF('3'); at('memo3'); KF('Enter');
+      KF('4'); at('memo4'); KF('b'); KF('Escape');
+      at('menu');
+      /* 柔柔补挖(E4 未取,要真挖) */
+      KF('1'); at('inbox');
+      KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');
+      KF('1'); KF('1'); drain();
+      at('inbox'); at('menu');
+      /* 已删除:先撬容器再听 */
+      KF('7'); at('deletedConfirm');
+      KF('1'); at('deleted');
+      KF('Enter'); drain();
+      if (CONTENT.currentId !== 'e5crack') CONTENT.go('e5crack', true);
+      frame();
+      KF('1');                                     // 重试读取(rnd .5 → c70 成功)
+      at('e5voice');
+      advance(19500);
+      KF('Escape'); drain();
+      /* 旧机残留 */
+      at('deleted');
+      KF('ArrowDown'); KF('Enter'); at('oldPhone');
+      KF('1'); at('residueRead'); advance(6500); KF('Escape'); at('oldPhone');
+      KF('2'); at('deleted');
+      at('menu');
+      /* 收束 */
+      KF('6'); at('tools');
+      KF('1'); at('uploadB');
+      KF('1'); at('upload92B');
+      advance(2400); at('holdDisc');
+      KF('Enter'); at('sealBottle');
+      KF('3'); at('receiptFull');
+      frame();
+    }
+  }
 ];
 
 /* ================= 运行 + 汇总 ================= */

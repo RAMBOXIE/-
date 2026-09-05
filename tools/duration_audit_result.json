@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-02T10:26:28.132Z",
+  "generatedAt": "2026-09-05T02:19:30.582Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -219,7 +219,7 @@
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2612,
+      "readChars": 2607,
       "decisionCount": 22,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -271,11 +271,11 @@
         },
         {
           "screen": "menu",
-          "chars": 197
+          "chars": 194
         },
         {
           "screen": "inbox",
-          "chars": 165
+          "chars": 162
         },
         {
           "screen": "memo2",
@@ -300,29 +300,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.22,
+          "read": 5.21,
           "decision": 1.1,
           "wait": 1.07,
-          "total": 7.4
+          "total": 7.39
         },
         "普通": {
-          "read": 9.33,
+          "read": 9.31,
           "decision": 2.2,
           "wait": 1.07,
-          "total": 12.6
+          "total": 12.58
         },
         "沉浸": {
-          "read": 18.86,
+          "read": 18.83,
           "decision": 4.4,
           "wait": 1.07,
-          "total": 24.34
+          "total": 24.3
         }
       }
     },
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2606,
+      "readChars": 2507,
       "decisionCount": 16,
       "decisions": [
         "漂流瓶:取走",
@@ -361,11 +361,7 @@
         },
         {
           "screen": "menu",
-          "chars": 176
-        },
-        {
-          "screen": "bottleIn",
-          "chars": 144
+          "chars": 166
         },
         {
           "screen": "e5voice",
@@ -380,36 +376,134 @@
           "chars": 130
         },
         {
-          "screen": "inbox",
-          "chars": 125
-        },
-        {
           "screen": "receiptFull",
           "chars": 116
         },
         {
+          "screen": "bottleIn",
+          "chars": 109
+        },
+        {
           "screen": "deleted",
           "chars": 109
+        },
+        {
+          "screen": "memo4",
+          "chars": 105
         }
       ],
       "minutes": {
         "速读": {
-          "read": 5.21,
+          "read": 5.01,
           "decision": 0.8,
           "wait": 0.5,
-          "total": 6.52
+          "total": 6.32
         },
         "普通": {
-          "read": 9.31,
+          "read": 8.95,
           "decision": 1.6,
           "wait": 0.5,
-          "total": 11.41
+          "total": 11.06
         },
         "沉浸": {
-          "read": 18.82,
+          "read": 18.11,
           "decision": 3.2,
           "wait": 0.5,
-          "total": 22.52
+          "total": 21.81
+        }
+      }
+    },
+    {
+      "id": "E",
+      "name": "剧本B·A浅局线继承(要自己撬容器)",
+      "readChars": 1912,
+      "decisionCount": 16,
+      "decisions": [
+        "漂流瓶:致谢",
+        "漂流瓶:关闭",
+        "采样协议:回/不回",
+        "D1 饵:标记可信与否",
+        "柔柔:补挖 1",
+        "柔柔:补挖 2",
+        "已删除:进入",
+        "理由(进已删除)",
+        "容器:重试读取",
+        "旧机:读取写入",
+        "旧机:回收方式",
+        "处置:三选",
+        "处置理由",
+        "掉落归属",
+        "封瓶:三选",
+        "封瓶:一句话"
+      ],
+      "forcedWaitSec": 30.2,
+      "waitItems": {
+        "bootB": 1.5,
+        "e5voice": 19,
+        "residue": 6,
+        "upload92": 2.2,
+        "holdDisc": 1.5
+      },
+      "topScreens": [
+        {
+          "screen": "e5voice",
+          "chars": 141
+        },
+        {
+          "screen": "memoList",
+          "chars": 138
+        },
+        {
+          "screen": "menu",
+          "chars": 131
+        },
+        {
+          "screen": "memo2",
+          "chars": 130
+        },
+        {
+          "screen": "deleted",
+          "chars": 118
+        },
+        {
+          "screen": "bottleIn",
+          "chars": 116
+        },
+        {
+          "screen": "inbox",
+          "chars": 106
+        },
+        {
+          "screen": "memo4",
+          "chars": 105
+        },
+        {
+          "screen": "oldPhone",
+          "chars": 104
+        },
+        {
+          "screen": "th_proto",
+          "chars": 86
+        }
+      ],
+      "minutes": {
+        "速读": {
+          "read": 3.82,
+          "decision": 0.8,
+          "wait": 0.5,
+          "total": 5.13
+        },
+        "普通": {
+          "read": 6.83,
+          "decision": 1.6,
+          "wait": 0.5,
+          "total": 8.93
+        },
+        "沉浸": {
+          "read": 13.81,
+          "decision": 3.2,
+          "wait": 0.5,
+          "total": 17.51
         }
       }
     }
