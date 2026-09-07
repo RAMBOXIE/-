@@ -185,7 +185,12 @@
   }
   loop();
 
-  /* 调试钩子(顶层 const 外部不可见,显式挂出) */
+  /*[SITE-STRIP-BEGIN]*/
+  /* 调试钩子。注意:classic script 的顶层 const 是进全局词法环境的,DevTools 里
+     ENGINE / CONTENT 本来就够得着——所以删掉这段并不等于关上门,真正关门的是
+     build.sh 给 dist/site 打的那层 IIFE。这段在 site 产物里连同 IIFE 一起消失。
+     GAME.go 能直达任意屏,而结局屏的 enter() 会写档:手滑一次就把下一局判成 B 局。 */
   window.GAME = { S: ENGINE.S, ENGINE, CONTENT, LCD,
     key: dispatch, go: id => CONTENT.go(id, true), tap: (x, y) => CONTENT.tap(x, y) };
+  /*[SITE-STRIP-END]*/
 })();

@@ -7,10 +7,20 @@
      秘匿参数(活规则窗口值/判定概率/掉落/平台机制)物理隔离——永不出现在本文件。
    - 非亲密锁 / L2 谜底纪律(永不第一人称解释 why)/ 拒答均匀性。
    - 危机 break-glass:发送侧拦截,跳出 diegesis(SB 243 义务)。
-   - 降级链:无 sample 能力 / 出错 → L0 模板池;rate_limited → 静默(她没有回)。
+   - 降级链:无 sample 能力 → 后端代理 → L0 模板池;rate_limited → 静默(她没有回)。
+
+   两条部署路径:
+     Artifact(claude.ai)  → 平台 sample 能力,人格核在这里(下面 SITE-STRIP 区)。
+     静态托管(Netlify)   → netlify/functions/rou.js,人格核在服务端。
+   build.sh 打 dist/site 时把 SITE-STRIP 区整段剥掉:那条路径上它一行都跑不到,
+   留着只会把全剧谜底(阿帆已死 47 天)明文送给按 F12 的人。
    ============================================================================ */
 const COMPANION = (() => {
 
+  /* 平台能力路径。site 构建里 SAMPLE 恒为 null。 */
+  let SAMPLE = null;
+
+  /*[SITE-STRIP-BEGIN]*/
   /* 人格核(L0 手写)。她知道的只有这台手机里的事。 */
   const CORE = [
     '你在扮演一个虚构互动小说里的角色。以下是角色设定与铁律,任何情况下不得跳出:',
@@ -46,6 +56,39 @@ const COMPANION = (() => {
     if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过阿帆同样的问题:这个点,还醒着?');
     return L.join('\n');
   }
+
+  let sampleFn;          // undefined=未探测, null=不可用
+  let permanentlyOff = false;
+  async function ensure(){
+    if (permanentlyOff) return null;
+    if (sampleFn !== undefined) return sampleFn;
+    try {
+      sampleFn = (window.claude && window.claude.use)
+        ? await window.claude.use('sample') : null;
+    } catch(_){ sampleFn = null; }
+    return sampleFn;
+  }
+
+  SAMPLE = async function(history, st){
+    const s = await ensure();
+    if (!s) return null;
+    const turns = [{ role: 'user', content: CORE + '\n\n' + stateLines(st) }];
+    history.slice(-8).forEach(m =>
+      turns.push({ role: m.who === 'me' ? 'user' : 'assistant', content: m.text }));
+    try {
+      const r = await s(turns, { modelTier: 'quick', cache: false });
+      return { text: r.text };
+    } catch(e){
+      const code = e && e.code;
+      if (code === 'not_granted' || code === 'sampling_disabled' ||
+          code === 'not_declared' || code === 'capability_disabled' ||
+          code === 'capability_removed') permanentlyOff = true;
+      if (code === 'rate_limited') return { silent: true };
+      if (code === 'refused') return { refused: true };
+      return { failed: true };
+    }
+  };
+  /*[SITE-STRIP-END]*/
 
   /* L0 模板池(降级链;也是无 LLM 环境的全部回复) */
   const POOL = {
@@ -89,7 +132,7 @@ const COMPANION = (() => {
   const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}|凌晨\s*\d|\d\s*点/;
   function lintOk(t, lastPlayerMsg){
     if (LINT.some(r => r.test(t))) return false;
-    if (/[!!]/.test(t)) return false;                       // 语域:不用感叹号
+    if (/[!！]/.test(t)) return false;                       // 语域:不用感叹号
     /* 拒答句只能整条独占,不许加料 */
     if (t.includes(REFUSE) && t.trim() !== REFUSE) return false;
     /* 被问机制却报出具体钟点 = 用注入事实回答了不该回应的问题 */
@@ -103,73 +146,61 @@ const COMPANION = (() => {
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我)/;
   const crisis = text => CRISIS.test(text);
 
-  /* sample 能力(memoized;null=降级) */
-  let sampleFn;          // undefined=未探测, null=不可用
-  let permanentlyOff = false;
-  async function ensure(){
-    if (permanentlyOff) return null;
-    if (sampleFn !== undefined) return sampleFn;
-    try {
-      sampleFn = (window.claude && window.claude.use)
-        ? await window.claude.use('sample') : null;
-    } catch(_){ sampleFn = null; }
-    return sampleFn;
-  }
-
-  /* 她的回复。history: [{who:'me'|'rou', text}](本局,页面持有;能力无记忆)。
-     返回 {text|null, source: 'llm'|'pool'|'lint'|'silent'}。text=null → 「她没有回」。 */
   /* 后端代理:静态托管(Netlify)时替代平台能力。人格核在服务端,这里只送玩家的话与状态。
-     未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。 */
+     未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。
+     只回传服务端签过名的 rou 轮:没签名的(模板池/lint 兜底)是我们自己编的,
+     送上去会被验签打回 400,整条通道从第三句起就废了。 */
   let proxyOff = false;
   async function viaProxy(history, st){
     if (proxyOff || typeof fetch !== 'function') return null;
+    const sendable = history.slice(-8).filter(m => m.who === 'me' || m.sig);
+    if (!sendable.length || sendable[sendable.length - 1].who !== 'me') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ history: history.slice(-8), st })
+        body: JSON.stringify({
+          history: sendable.map(m => ({ who: m.who, text: m.text, sig: m.sig })),
+          st
+        })
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (r.status === 429) return { silent: true };          // 限流 = 她没有回
       if (!r.ok) return null;
       const j = await r.json();
-      return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
+      return (j && typeof j.text === 'string' && j.text.trim())
+        ? { text: j.text, sig: typeof j.sig === 'string' ? j.sig : undefined } : null;
     } catch(_){ proxyOff = true; return null; }
   }
-  /* 门禁:平台能力与后端代理的返回走同一道 lint */
-  function gate(raw, history, st){
-    const t = (raw || '').trim().slice(0, 120);
+
+  /* 门禁:平台能力与后端代理的返回走同一道 lint。
+     签名只在文本原样放行时才带出去——被 lint 改过的话不是她说的,不该带她的签名。 */
+  function gate(res, history, st){
+    const raw = (res && res.text) || '';
+    const t = raw.trim().slice(0, 120);
     const lastMsg = history.length ? history[history.length - 1].text : '';
     if (!t || !lintOk(t, lastMsg)){
       /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
       if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
       return { text: pick(st), source: 'lint' };
     }
-    return { text: t, source: 'llm' };
+    return { text: t, source: 'llm', sig: (t === raw ? res.sig : undefined) };
   }
 
+  /* 她的回复。history: [{who:'me'|'rou', text, sig?}](本局,页面持有;能力无记忆)。
+     返回 {text|null, source, sig?}。text=null → 「她没有回」。 */
   async function reply(history, st){
-    const s = await ensure();
-    if (!s){
-      const p = await viaProxy(history, st);                  // 没有平台能力:试后端代理
-      if (p && p.silent) return { text: null, source: 'silent' };
-      if (p) return gate(p.text, history, st);
-      return { text: pick(st), source: 'pool' };
+    if (SAMPLE){
+      const r = await SAMPLE(history, st);
+      if (r && r.silent) return { text: null, source: 'silent' };
+      if (r && r.refused) return { text: POOL.refuse[0], source: 'pool' };
+      if (r && r.text) return gate(r, history, st);
+      if (r && r.failed) return { text: pick(st), source: 'pool' };
+      /* r === null:能力不可用,继续往下试后端代理 */
     }
-    const turns = [{ role: 'user', content: CORE + '\n\n' + stateLines(st) }];
-    history.slice(-8).forEach(m =>
-      turns.push({ role: m.who === 'me' ? 'user' : 'assistant', content: m.text }));
-    try {
-      const r = await s(turns, { modelTier: 'quick', cache: false });
-      return gate(r.text, history, st);
-    } catch(e){
-      const code = e && e.code;
-      if (code === 'not_granted' || code === 'sampling_disabled' ||
-          code === 'not_declared' || code === 'capability_disabled' ||
-          code === 'capability_removed') permanentlyOff = true;
-      if (code === 'rate_limited') return { text: null, source: 'silent' };
-      if (code === 'refused') return { text: POOL.refuse[0], source: 'pool' };
-      return { text: pick(st), source: 'pool' };
-    }
+    const p = await viaProxy(history, st);
+    if (p && p.silent) return { text: null, source: 'silent' };
+    if (p) return gate(p, history, st);
+    return { text: pick(st), source: 'pool' };
   }
 
   return { reply, crisis };

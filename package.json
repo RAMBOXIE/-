@@ -1,0 +1,18 @@
+{
+  "name": "escape-ai",
+  "version": "1.0.0",
+  "description": "《欲望算法:逃离AI》可玩教学局。规格:`../research/逃离AI_开发规格_v3.1.md`;内容:`../research/M1_纸面原型_失踪采样体的手机_v0.4.md`。",
+  "main": "index.js",
+  "scripts": {
+    "build": "bash build.sh",
+    "test": "node tools/run_all.js"
+  },
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

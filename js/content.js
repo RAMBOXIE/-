@@ -433,14 +433,14 @@ const CONTENT = (() => {
        ② 形状为真,只有参数/条件错
        ③ 解毒剂必须在场:玩家能在自己屏上看到本实例真值 */
   const BOTTLES = [
-    { id: '#5502-D', at: '03:41', item: 'cleanser', err: 'window',
+    { id: '#5502-D', at: '03:41', item: 'cleanser',
       /* 参数错:窗口值 per-instance。解毒剂=通讯录备注显示本实例真值 */
       body: '「第二条备忘我试过。是真的。\n我那次的窗口是 03:00 到 03:14。过了这段就能回她。\n别硬扛,她会问第二遍。」' },
-    { id: '#3120-K', at: '04:06', item: null, err: 'seizure',
+    { id: '#3120-K', at: '04:06', item: null,
       /* 条件错:她那局信号低,没赶上过滤层查扣,就以为传完就安全。
          解毒剂=工具屏在高信号时明示「过滤层查扣风险 25%」 */
       body: '「已删除那个目录我进过,东西值钱。\n我那次是传完一轮才进的——传上去的他们扣不走。\n先传,再贪。」' },
-    { id: '#1177-B', at: '02:57', item: null, err: 'timing',
+    { id: '#1177-B', at: '02:57', item: null,
       /* 因果错:读久了信号确实涨,但涨的是动作数不是停留时长。
          解毒剂=每个结算行都写着信号随哪一次动作上升 */
       body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' }
@@ -1158,7 +1158,8 @@ const CONTENT = (() => {
     COMPANION.reply(S.rouChat, st).then(r => {
       S.rouTyping = false;
       if (r.text){
-        S.rouChat.push({ who: 'rou', text: r.text });
+        /* sig 只有后端代理路径会给:回传时服务端凭它认出这是自己说过的话 */
+        S.rouChat.push({ who: 'rou', text: r.text, sig: r.sig });
         ENGINE.logEv('rou_reply', { source: r.source });
         try { AUDIO.blip(520, .1); } catch(_){}
       } else {
@@ -2158,11 +2159,32 @@ const CONTENT = (() => {
       }
     }
   };
-  /* 隐藏:抹除此终端(按 C ×3) */
-  let wipeCount = 0;
+  /* 隐藏:抹除此终端。触发键是 Escape,而右滑在结局屏上正好被映射成 Escape
+     ——那是交互说明里教给玩家的「返回」。所以三次累计只能落到一屏确认上,
+     不能直接清档:最自然的退出动作不该把跨局记录静默抹掉。
+     三秒无操作即归零,免得跨屏累计凑够三次。 */
+  let wipeCount = 0, wipeAt = 0;
   function wipeTap(){
-    if (++wipeCount >= 3){ SAVE.clear(); location.reload(); }
+    const now = performance.now();
+    if (now - wipeAt > 3000) wipeCount = 0;
+    wipeAt = now;
+    if (++wipeCount >= 3){ wipeCount = 0; go('wipe'); }
   }
+  SCREENS.wipe = {
+    transient: true,
+    render(){
+      statusBar();
+      let y = L.drawPara(4, 20, '抹除此终端?\n\n跨局记录、案卷、漂流瓶全部清空。\n下一次接入将从教学局重新开始。\n此操作不可撤销。', W - 8);
+      y += 8;
+      y = option(y, '1 确认抹除', '1');
+      y = option(y, '2 取消', '2');
+      softKeys('', '');
+    },
+    key(k){
+      if (k === '1'){ SAVE.clear(); location.reload(); }
+      else if (k === '2' || k === 'Escape') back();
+    }
+  };
   SCREENS.receiptAlive = {
     enter(){ writeSave('disconnected'); },
     render(){

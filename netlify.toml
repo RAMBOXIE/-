@@ -1,6 +1,6 @@
 # 部署:预构建产物直接发布(不在 Netlify 上跑构建)
 #   本地  bash build.sh   →  dist/site/index.html
-#   上线  netlify deploy --dir=dist/site --functions=netlify/functions --prod
+#   上线  netlify deploy --prod --no-build --dir=dist/site --functions=netlify/functions
 [build]
   publish = "dist/site"
   functions = "netlify/functions"
@@ -10,15 +10,25 @@
 
 # 关系通道代理未配 ANTHROPIC_API_KEY 时返回 501,前端永久降级到手写模板池,
 # 游戏其余部分不受影响。配好 key 后无需改代码,重新部署即可生效。
+#
+# Node 运行时钉不进这份文件——zip-it-and-ship-it 只认站点级环境变量,写在
+# 这里是 no-op。首次部署后手动跑一次(或在站点设置里勾 Node 版本):
+#   netlify env:set AWS_LAMBDA_JS_RUNTIME nodejs22.x --scope functions
+# rou.js 用了全局 fetch,Node < 18 会直接 500 runtime_too_old——不设这个环境
+# 变量也不会悄悄坏掉,只是没显式钉版本。
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    X-Frame-Options = "DENY"
+    Cross-Origin-Opener-Policy = "same-origin"
+    # 产物零外链、零 inline 事件处理器,只有一个 <canvas> + AudioContext:
+    # 可以锁到只放行 inline script/style,别的一律不放。
+    Content-Security-Policy = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Cache-Control = "no-store"
+# /.netlify/functions/* 这条自定义 header 规则对 Function 响应不生效——那条
+# 前缀由 Functions 服务直接接管,不经过静态资产的 headers 规则。rou.js 自己
+# 在每个响应上写 no-store,缓存策略在那边管,这里不重复配置。
