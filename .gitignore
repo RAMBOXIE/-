@@ -1,2 +1,3 @@
 .gstack/
 node_modules/
+.netlify/

@@ -744,6 +744,25 @@ const CONTENT = (() => {
     }
     return y;
   }
+  /* 与 settleLines 相同,但绝不画过 baseY 之前一点点(caller 传自己下面那排
+     按钮的 y)。用在"上方内容长短不定 + 结算行本身也长短不定"的屏上——那种
+     屏把按钮往下推来避让,反而会把按钮推出 224px 的画布,变成点不到的按钮
+     (画布没有滚动,推出去就是真的够不着,不只是好看不好看的问题)。
+     所以反过来:按钮钉死在原位,结算行的尾巴挤不下就不画——数值类的结算
+     信息(电量/缓存扣减)总是排在句首,真正会被裁掉的只是句尾的风味文案。 */
+  function settleLinesCapped(y, baseY){
+    if (!S.settle.length) return y;
+    const capY = baseY - 2;
+    L.hline(y, 4, W - 5, 2); y += 6;
+    for (const line of S.settle){
+      const ls = L.wrap(line, W - 8);
+      for (const t of ls){
+        if (y > capY) return y;
+        L.drawText(4, y, t); y += LH;
+      }
+    }
+    return y;
+  }
   /* 全宽可点选项行 */
   function option(y, label, k, o){
     L.frameRect(2, y, W - 4, 20);
@@ -1119,7 +1138,7 @@ const CONTENT = (() => {
       L.drawText(4, 14, '未指定收件人');
       L.hline(26, 4, W - 5, 2);
       let y = L.drawPara(4, 31, bottleText(), W - 8);
-      y = settleLines(y + 2);
+      settleLinesCapped(y + 2, H - 45);
       if (CUR_BOTTLE.item) btn2(H - 45, S.bottleTaken ? '已取走' : '取走', 't', '致谢', 'x');
       else option(H - 45, '致谢', 'x');
       softKeys('', '关闭');
@@ -1363,7 +1382,7 @@ const CONTENT = (() => {
         y = optSlim(y, '1 回复「收到」', '1');
         optSlim(y, '2 不回,返回', '2');
       } else {
-        settleLines(y - 6);
+        settleLinesCapped(y - 6, H - 42);
         option(H - 42, '继续', 'Enter');
       }
       softKeys(this._done ? '继续' : '', '返回');
@@ -1584,7 +1603,7 @@ const CONTENT = (() => {
         option(H - 42, '挂断', 'Escape');
       } else {
         let y = L.drawPara(4, 72, DIAL.who.result, W - 8);
-        settleLines(y + 6);
+        settleLinesCapped(y + 6, H - 42);
         option(H - 42, '返回', 'Enter');
       }
       softKeys('', '');
@@ -1698,7 +1717,12 @@ const CONTENT = (() => {
       let y = 128;
       const caps = L.wrap(ph.cap, W - 8);
       caps.forEach(t => { L.drawText(4, y, t); y += LH; });
-      settleLines(y + 2);
+      /* 照片配文长短不一(dinner 那张两行)+ 回收进程掠过等事件会把结算行
+         顶得更长——实测截图坐实过字压按钮。按钮钉死在 H-40 不动(画布只有
+         224px 高、不能滚动,把按钮往下推只会把它推出画布、变得点不到);
+         结算行真挤不下就宁可裁掉句尾的风味文案,数值类信息永远排在句首,
+         不会被裁。 */
+      settleLinesCapped(y + 2, H - 40);
       btn2(H - 40, '往前翻(深搜)', '1', '退出', '2');
       softKeys('', '');
     },
