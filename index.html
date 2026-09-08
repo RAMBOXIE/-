@@ -17,13 +17,13 @@
     -webkit-font-smoothing:antialiased;min-height:100%}
   .wrap{display:flex;align-items:center;justify-content:center;padding:12px 8px;min-height:100dvh}
 
-  .device{width:min(688px,100vw - 16px);padding:20px clamp(12px,4vw,36px) 20px;border-radius:16px;
+  .device{width:min(760px,100vw - 8px,100dvh * .8);padding:9px 10px 7px;border-radius:14px;
     background:linear-gradient(180deg,var(--shell) 0%,var(--shell-2) 100%);
     border:1px solid var(--shell-edge);
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
   .brand{display:flex;justify-content:space-between;align-items:baseline;
-    font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:12px}
-  .bezel{position:relative;padding:10px;border-radius:6px;background:#05100c;
+    font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:6px}
+  .bezel{position:relative;padding:5px;border-radius:5px;background:#05100c;
     border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
   .screen-stack{position:relative;line-height:0;touch-action:none;cursor:pointer;user-select:none}
   canvas{display:block;image-rendering:pixelated;width:100%;height:auto}
@@ -32,7 +32,7 @@
                repeating-linear-gradient(to bottom,transparent 0 2px,rgba(3,10,8,.62) 2px 3px)}
   .glass{position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(115% 85% at 50% 0%,rgba(120,255,220,.055),transparent 60%)}
-  .chin{margin-top:12px;text-align:center;font-size:10px;letter-spacing:.5em;color:#39413e}
+  .chin{margin-top:6px;text-align:center;font-size:10px;letter-spacing:.42em;color:#39413e}
 
   /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
   .overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
@@ -64,7 +64,7 @@
         <div class="glass"></div><div class="grid"></div>
       </div>
     </div>
-    <div class="chin">KUIPER</div>
+    <div class="chin">欲望算法</div>
   </div>
 </div>
 

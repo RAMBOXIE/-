@@ -187,5 +187,20 @@ scenario('柔柔会话·B 局识别句不把结算行挤到软键上', ({A, CONT
      history: [{ inst:'#7741-A', ending:'captured', cacheVal: 460, ev: 2 }],
      seenBottles: ['#5502-D'] });
 
+/* ---- B 局开场两屏(固定"接入"按钮 + 流式回收单):不压按钮 ---- */
+scenario('preDeath·#6404-C 回收单不压"接入"按钮', ({A, CONTENT, calls, frame}) => {
+  CONTENT.go('preDeath', true);
+  frame();
+  checkFrame(calls, A, 'preDeath');
+});
+
+scenario('bootB·B 开机不压"接入"按钮', ({A, CONTENT, calls, frame, advance}) => {
+  CONTENT.go('bootB', true);
+  advance(1500); frame();                                 // t>1s 后"接入"按钮才出
+  checkFrame(calls, A, 'bootB');
+}, { runCount:2, lastEnding:'disconnected', evidence:['E1','E2','E3'], caseOpen:true,
+     clues:{ ruleShape:true, ruleParam:true },
+     history:[{ inst:'#7741-A', cacheVal:400 }, { inst:'#7741-B', cacheVal:500 }] });
+
 console.log(failures ? ('\nFAILED: ' + failures) : '\nALL LAYOUT CHECKS PASS');
 process.exit(failures ? 1 : 0);

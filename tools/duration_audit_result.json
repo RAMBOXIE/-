@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-08T04:34:38.463Z",
+  "generatedAt": "2026-09-08T08:11:18.602Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -51,7 +51,7 @@
     {
       "id": "A",
       "name": "最短线·中止断连",
-      "readChars": 615,
+      "readChars": 627,
       "decisionCount": 4,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -74,11 +74,11 @@
           "chars": 79
         },
         {
-          "screen": "receiptAlive",
-          "chars": 64
+          "screen": "preDeath",
+          "chars": 76
         },
         {
-          "screen": "preDeath",
+          "screen": "receiptAlive",
           "chars": 64
         },
         {
@@ -108,29 +108,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 1.23,
+          "read": 1.25,
           "decision": 0.2,
           "wait": 0.13,
-          "total": 1.56
+          "total": 1.59
         },
         "普通": {
-          "read": 2.2,
+          "read": 2.24,
           "decision": 0.4,
           "wait": 0.13,
-          "total": 2.73
+          "total": 2.77
         },
         "沉浸": {
-          "read": 4.44,
+          "read": 4.53,
           "decision": 0.8,
           "wait": 0.13,
-          "total": 5.38
+          "total": 5.46
         }
       }
     },
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2066,
+      "readChars": 2078,
       "decisionCount": 11,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -197,29 +197,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.13,
+          "read": 4.16,
           "decision": 0.55,
           "wait": 0.74,
-          "total": 5.42
+          "total": 5.44
         },
         "普通": {
-          "read": 7.38,
+          "read": 7.42,
           "decision": 1.1,
           "wait": 0.74,
-          "total": 9.22
+          "total": 9.26
         },
         "沉浸": {
-          "read": 14.92,
+          "read": 15.01,
           "decision": 2.2,
           "wait": 0.74,
-          "total": 17.86
+          "total": 17.95
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2632,
+      "readChars": 2644,
       "decisionCount": 22,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -300,29 +300,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.26,
+          "read": 5.29,
           "decision": 1.1,
           "wait": 1.07,
-          "total": 7.44
+          "total": 7.46
         },
         "普通": {
-          "read": 9.4,
+          "read": 9.44,
           "decision": 2.2,
           "wait": 1.07,
-          "total": 12.67
+          "total": 12.71
         },
         "沉浸": {
-          "read": 19.01,
+          "read": 19.1,
           "decision": 4.4,
           "wait": 1.07,
-          "total": 24.48
+          "total": 24.57
         }
       }
     },
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2513,
+      "readChars": 2511,
       "decisionCount": 16,
       "decisions": [
         "漂流瓶:取走",
@@ -394,7 +394,7 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.03,
+          "read": 5.02,
           "decision": 0.8,
           "wait": 0.5,
           "total": 6.33
@@ -403,20 +403,20 @@
           "read": 8.97,
           "decision": 1.6,
           "wait": 0.5,
-          "total": 11.08
+          "total": 11.07
         },
         "沉浸": {
-          "read": 18.15,
+          "read": 18.13,
           "decision": 3.2,
           "wait": 0.5,
-          "total": 21.85
+          "total": 21.84
         }
       }
     },
     {
       "id": "E",
       "name": "剧本B·A浅局线继承(要自己撬容器)",
-      "readChars": 1984,
+      "readChars": 1981,
       "decisionCount": 16,
       "decisions": [
         "漂流瓶:致谢",
@@ -488,22 +488,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 3.97,
+          "read": 3.96,
           "decision": 0.8,
           "wait": 0.5,
           "total": 5.27
         },
         "普通": {
-          "read": 7.09,
+          "read": 7.08,
           "decision": 1.6,
           "wait": 0.5,
-          "total": 9.19
+          "total": 9.18
         },
         "沉浸": {
-          "read": 14.33,
+          "read": 14.31,
           "decision": 3.2,
           "wait": 0.5,
-          "total": 18.03
+          "total": 18.01
         }
       }
     }

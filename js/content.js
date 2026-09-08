@@ -454,7 +454,7 @@ const CONTENT = (() => {
       const head = SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
-        L.drawText(4, y, '案卷继承: 证据 ' + Object.keys(S.evidence).length + '/5 · 规则线索 ' +
+        L.drawText(4, y, '案卷继承 证据 ' + Object.keys(S.evidence).length + '/5 · 线索 ' +
           ((S.clues.ruleShape ? 1 : 0) + (S.clues.ruleParam ? 1 : 0)) + '/2', thr); y += LH;
         L.drawText(4, y, '(死亡不清零认知。)', thr); y += LH;
       }
@@ -654,28 +654,26 @@ const CONTENT = (() => {
   /* ---- 前人之死(教学=尸体,不是说明书):#6404-C 的回收单一瞥 ---- */
   SCREENS.preDeath = {
     transient: true,
-    enter(){ ENGINE.logEv('predeath', {}); },
+    enter(){ this.scroll = 0; ENGINE.logEv('predeath', {}); },
     render(){
       statusBar();
-      let y = 16;
-      L.drawText(4, y, '设备回收单 · #6404-C'); y += LH;
-      L.drawText(4, y, '(第 3 次接入)'); y += LH + 2;
-      L.hline(y, 4, W - 5, 2); y += 6;
-      y = L.drawPara(4, y, '缓存价值: ¥1,570\n未完成传输,全部散佚。\n致死因子: 上传第 2 回合,信号触顶。', W - 8);
-      y += 4;
-      /* 他的遗言(反白)——备忘二那三条,是他死前写给你的 */
-      const lw = '遗言: 「留三成。我自己没做到。」';
-      L.wrap(lw, W - 16).forEach(t => {
-        L.rect(4, y - 2, W - 8, LH + 2, 1);
-        darkText(8, y, t);
-        y += LH + 4;
-      });
-      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
-      L.drawText(4, y, '下一个接入者: 你');
+      /* 回收单正文进固定视口(窄屏折行会变高);"下一个接入者 + 接入"钉在底,永不被顶叠 */
+      const lines = [
+        '设备回收单 · #6404-C',
+        '(第 3 次接入)',
+        '',
+        '缓存价值: ¥1,570',
+        '未完成传输,全部散佚。',
+        '致死因子: 上传第 2 回合,信号触顶。',
+        '',
+        '遗言: 「留三成。我自己没做到。」'
+      ];
+      scrollView(lines, 16, H - 64, this);
+      L.drawText(4, H - 60, '下一个接入者: 你');
       option(H - 42, '#7741-A 激活 · 接入', 'Enter');
-      hit(0, 0, W, H - 46, 'Enter');
+      hit(0, 0, W, H - 64, 'Enter');
     },
-    key(k){ if (k === 'Enter' || k === 'softL') go('brief', true); }
+    key(k){ if (scrollKey(this, k)) return; if (k === 'Enter' || k === 'softL') go('brief', true); }
   };
 
   /* ---- 任务备忘(目标先亮起) ---- */
