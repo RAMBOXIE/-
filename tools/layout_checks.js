@@ -207,7 +207,7 @@ scenario('bootB·B 开机不压"接入"按钮', ({A, CONTENT, calls, frame, adva
   CONTENT.go('bootB', true);
   advance(1500); frame();                                 // t>1s 后"接入"按钮才出
   checkFrame(calls, A, 'bootB');
-}, { runCount:2, lastEnding:'disconnected', evidence:['E1','E2','E3'], caseOpen:true,
+}, { runCount:2, lastEnding:'captured', residueClaimed:false, bottleSealed:'x', evidence:['E1','E2','E3'], caseOpen:true,
      clues:{ ruleShape:true, ruleParam:true },
      history:[{ inst:'#7741-A', cacheVal:400 }, { inst:'#7741-B', cacheVal:500 }] });
 

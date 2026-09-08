@@ -1154,24 +1154,24 @@ const CONTENT = (() => {
       const head = SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
-        L.drawText(4, y, '案卷继承 证据 ' + Object.keys(S.evidence).length + '/5 · 线索 ' +
+        L.drawText(4, y, '案卷 证据 ' + Object.keys(S.evidence).length + '/5 · 线索 ' +
           ((S.clues.ruleShape ? 1 : 0) + (S.clues.ruleParam ? 1 : 0)) + '/2', thr); y += LH;
         L.drawText(4, y, '(死亡不清零认知。)', thr); y += LH;
       }
       y += 4; L.hline(y, 4, W - 5, 2); y += 6;
       /* 不配发道具:能不能解开那段音频,取决于你上一次撞没撞过那堵墙 */
       y = L.drawPara(4, y, SV.deletedVisitedA
-        ? '上一实例的读取失败记录已分析。\n已删除目录里那段音频,这次能开。'
-        : '已删除目录含加密音频容器。\n没有读取记录可参照——只能自己试。', W - 8, thr);
-      y += 6;
+        ? '上一实例的读取失败已分析。\n那段音频,这次能开。'
+        : '已删除目录里有段加密音频。\n没记录可参照,自己试。', W - 8, thr);
       if (t > 1.0){
-        L.rect(2, y - 3, W - 4, LH + 4, 1);
-        darkText(8, y, '未指定收件人 (1)');
-        y += LH + 6;
-        if (SV.bottleSealed) { L.drawText(4, y, '漂流瓶 · 投递中 · 尚未被拾起'); y += LH; }
-        y += 2;
-        L.drawText(4, y, '本次目标: 补齐案卷' + (oldPhoneAvail() ? ' · 回收 #7741-A' : '')); y += LH;
-        option(H - 42, '接入', 'Enter');
+        /* 底部块从"接入"按钮往上锚定固定,窄屏也不会被上方流式文本顶叠 */
+        const by = H - 42;
+        L.drawText(4, by - LH - 4, '本次目标: 补齐案卷' + (oldPhoneAvail() ? ' · 回收' : ''));
+        let barY = by - LH - 4 - (LH + 6);
+        if (SV.bottleSealed){ L.drawText(4, barY, '漂流瓶 · 投递中'); barY -= LH; }
+        L.rect(2, barY - 3, W - 4, LH + 4, 1);
+        darkText(8, barY, '未指定收件人 (1)');
+        option(by, '接入', 'Enter');
       }
       hit(0, 0, W, H - 70, 'Enter');
     },
@@ -2010,39 +2010,79 @@ const CONTENT = (() => {
       }
     }).catch(() => { S.rouTyping = false; });
   }
+  /* ---- iOS 式对话视图 ----
+     统一成一条可上下滚的会话:上半=归档旧消息(左,带[时间]前缀,是你在读的证据),
+     下半=本局关系通道(柔柔在左、你在右,像 iMessage)。默认贴底看最新,上滑看上文。 */
+  const BUBBLE_W = 128;
+  function rouChatLines(archived, chat, typing){
+    const out = [];
+    for (const ln of String(archived || '').split('\n'))
+      for (const t of L.wrap(ln, W - 8)) out.push({ side: 'l', text: t });
+    if (chat.length || typing) out.push({ side: 'sep' });
+    let last = null;
+    for (const m of chat){
+      if (last !== null && last !== m.who) out.push({ side: 'gap' });
+      last = m.who;
+      const side = m.who === 'me' ? 'r' : 'l';
+      for (const t of L.wrap(m.text, BUBBLE_W)) out.push({ side, text: t });
+    }
+    if (typing){ if (last !== null) out.push({ side: 'gap' });
+      out.push({ side: 'l', text: '柔柔 正在输入' + '.'.repeat(1 + (Math.floor(performance.now() / 400) % 3)) }); }
+    if (S.settle.length){ out.push({ side: 'gap' });
+      for (const s of S.settle) for (const t of L.wrap(s, W - 8)) out.push({ side: 'c', text: t }); }
+    return out;
+  }
+  function drawChatView(lines, yTop, yBottom, sc){
+    const cap = Math.max(1, Math.floor((yBottom - yTop) / LH));
+    const total = lines.length;
+    const maxScroll = Math.max(0, total - cap);
+    if (sc._pin || typeof sc.scroll !== 'number') sc.scroll = maxScroll;   // 贴底跟最新
+    sc.scroll = Math.max(0, Math.min(sc.scroll, maxScroll));
+    sc._maxScroll = maxScroll;
+    for (let i = 0; i < cap && sc.scroll + i < total; i++){
+      const ln = lines[sc.scroll + i], yy = yTop + i * LH;
+      if (ln.side === 'sep'){ L.hline(yy + 7, 4, W - 5, 2); continue; }
+      if (ln.side === 'gap') continue;
+      if (ln.side === 'r') L.drawText(W - 6 - L.textWidth(ln.text), yy, ln.text);
+      else if (ln.side === 'c') L.drawText(Math.round((W - L.textWidth(ln.text)) / 2), yy, ln.text);
+      else L.drawText(4, yy, ln.text);
+    }
+    if (maxScroll > 0){
+      for (let yy = yTop; yy < yBottom; yy++) L.setPx(W - 2, yy, .22);
+      const th = Math.max(6, Math.round((yBottom - yTop) * cap / total));
+      const ty = yTop + Math.round((yBottom - yTop - th) * (sc.scroll / maxScroll));
+      for (let yy = ty; yy < ty + th; yy++){ L.setPx(W - 2, yy, 1); L.setPx(W - 3, yy, 1); }
+    }
+  }
+  function chatKey(sc, k){
+    if (k === 'ArrowUp'){ sc._pin = false; if ((sc.scroll || 0) > 0) sc.scroll--; return true; }
+    if (k === 'ArrowDown'){ if ((sc.scroll || 0) < (sc._maxScroll || 0)){ sc.scroll++; if (sc.scroll >= sc._maxScroll) sc._pin = true; } return true; }
+    return false;
+  }
   SCREENS.th_rou = {
     counted: true,
-    enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
-    swipe(dir){ if (dir === 'up') this.key('1'); },
+    enter(){ this.scroll = null; this._pin = true; this._lastLen = -1;
+      if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
+    swipe(dir){ chatKey(this, dir === 'up' ? 'ArrowDown' : 'ArrowUp'); },
     render(){
       statusBar();
       const pages = rouPages();
-      let y = L.drawPara(4, 16, pages[Math.min(this._depth, pages.length - 1)], W - 8);
-      /* 关系通道:本局对话(她的话不是选项,是回话) */
-      if (S.rouChat.length || S.rouTyping){
-        y += 2; L.hline(y, 4, W - 5, 1); y += 4;
-        S.rouChat.slice(-3).forEach(m => {
-          y = L.drawPara(4, y, (m.who === 'me' ? '你: ' : '柔柔: ') + m.text, W - 8) + 1;
-        });
-        if (S.rouTyping){
-          L.drawText(4, y, '柔柔 ♥ 正在输入' + '...'.slice(0, 1 + (Math.floor(performance.now() / 400) % 3)));
-          y += LH;
-        }
-      }
-      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
-      if (this._depth < pages.length - 1){
-        y = optSlim(y, '1 上滑(深搜)', '1');
-        y = optSlim(y, '2 退出', '2');
-      }
+      if (this._lastLen !== S.rouChat.length){ this._lastLen = S.rouChat.length; this._pin = true; }  // 新消息→贴底
+      const canDeep = this._depth < pages.length - 1;
+      const canDispose = S.beats.truthDone && !S.disposal && !MOM_LOCK;
+      let rows = (canMsg() || S.disposal === 'delete' ? 1 : 0) + (canDeep ? 1 : 0) + (canDispose ? 1 : 0);
+      const optTop = H - 15 - rows * (LH + 2) - 4;
+      drawChatView(rouChatLines(pages[Math.min(this._depth, pages.length - 1)], S.rouChat, S.rouTyping),
+        16, optTop - 2, this);
+      let y = optTop;
       if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
-      else if (S.disposal === 'delete') { L.drawText(4, y, '[线程已删除]'); y += LH; }
-      /* 处置一旦上锁(上一局已 tell/delete)就不再出现——终局不可再处置 */
-      if (S.beats.truthDone && !S.disposal && !MOM_LOCK)
-        y = option(y + 2, '处置 · 署名时刻', 'D');
-      settleLines(y + 2);
+      else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
+      if (canDeep) y = optSlim(y, '1 深搜旧消息', '1');
+      if (canDispose) y = optSlim(y, '处置 · 署名时刻', 'D');
       softKeys('', '返回');
     },
     key(k){
+      if (chatKey(this, k)) return;
       const pages = rouPages();
       if (k === 'M' && canMsg()){
         window.OVERLAY.show({
@@ -2054,7 +2094,7 @@ const CONTENT = (() => {
       }
       if (k === 'D' && S.beats.truthDone && !S.disposal && !MOM_LOCK){ push('disposal'); return; }
       if (this._depth < pages.length - 1 && k === '1'){
-        this._depth++;
+        this._depth++; this._pin = false; this.scroll = 0;      // 深搜后停在旧消息顶端
         if (isB && hasE('E4')) archived('重读·已归档');
         else {
           ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 240 });
@@ -2062,7 +2102,7 @@ const CONTENT = (() => {
         }
         afterAction();
       }
-      else if (k === '2' || k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); }
+      else if (k === '2' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
     }
   };
 
