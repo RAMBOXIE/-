@@ -243,6 +243,22 @@ const CONTENT = (() => {
     if (b.apply) b.apply();
     return b;
   }
+  /* D-105 块3:遭遇叙述让 LLM 在引擎预批分支里挑一个 id(仅叙述口吻,数值仍归引擎)。
+     只回 id,越界/空由 resolveBranch 回退默认=防越狱。代理专用;未配 key → null → 离线加权。 */
+  let proxyPickerOff = false;
+  async function pickBranchLLM(branches){
+    if (proxyPickerOff || typeof fetch !== 'function') return null;
+    try {
+      const r = await fetch('/.netlify/functions/rou', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ persona: 'picker', candidates: branches.map(b => ({ id: b.id, line: b.line })) })
+      });
+      if (r.status === 404 || r.status === 501){ proxyPickerOff = true; return null; }
+      if (!r.ok) return null;
+      const j = await r.json();
+      return (j && typeof j.id === 'string' && j.id) ? j.id : null;
+    } catch(_){ proxyPickerOff = true; return null; }
+  }
   /* 上下键滚动;消费了键就返回 true(调用方据此不再往下处理) */
   function scrollKey(sc, k){
     if (k === 'ArrowUp'   && (sc.scroll || 0) > 0){ sc.scroll--; return true; }
@@ -2277,8 +2293,11 @@ const CONTENT = (() => {
     const evN = Object.keys(S.evidence).length;
     const bottles = (s && Array.isArray(s.seenBottles)) ? s.seenBottles.length : 0;
     const prog = ['', '本账号 · 未闭合项:'];
-    /* 采样官评级(D-101):把这一局的分数冷冷挂上 */
-    if (s && s.lastGrade) prog.push('采样官评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
+    /* 采样官评级(D-101):把这一局的分数冷冷挂上,后接采样官亲口的一句结算话(块3b) */
+    if (s && s.lastGrade){
+      prog.push('采样官评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
+      if (S.graderVerdict) S.graderVerdict.split('\n').forEach(l => prog.push('  采样官:' + l));
+    }
     /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
     const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
     if (lock === 'told') prog.push('阿帆的名义 已交还 · 不可撤回');
@@ -2297,7 +2316,18 @@ const CONTENT = (() => {
   }
   SCREENS.worldReport = {
     transient: true,
-    enter(){ this.scroll = 0; ENGINE.logEv('world_report', {}); },
+    enter(){
+      this.scroll = 0; ENGINE.logEv('world_report', {});
+      /* D-101 块3b:采样官对刚结束这局的评级,甩一句结算话(LLM,模板兜底)。
+         grade 取本局实时评级(settleDirective 已在 writeSave 里结算)。 */
+      const g = S.grade || ((SAVE.load() || {}).lastGrade);
+      if (S.graderVerdict === undefined && g){
+        S.graderVerdict = null;
+        GRADER.verdict({ grade: g, tier: GRADER_TIER, runN: (SV && SV.runCount) || 0 })
+          .then(t => { if (t) S.graderVerdict = t; })
+          .catch(() => {});
+      }
+    },
     render(){
       statusBar();
       scrollView(worldReportLines(), 16, H - 46, this);
@@ -2473,9 +2503,23 @@ const CONTENT = (() => {
   }
 
   /* ---- 回收进程抵达:最后一下由玩家亲手按(躲不掉,但必须你按) ---- */
+  /* 回收进程"擦过"的预批叙述集(数值恒定 bat:2,只叙述口吻不同) */
+  const GRAZE_BRANCHES = [
+    { id: 'graze', line: '进程掠过了你。' },
+    { id: 'brush', line: '它擦着你的接入点过去了。' },
+    { id: 'near',  line: '差一点。它没认出你。' }
+  ];
   SCREENS.huntArrive = {
     transient: true,
-    enter(){ ENGINE.logEv('hunt_arrive', {}); },
+    enter(){
+      ENGINE.logEv('hunt_arrive', {});
+      /* D-105 块3:趁玩家还在盯"他们到了",后台让 LLM 预挑一句擦过叙述;按下时若已回来
+         就用它,没回来/离线就现挑(离线加权)。零额外等待,数值不受影响。 */
+      if (S.huntNarr === undefined){
+        S.huntNarr = null;
+        pickBranchLLM(GRAZE_BRANCHES).then(id => { if (id) S.huntNarr = id; }).catch(() => {});
+      }
+    },
     render(){
       statusBar();
       L.drawTextScaled(cxof('他们到了', 2), 62, '他们到了', 2, { corrupt: .02 });
@@ -2488,12 +2532,9 @@ const CONTENT = (() => {
       S.hunt = null; S.huntDone = true;                // 每局只抵达一次,不再循环
       if (ENGINE.roll('c90')){
         /* 受限裁决(D-105):判定归引擎(c90 决定擦过/命中),擦过的叙述在引擎批准的
-           分支集里挑一个——每次不同,但数值恒定(都是 bat:2 的擦过),不动死亡率。 */
-        const b = verdict([
-          { id: 'graze', line: '进程掠过了你。' },
-          { id: 'brush', line: '它擦着你的接入点过去了。' },
-          { id: 'near',  line: '差一点。它没认出你。' }
-        ]);
+           分支集里挑一个——在线时由 LLM 预挑(S.huntNarr),离线/未回来则加权现挑;
+           越界回退默认。每次口吻可不同,但数值恒定(都是 bat:2 的擦过),不动死亡率。 */
+        const b = verdict(GRAZE_BRANCHES, S.huntNarr);
         ENGINE.act('特征比对·不匹配', { bat: 2 }, [b.line]);
         ENGINE.logEv('hunt_miss', { branch: b.id });
         back(); afterAction();

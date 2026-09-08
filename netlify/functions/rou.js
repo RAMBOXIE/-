@@ -209,20 +209,36 @@ exports.handler = async function(event){
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return json(400, { error: 'bad_body' });                 // 'null' / 'false' / '[]' 都在这里挡住
 
-  /* 人格分派:'grader'(采样官,单向、无玩家文本)/ 默认 'rou'(柔柔,多轮对话)。 */
-  const persona = body.persona === 'grader' ? 'grader' : 'rou';
+  /* 人格分派:'grader'(采样官)/ 'picker'(遭遇叙述挑分支,只回 id)/ 默认 'rou'(柔柔)。 */
+  const persona = body.persona === 'grader' ? 'grader' : body.persona === 'picker' ? 'picker' : 'rou';
   const st = (body.st && typeof body.st === 'object' && !Array.isArray(body.st)) ? body.st : {};
 
   const now = Date.now();
   const limited = rateLimited(clientIp(h), now);
   if (limited) return json(429, { error: 'rate_limited', scope: limited });
 
-  let system, messages, wantSig;
-  if (persona === 'grader'){
+  let system, messages, wantSig, picker = null;
+  if (persona === 'picker'){
+    /* 受限裁决(D-105 块3):引擎已给出一组预批分支(每个带 id + 一句叙述,全是非秘匿的
+       引擎文案)。LLM 只从中挑一个 id——挑不出或越界,客户端 resolveBranch 回退默认。
+       所以这里不需要人格核、不签名、也没有任何秘匿面。 */
+    const cands = Array.isArray(body.candidates) ? body.candidates.slice(0, 6) : [];
+    if (!cands.length) return json(400, { error: 'empty_candidates' });
+    for (const c of cands){
+      if (!c || typeof c.id !== 'string' || !/^[a-z0-9_]{1,16}$/.test(c.id) ||
+          typeof c.line !== 'string' || !c.line.trim() || c.line.length > 40)
+        return json(400, { error: 'bad_candidate' });
+    }
+    system = PICKER_CORE;
+    messages = [{ role: 'user', content: cands.map(c => c.id + ':' + c.line).join('\n') + '\n\n只回其中一个 id,别的都不要。' }];
+    wantSig = false; picker = cands;
+  } else if (persona === 'grader'){
     /* 采样官:玩家不往里打字,没有 history,也没有可回传的 assistant 轮 → 不验签、不签名。
-       态势全定性(客户端也只送定性枚举/整数),facts 里一个秘匿真值都没有。 */
-    system = GRADER_CORE + '\n\n' + graderState(st);
-    messages = [{ role: 'user', content: '下令。给他本局的态度。' }];
+       态势全定性(客户端也只送定性枚举/整数),facts 里一个秘匿真值都没有。
+       mode:'taunt'(下令)/ 'verdict'(结算评级)。 */
+    const mode = body.mode === 'verdict' ? 'verdict' : 'taunt';
+    system = GRADER_CORE + '\n\n' + graderState(st, mode);
+    messages = [{ role: 'user', content: graderTrigger(st, mode) }];
     wantSig = false;
   } else {
     /* 柔柔:客户端只能传玩家消息历史 + 状态标志。人格核不接受传入。 */
@@ -266,6 +282,8 @@ exports.handler = async function(event){
 
   const j = await res.json().catch(() => null);
   const text = parseText(cfg, j).trim().slice(0, 120);
+  /* picker:从模型输出里认出一个预批 id;认不出就回空,客户端据此回退离线加权挑选。 */
+  if (picker){ const hit = picker.find(c => text.includes(c.id)); return json(200, { id: hit ? hit.id : '' }); }
   if (!text) return json(502, { error: 'empty_completion' });
 
   return json(200, wantSig ? { text, sig: sign(text) } : { text });
@@ -291,12 +309,28 @@ const GRADER_CORE = [
   '只输出采样官要说的那一两句话本身,不要引号,不要任何解释。'
 ].join('\n');
 
-function graderState(st){
+const GRADE_CN = { praise: '赏识', pass: '合格', fail: '失望' };
+function graderState(st, mode){
   const tier = ['你对他没什么期待。', '你开始盯着他。', '你对他要求很高了。', '你对他极其苛刻,毫不耐烦。']
     [Math.max(0, Math.min(3, (st && st.tier) | 0))];
   const runN = (st && st.runN) | 0;
   const seen = runN >= 6 ? '他来过很多趟了。' : runN >= 2 ? '他来过几趟。' : '这是他第一次接进来。';
-  const last = { praise: '上一趟你给了赏识,但你不打算夸第二次。',
-                 pass: '上一趟他勉强合格。', fail: '上一趟他让你失望。' }[st && st.grade] || '';
+  const last = mode === 'verdict' ? '' :
+    ({ praise: '上一趟你给了赏识,但你不打算夸第二次。',
+       pass: '上一趟他勉强合格。', fail: '上一趟他让你失望。' }[st && st.grade] || '');
   return ['态势:', tier, seen, last].filter(Boolean).join('\n');
 }
+function graderTrigger(st, mode){
+  return mode === 'verdict'
+    ? '你现在要给他的评级是:' + (GRADE_CN[st && st.grade] || '失望') + '。用一句话,把这个结果甩给他。'
+    : '下令。给他本局的态度。';
+}
+
+/* ---- 受限裁决挑分支(persona:'picker';D-105 块3)----
+   中性指令,不涉剧情、不涉秘匿:给一组预批候选,只让模型回其中一个 id。
+   数值与最终叙述都由引擎按被选 id 决定;越界/空回退默认(客户端 resolveBranch)。 */
+const PICKER_CORE = [
+  '你在为一段紧张的互动叙述挑选此刻最合适的一句。',
+  '下面每行是一个候选,格式为「id:文本」。',
+  '只输出你选中的那个 id,不要输出文本、标点或任何解释。'
+].join('\n');

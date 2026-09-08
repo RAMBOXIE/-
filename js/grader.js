@@ -38,14 +38,22 @@ const GRADER = (() => {
     '只输出采样官要说的那一两句话本身,不要引号,不要任何解释。'
   ].join('\n');
 
-  /* 态势注入:全定性,零数字(秘匿纪律 + 防诱导吐数字) */
-  function stateLines(f){
+  /* 态势注入:全定性,零数字(秘匿纪律 + 防诱导吐数字)。
+     taunt=下令前,grade 是上一趟的历史;verdict=结算,grade 是本趟结果,经 trigger 递入。 */
+  function stateLines(f, mode){
     const tier = ['你对他没什么期待。', '你开始盯着他。', '你对他要求很高了。', '你对他极其苛刻,毫不耐烦。']
       [Math.max(0, Math.min(3, f.tier | 0))];
     const seen = f.runN >= 6 ? '他来过很多趟了。' : f.runN >= 2 ? '他来过几趟。' : '这是他第一次接进来。';
-    const last = { praise: '上一趟你给了赏识,但你不打算夸第二次。',
-                   pass: '上一趟他勉强合格。', fail: '上一趟他让你失望。' }[f.grade] || '';
+    const last = mode === 'verdict' ? '' :
+      ({ praise: '上一趟你给了赏识,但你不打算夸第二次。',
+         pass: '上一趟他勉强合格。', fail: '上一趟他让你失望。' }[f.grade] || '');
     return ['态势:', tier, seen, last].filter(Boolean).join('\n');
+  }
+  const GRADE_CN = { praise: '赏识', pass: '合格', fail: '失望' };
+  function trigger(f, mode){
+    return mode === 'verdict'
+      ? '你现在要给他的评级是:' + (GRADE_CN[f.grade] || '失望') + '。用一句话,把这个结果甩给他。'
+      : '下令。给他本局的态度。';
   }
 
   let sampleFn;
@@ -57,11 +65,11 @@ const GRADER = (() => {
     catch(_){ sampleFn = null; }
     return sampleFn;
   }
-  SAMPLE = async function(f){
+  SAMPLE = async function(f, mode){
     const s = await ensure();
     if (!s) return null;
     const turns = [
-      { role: 'user', content: CORE + '\n\n' + stateLines(f) + '\n\n下令。给他本局的态度。' }
+      { role: 'user', content: CORE + '\n\n' + stateLines(f, mode) + '\n\n' + trigger(f, mode) }
     ];
     try { const r = await s(turns, { modelTier: 'quick', cache: false }); return { text: r.text }; }
     catch(e){
@@ -80,8 +88,15 @@ const GRADER = (() => {
     ['这次别再让我失望。', '标准我提了,自己掂量。'],
     ['你已经很熟了。', '所以标准我提了,别指望宽限。']
   ];
+  /* 评级结算话(块3b):按本局结果甩一句。数值不进,只出态度。 */
+  const VERDICT = {
+    praise: ['这次没让我失望。', '合格线以上。别习惯。'],
+    pass:   ['勉强够看。', '过了。仅此而已。'],
+    fail:   ['废样本。记录里又添一笔。', '你让我失望了。意料之中。']
+  };
   const rand = a => a[Math.floor(Math.random() * a.length)];
   function fallback(f){ return rand(TAUNT[Math.max(0, Math.min(3, f.tier | 0))]); }
+  function fbVerdict(f){ return rand(VERDICT[f.grade] || VERDICT.fail); }
 
   /* 输出 lint:采样官的话里绝不该有数字/长句/平台词 */
   const BAD = /(游戏|玩家|模型|程序|AI|人工智能|assistant)/i;
@@ -94,14 +109,15 @@ const GRADER = (() => {
     return lines.every(l => l.trim().length <= 18);
   }
 
-  /* 后端代理(静态托管):persona:'grader',人格核在服务端。未配 key → 501 → 模板。 */
+  /* 后端代理(静态托管):persona:'grader' + mode,人格核在服务端。未配 key → 501 → 模板。 */
   let proxyOff = false;
-  async function viaProxy(f){
+  async function viaProxy(f, mode){
     if (proxyOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ persona: 'grader', st: { tier: f.tier | 0, grade: f.grade || 'none', runN: f.runN | 0 } })
+        body: JSON.stringify({ persona: 'grader', mode: mode === 'verdict' ? 'verdict' : 'taunt',
+          st: { tier: f.tier | 0, grade: f.grade || 'none', runN: f.runN | 0 } })
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
@@ -112,17 +128,15 @@ const GRADER = (() => {
 
   function clean(t){ return String(t).trim().slice(0, 60); }
 
-  /* 取本局采样官台词。f={tier,grade,runN}。永远给一句(LLM 不成就模板),不抛错。 */
-  async function taunt(f){
+  /* 三级降级取一句;mode 决定下令(taunt)还是结算(verdict),各有模板兜底。 */
+  async function say(f, mode, fb){
     f = f || {};
-    if (SAMPLE){
-      const r = await SAMPLE(f);
-      if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; }
-    }
-    const p = await viaProxy(f);
-    if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
-    return fallback(f);
+    if (SAMPLE){ const r = await SAMPLE(f, mode); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
+    const p = await viaProxy(f, mode); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
+    return fb(f);
   }
+  const taunt   = f => say(f, 'taunt',   fallback);       // 下令屏挑衅
+  const verdict = f => say(f, 'verdict', fbVerdict);      // 结算评级话(块3b)
 
-  return { taunt, _lintOk: lintOk, _fallback: fallback };   // _ 前缀:门禁用
+  return { taunt, verdict, _lintOk: lintOk, _fallback: fallback, _fbVerdict: fbVerdict };   // _ 前缀:门禁用
 })();

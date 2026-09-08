@@ -83,6 +83,51 @@ function scenario(name, fn){
     A(n === 1, '501 后应永久降级,不再打代理,实际打了 ' + n + ' 次');
   });
 
+  /* ---- 块3b 评级结算话:离线按 grade 回退模板,且 lint-clean ---- */
+  await scenario('评级结算 · 离线按 grade 回退模板', async ({A}) => {
+    const G = bootGrader();
+    for (const grade of ['praise','pass','fail']){
+      const t = await G.verdict({ grade, tier:1, runN:2 });
+      A(typeof t === 'string' && t.length > 0, grade+' 应给一句结算话');
+      A(G._lintOk(t), grade+' 结算话须 lint-clean:' + JSON.stringify(t));
+    }
+    // fail 与 praise 的池不同(结算话按结果分化)
+    const fails = new Set(), praises = new Set();
+    for (let i=0;i<20;i++){ Math.random=()=>i/20; fails.add(G._fbVerdict({grade:'fail'})); praises.add(G._fbVerdict({grade:'praise'})); }
+    A([...fails].every(x => ![...praises].includes(x)), 'fail 与 praise 结算话不重叠');
+  });
+
+  await scenario('评级结算 · 代理带数字被拦→回退', async ({A}) => {
+    const fetch = () => Promise.resolve({ ok:true, status:200, json: () => Promise.resolve({ text: '评级 3 档,滚。' }) });
+    const G = bootGrader({ fetch });
+    const t = await G.verdict({ grade:'fail', tier:2, runN:3 });
+    A(!/[0-9]/.test(t), '越界数字不得上屏,实际 ' + JSON.stringify(t));
+  });
+
+  /* ---- 服务端 verdict 模式:trigger 递入评级、graderState 不再挂"上一趟" ---- */
+  await scenario('服务端 mode=verdict · trigger 含评级、facts 无数字', async ({A}) => {
+    const save = {}; ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => save[k]=process.env[k]);
+    process.env.ANTHROPIC_API_KEY = 'test-key'; process.env.ROU_SIG_KEY = 'test-sig'; delete process.env.LLM_PROVIDER;
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+    const fn = require(ROOT + '/netlify/functions/rou.js');
+    let sent = null; const realFetch = global.fetch;
+    global.fetch = (u, o) => { sent = JSON.parse(o.body);
+      return Promise.resolve({ ok:true, status:200,
+        json: () => Promise.resolve({ content:[{type:'text',text:'废样本。'}] }), text: () => Promise.resolve('') }); };
+    const r = await fn.handler({ httpMethod:'POST',
+      body: JSON.stringify({ persona:'grader', mode:'verdict', st:{ tier:1, grade:'praise', runN:2 } }),
+      headers: { 'content-type':'application/json', host:'demo.netlify.app', 'x-nf-client-connection-ip':'203.0.113.8' } });
+    global.fetch = realFetch;
+    A(r.statusCode === 200, 'verdict 模式应 200,实际 ' + r.statusCode + ' ' + r.body);
+    A(JSON.parse(r.body).sig === undefined, 'grader 仍不签名');
+    A(sent.messages[0].content.includes('赏识'), 'verdict trigger 应把评级(赏识)递给它,实际 ' + sent.messages[0].content);
+    A(!sent.system.includes('上一趟'), 'verdict 模式 graderState 不应再挂"上一趟"');
+    A(!/\d{1,2}:\d{2}/.test(JSON.stringify(sent)), 'verdict prompt 不得含时刻');
+    ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => {
+      if (save[k] === undefined) delete process.env[k]; else process.env[k]=save[k]; });
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+  });
+
   /* ---- 服务端 persona 路由:grader 无需 history、不签名、facts 定性零数字 ---- */
   await scenario('服务端 persona=grader · 无 history/不签名/facts 零数字', async ({A}) => {
     const save = {}; ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => save[k]=process.env[k]);
