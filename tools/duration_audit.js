@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-const SRC = ['js/lcd.js', 'js/save.js', 'js/companion.js', 'js/grader.js', 'js/engine.js', 'js/content.js']
+const SRC = ['js/lcd.js', 'js/save.js', 'js/companion.js', 'js/grader.js', 'js/mom.js', 'js/engine.js', 'js/content.js']
   .map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n;\n');
 
 /* ---------------- 画像 ---------------- */

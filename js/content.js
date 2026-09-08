@@ -1230,7 +1230,9 @@ const CONTENT = (() => {
       '\n[三天前] 帆,你回得比以前快,妈就放心\n[三天前] 阿帆: 不冷。吃过了,睡吧。';
   }
   function momPages(){
-    if (MOM_LOCK === 'told') return MOM_TOLD_PAGES;
+    /* 告知态开场页(她对陌生号码说话)走 LLM,每次不同;未回来/离线用脚本兜底(D-103)。
+       深搜的阿帆真实历史(1..3)永远脚本,不交给 LLM。 */
+    if (MOM_LOCK === 'told') return [S.momToldPage || MOM_TOLD_PAGES[0], MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]];
     if (CONT_N > 0) return [momDecayPage0(), MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]];
     return MOM_PAGES;
   }
@@ -1240,6 +1242,11 @@ const CONTENT = (() => {
       this.scroll = 0;
       if (MOM_LOCK === 'deleted') return;                      // 停摆:开着不花电、不深搜
       if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); }
+      /* D-103:告知态开场白交给 LLM(单向、无玩家文本);模板先兜底,回来再替换,越界静默回退。 */
+      if (MOM_LOCK === 'told' && S.momToldPage === undefined){
+        S.momToldPage = null;
+        MOMLLM.told().then(t => { if (t) S.momToldPage = t; }).catch(() => {});
+      }
     },
     swipe(dir){
       /* 页文溢出时上下滑=滚;无可滚时上滑=深搜(原行为) */

@@ -9,7 +9,7 @@
    按钮 y >= 内容结束 y。 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/engine.js','js/content.js']
+const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/engine.js','js/content.js']
   .map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 
 let failures = 0;

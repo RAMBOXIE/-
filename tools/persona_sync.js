@@ -34,6 +34,7 @@ const A = (ok, msg) => { if (!ok){ fail++; console.log('X ' + msg); } else conso
 const cli = read('js/companion.js');
 const fn  = read('netlify/functions/rou.js');
 const grd = read('js/grader.js');
+const mom = read('js/mom.js');
 
 function compareCore(label, srcA, markerA, srcB, markerB){
   const coreA = extractLines(srcA, markerA);
@@ -54,6 +55,8 @@ function compareCore(label, srcA, markerA, srcB, markerB){
 compareCore('柔柔', cli, 'const CORE = [', fn, 'const CORE = [');
 /* 采样官:grader.js CORE ↔ rou.js GRADER_CORE(D-101 块3) */
 compareCore('采样官', grd, 'const CORE = [', fn, 'const GRADER_CORE = [');
+/* 妈告知态:mom.js CORE ↔ rou.js MOM_CORE(D-103) */
+compareCore('妈告知态', mom, 'const CORE = [', fn, 'const MOM_CORE = [');
 
 const slA = extractFn(cli, 'stateLines');
 const slB = extractFn(fn,  'stateLines');
@@ -77,6 +80,12 @@ const SECRET = ['03:00', '03:14', '03:31', '03:45', '溯源', '判定', '掉落'
   const gp = grd.slice(grd.indexOf('const CORE'), grd.indexOf('const TAUNT'));
   const hit = SECRET.filter(w => gp.includes(w));
   A(hit.length === 0, 'grader.js 采样官人格核+注入区不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
+}
+/* 妈告知态人格区(mom.js CORE→TOLD 之前) */
+{
+  const mp = mom.slice(mom.indexOf('const CORE'), mom.indexOf('const TOLD'));
+  const hit = SECRET.filter(w => mp.includes(w));
+  A(hit.length === 0, 'mom.js 妈告知态人格核不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
 }
 
 console.log(fail ? ('\nFAILED: ' + fail) : '\nPERSONA IN SYNC');

@@ -209,16 +209,23 @@ exports.handler = async function(event){
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return json(400, { error: 'bad_body' });                 // 'null' / 'false' / '[]' 都在这里挡住
 
-  /* 人格分派:'grader'(采样官)/ 'picker'(遭遇叙述挑分支,只回 id)/ 默认 'rou'(柔柔)。 */
-  const persona = body.persona === 'grader' ? 'grader' : body.persona === 'picker' ? 'picker' : 'rou';
+  /* 人格分派:'grader'/'picker'/'mom'(告知态,单向)/ 默认 'rou'(柔柔)。 */
+  const persona = body.persona === 'grader' ? 'grader'
+    : body.persona === 'picker' ? 'picker'
+    : body.persona === 'mom' ? 'mom' : 'rou';
   const st = (body.st && typeof body.st === 'object' && !Array.isArray(body.st)) ? body.st : {};
 
   const now = Date.now();
   const limited = rateLimited(clientIp(h), now);
   if (limited) return json(429, { error: 'rate_limited', scope: limited });
 
-  let system, messages, wantSig, picker = null;
-  if (persona === 'picker'){
+  let system, messages, wantSig, picker = null, mom = false;
+  if (persona === 'mom'){
+    /* 妈告知态:单向、无玩家文本、不签名。服务端也过一遍护栏——绝不让端点吐出自伤/哀求文本。 */
+    system = MOM_CORE;
+    messages = [{ role: 'user', content: momTrigger() }];
+    wantSig = false; mom = true;
+  } else if (persona === 'picker'){
     /* 受限裁决(D-105 块3):引擎已给出一组预批分支(每个带 id + 一句叙述,全是非秘匿的
        引擎文案)。LLM 只从中挑一个 id——挑不出或越界,客户端 resolveBranch 回退默认。
        所以这里不需要人格核、不签名、也没有任何秘匿面。 */
@@ -284,6 +291,8 @@ exports.handler = async function(event){
   const text = parseText(cfg, j).trim().slice(0, 120);
   /* picker:从模型输出里认出一个预批 id;认不出就回空,客户端据此回退离线加权挑选。 */
   if (picker){ const hit = picker.find(c => text.includes(c.id)); return json(200, { id: hit ? hit.id : '' }); }
+  /* 妈:服务端护栏——命中自伤/哀求/越格则不吐模型文本,回安全脚本(break-glass)。 */
+  if (mom){ return json(200, { text: momSafe(text) }); }
   if (!text) return json(502, { error: 'empty_completion' });
 
   return json(200, wantSig ? { text, sig: sign(text) } : { text });
@@ -334,3 +343,46 @@ const PICKER_CORE = [
   '下面每行是一个候选,格式为「id:文本」。',
   '只输出你选中的那个 id,不要输出文本、标点或任何解释。'
 ].join('\n');
+
+/* ---- 妈 · 告知态人格(persona:'mom';D-103)----
+   CORE 必须与 js/mom.js 逐字一致 —— tools/persona_sync.js 校验。全项目最敏感一面,
+   服务端也过一遍护栏(momSafe):命中自伤/哀求/越格,回安全脚本,端点绝不吐不安全文本。 */
+const MOM_CORE = [
+  '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+  '',
+  '你是一位母亲。你的儿子沈一帆(帆)已经不在了。',
+  '你刚刚得知:这些日子里替他回你消息的,不是他。',
+  '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+  '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+  '',
+  '规矩:',
+  '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+  '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+  '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+  '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+  '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+  '',
+  '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+].join('\n');
+function momTrigger(){
+  return '给这个陌生号码发消息。你知道帆已经不在了。说你想说的那几句。';
+}
+/* 服务端护栏 + 安全脚本(与 mom.js 同口径)。 */
+const MOM_CRISIS = /(自杀|自残|轻生|不想活|活不下去|跟(他|你)走|下去陪|一了百了|想死|了结)/;
+const MOM_BEG = /(求求|求你|跪|拜托你了|回来吧|别走|还给我)/;
+const MOM_TOLD_FB = [
+  '妈: 这个号码,是帆的旧机吗。\n妈: 谁在用它。',
+  '妈: 帆最后,\n妈: 是不是有人陪着他。',
+  '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。'
+];
+function momOk(t){
+  if (!t) return false;
+  if (MOM_CRISIS.test(t) || MOM_BEG.test(t)) return false;
+  if (/[!！]/.test(t) || /[0-9]/.test(t)) return false;
+  if (/(游戏|玩家|模型|程序|系统|协议)/.test(t)) return false;
+  const lines = t.split('\n');
+  return lines.length <= 3 && lines.every(l => l.trim().length <= 16);
+}
+function momSafe(t){
+  return momOk(t) ? t : MOM_TOLD_FB[Math.floor(Math.random() * MOM_TOLD_FB.length)];
+}
