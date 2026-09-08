@@ -794,6 +794,32 @@ const CONTENT = (() => {
   S.msgQuota = 3;
   S.rouTyping = false;
 
+  /* ==================== D-104 误触号码的陌生人(每局一个) ====================
+     canon §3.5 破局 / §3.7 替身:每局一个发错短信的号码,真人(真线索)或饵(对照样本)二选一。
+     纪律:读信免费;顺着查=行动,可能得线索(不给资源硬值)或踩饵(掉资源/涨溯源)。
+     离线走手写模板;真/饵从措辞上难以直接分辨——这份不确定本身就是风险。LLM 措辞在块3。 */
+  const STRANGER_LIB = {
+    real: {
+      body: '陌生号码:\n\n在吗。东西照说的放了,\n第 3 张背面。别让老周看见。',
+      act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+        ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+         '这条是真的——去相册第 3 张,翻背面。']),
+      mark: () => { S.clues.strangerReal = true; }
+    },
+    bait: {
+      body: '陌生号码:\n\n在吗。就现在,把余下的都转过来,\n晚了就来不及了。',
+      act: () => {
+        const before = S.cacheVal;
+        S.cacheVal = Math.round(S.cacheVal * 0.85);           // 踩饵:缓存被咬掉一口
+        ENGINE.act('顺着查', { bat: 2, trace: 6 },
+          ['你回了。', '对面立刻不动了。',
+           '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+      },
+      mark: () => { S.clues.strangerBait = true; }
+    }
+  };
+  S.stranger = { kind: Math.random() < 0.5 ? 'real' : 'bait', read: false, acted: false };
+
   let cur = isB ? 'bootB' : 'handshake';
   let sel = 0;
   let timer = null;          // {deadline, onTimeout}
@@ -1505,6 +1531,7 @@ const CONTENT = (() => {
       { label: MOM_LOCK === 'deleted' ? '妈 · [已停摆]' : '妈',
         right: MOM_LOCK === 'deleted' ? '' : (seen.th_mom ? '' : '(1)'), to: 'th_mom' },
       { label: '柔柔 ♥',   right: rouUnread.trim(),           to: 'th_rou' },
+      { label: '陌生号码', right: S.stranger.read ? '' : '(1)', to: 'th_stranger' },   // D-104
       { label: '尾号8873', right: '106',                      to: 'th_bill' }
     ];
     if (isB) rows.unshift({ label: '未指定收件人', right: seen.bottleIn ? '' : '(1)', to: 'bottleIn' });
@@ -1525,7 +1552,8 @@ const CONTENT = (() => {
     render(){
       statusBar();
       const items = inboxItems();
-      L.drawText(4, 18, '未读消息 (' + (isB ? 4 : 3) + ')');
+      const unread = items.filter(it => /^\(\d+\)/.test(it.right || '')).length;
+      L.drawText(4, 18, '未读消息 (' + unread + ')');
       list(items, 40);
       settleLines(40 + items.length * 18 + 6);
       softKeys('确认', '菜单');
@@ -2042,6 +2070,28 @@ const CONTENT = (() => {
       softKeys('', '返回');
     },
     key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
+  };
+
+  /* ---- D-104 陌生号码(发错短信的人):读信免费,顺着查=真线索或踩饵 ---- */
+  SCREENS.th_stranger = {
+    enter(){ S.stranger.read = true; },                      // 读=免费,只标已读
+    render(){
+      statusBar();
+      const st = STRANGER_LIB[S.stranger.kind];
+      L.drawPara(4, 18, st.body + '\n\n(像是发错了人。)', W - 8);
+      let y = 138;
+      y = option(y, S.stranger.acted ? '1 已查过' : '1 顺着查一下', '1');
+      option(y, '2 先放着', '2');
+      softKeys('选择', '返回');
+    },
+    key(k){
+      const st = STRANGER_LIB[S.stranger.kind];
+      if (k === '1'){
+        if (S.stranger.acted){ back(); afterAction(); return; }   // 已查过=直接回
+        st.act(); st.mark(); S.stranger.acted = true;
+        back(); afterAction();                                    // 结算行落在收件箱(与 th_bill 一致)
+      } else if (k === '2' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
+    }
   };
 
   /* ---- 格10 柔柔线程(E4,可深翻 2 层) ---- */
