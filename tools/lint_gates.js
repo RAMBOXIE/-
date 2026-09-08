@@ -5,7 +5,7 @@
    ② 状态 E 拒答句后面缀了「你要发就发。我不睡。」→ 拒答不再均匀,还擦到非亲密锁 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/engine.js','js/content.js']
+const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
   .map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 
 let failures = 0;

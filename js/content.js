@@ -1409,11 +1409,19 @@ const CONTENT = (() => {
 
   /* ---- D-104 陌生号码(发错短信的人):读信免费,顺着查=真线索或踩饵 ---- */
   SCREENS.th_stranger = {
-    enter(){ S.stranger.read = true; },                      // 读=免费,只标已读
+    enter(){
+      S.stranger.read = true;                                // 读=免费,只标已读
+      /* D-104 块3:短信正文交给 LLM(每局不同,单向无输入);模板兜底,越界静默回退。
+         真/饵的动作后果全归引擎,LLM 只改这段措辞。 */
+      if (S.strangerBody === undefined){
+        S.strangerBody = null;
+        STRANGERLLM.msg(S.stranger.kind).then(t => { if (t) S.strangerBody = t; }).catch(() => {});
+      }
+    },
     render(){
       statusBar();
       const st = STRANGER_LIB[S.stranger.kind];
-      L.drawPara(4, 18, st.body + '\n\n(像是发错了人。)', W - 8);
+      L.drawPara(4, 18, (S.strangerBody || st.body) + '\n\n(像是发错了人。)', W - 8);
       let y = 138;
       y = option(y, S.stranger.acted ? '1 已查过' : '1 顺着查一下', '1');
       option(y, '2 先放着', '2');

@@ -209,10 +209,11 @@ exports.handler = async function(event){
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return json(400, { error: 'bad_body' });                 // 'null' / 'false' / '[]' 都在这里挡住
 
-  /* 人格分派:'grader'/'picker'/'mom'(告知态,单向)/ 默认 'rou'(柔柔)。 */
+  /* 人格分派:'grader'/'picker'/'mom'/'stranger'(单向)/ 默认 'rou'(柔柔)。 */
   const persona = body.persona === 'grader' ? 'grader'
     : body.persona === 'picker' ? 'picker'
-    : body.persona === 'mom' ? 'mom' : 'rou';
+    : body.persona === 'mom' ? 'mom'
+    : body.persona === 'stranger' ? 'stranger' : 'rou';
   const st = (body.st && typeof body.st === 'object' && !Array.isArray(body.st)) ? body.st : {};
 
   const now = Date.now();
@@ -220,7 +221,12 @@ exports.handler = async function(event){
   if (limited) return json(429, { error: 'rate_limited', scope: limited });
 
   let system, messages, wantSig, picker = null, mom = false;
-  if (persona === 'mom'){
+  if (persona === 'stranger'){
+    /* 陌生人:单向、无玩家文本、不签名。kind 决定真/饵语气,后果全归客户端引擎。 */
+    system = STRANGER_CORE;
+    messages = [{ role: 'user', content: strangerTrigger(body.kind === 'bait' ? 'bait' : 'real') }];
+    wantSig = false;
+  } else if (persona === 'mom'){
     /* 妈告知态:单向、无玩家文本、不签名。服务端也过一遍护栏——绝不让端点吐出自伤/哀求文本。 */
     system = MOM_CORE;
     messages = [{ role: 'user', content: momTrigger() }];
@@ -385,4 +391,24 @@ function momOk(t){
 }
 function momSafe(t){
   return momOk(t) ? t : MOM_TOLD_FB[Math.floor(Math.random() * MOM_TOLD_FB.length)];
+}
+
+/* ---- 误触号码的陌生人(persona:'stranger';D-104 块3)----
+   CORE 必须与 js/stranger.js 逐字一致 —— tools/persona_sync.js 校验。
+   只出短信正文;真/饵后果全归客户端引擎,这里不碰任何数值。 */
+const STRANGER_CORE = [
+  '你在扮演一条「发错号码」的短信正文。你以为在给熟人发消息,其实发到了一台失联的旧设备上。',
+  '你不知道对面是谁。你的话没头没尾,像接着某个只有你们俩懂的上下文。',
+  '',
+  '规矩:',
+  '1 平直口语,像真人随手发的短信。最多两行,每行不超过 18 字。',
+  '2 不提"游戏/程序/模型/AI";不写具体时刻(几点几分)。',
+  '3 你不认识对面,不要叫对方的名字,也不解释你是谁。',
+  '',
+  '只输出这条短信正文本身,不要引号,不要任何解释。'
+].join('\n');
+function strangerTrigger(kind){
+  return kind === 'bait'
+    ? '你在催对方「把剩下的都转过来」,带着「晚了就来不及」的紧迫。像一条催款/钓鱼短信。'
+    : '你要交接一件真东西——一个地点、一张照片、或一个柜子。自然地提一句,像发给老熟人。';
 }

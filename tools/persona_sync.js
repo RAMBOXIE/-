@@ -35,6 +35,7 @@ const cli = read('js/companion.js');
 const fn  = read('netlify/functions/rou.js');
 const grd = read('js/grader.js');
 const mom = read('js/mom.js');
+const stg = read('js/stranger.js');
 
 function compareCore(label, srcA, markerA, srcB, markerB){
   const coreA = extractLines(srcA, markerA);
@@ -57,6 +58,8 @@ compareCore('柔柔', cli, 'const CORE = [', fn, 'const CORE = [');
 compareCore('采样官', grd, 'const CORE = [', fn, 'const GRADER_CORE = [');
 /* 妈告知态:mom.js CORE ↔ rou.js MOM_CORE(D-103) */
 compareCore('妈告知态', mom, 'const CORE = [', fn, 'const MOM_CORE = [');
+/* 陌生人:stranger.js CORE ↔ rou.js STRANGER_CORE(D-104 块3) */
+compareCore('陌生人', stg, 'const CORE = [', fn, 'const STRANGER_CORE = [');
 
 const slA = extractFn(cli, 'stateLines');
 const slB = extractFn(fn,  'stateLines');
@@ -86,6 +89,12 @@ const SECRET = ['03:00', '03:14', '03:31', '03:45', '溯源', '判定', '掉落'
   const mp = mom.slice(mom.indexOf('const CORE'), mom.indexOf('const TOLD'));
   const hit = SECRET.filter(w => mp.includes(w));
   A(hit.length === 0, 'mom.js 妈告知态人格核不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
+}
+/* 陌生人人格区(stranger.js CORE→BODY 之前) */
+{
+  const sp = stg.slice(stg.indexOf('const CORE'), stg.indexOf('const BODY'));
+  const hit = SECRET.filter(w => sp.includes(w));
+  A(hit.length === 0, 'stranger.js 陌生人人格核不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
 }
 
 console.log(fail ? ('\nFAILED: ' + fail) : '\nPERSONA IN SYNC');

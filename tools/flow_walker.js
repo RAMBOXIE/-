@@ -2,7 +2,7 @@
 /* 玩家动线遍历:断头路 / 不可达屏 / 卡死检测 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/engine.js','js/content.js']
+const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
   .map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 
 const KEYS = ['Enter','Escape','softL','softR','1','2','3','4','5','6','7',
