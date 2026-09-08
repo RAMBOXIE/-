@@ -161,6 +161,9 @@ function bootFull(io){
   expect('brief');
   frame();
   KF('Enter');
+  expect('saymaster');          // 采样官下令(D-101)
+  frame();
+  KF('Enter');
   expect('inbox');
 }
 
@@ -399,6 +402,7 @@ const PATHS = [
       };
       CONTENT.SCREENS.bootB.enter();
       frame(); advance(1300); frame();
+      KF('Enter'); at('saymaster');
       KF('Enter'); at('inbox');
       /* 漂流瓶(首行) */
       KF('Enter'); at('bottleIn');
@@ -489,6 +493,7 @@ const PATHS = [
       const { K, KF, frame, advance, at, drain, CONTENT, S, ENGINE } = io;
       CONTENT.SCREENS.bootB.enter();
       frame(); advance(1300); frame();
+      KF('Enter'); at('saymaster');
       KF('Enter'); at('inbox');
       KF('Enter'); at('bottleIn');                 // 首行:瓶(这局是没附件的那张)
       KF('x'); KF('Escape'); at('inbox');

@@ -737,6 +737,34 @@ const CONTENT = (() => {
   /* 三态渲染:遗言/理由(评审 P1/P2:null 永不落入「缺失」语族) */
   const inkOr = (v, kept) => kept ? '[无法访问]' : (v ? '「' + v + '」' : '[未写入]');
 
+  /* ==================== 采样官 · 采样指令(D-101 · canon M20/M22 下沉到每局) ====================
+     块1a:下指令 + 展示 + 结局评级 + 逐局加码。破局白嫖与陷阱条款见块1b。
+     纪律:指令内容全由状态机定;文案只引用玩家可见物,不含窗口值/概率/掉落阈值(秘匿隔离)。
+     LLM 只渲染采样官措辞(块3),块1a 用手写挑衅模板。 */
+  const GRADER_TIER = Math.min(3, Math.floor(((SV && SV.praiseCount) || 0) / 2));   // 越被赏识越狠
+  const CACHE_TARGET = [300, 500, 800, 1200][GRADER_TIER];
+  /* 指令库(封闭)。met() 在结局时按现有状态判达标。 */
+  const DIRECTIVE_LIB = [
+    { id: 'D_CASE',  ab: 'ab', line: '案卷补到四件。补不齐,你这趟就是废样本。', met: () => Object.keys(S.evidence).length >= 4 },
+    { id: 'D_CACHE', ab: 'ab', line: '缓存做到 ¥' + CACHE_TARGET + '。低于这个数,评级降档。', met: () => S.cacheVal >= CACHE_TARGET },
+    { id: 'D_QUIET', ab: 'ab', line: '别惊动残响。信号过两格,算你没完成。', met: () => ENGINE.sigBars() <= 2 },
+    { id: 'D_AUDIO', ab: 'b',  line: '本局要那段删掉的音频。撬不开,那就别回来。', met: () => !!S.evidence.E5 }
+  ];
+  const S_TIER = isB ? 'b' : 'a';
+  const DIR_POOL = DIRECTIVE_LIB.filter(d => d.ab === 'ab' || d.ab === S_TIER);
+  S.directive = DIR_POOL[Math.floor(Math.random() * DIR_POOL.length)];   // 本局指令(状态机定)
+  S.dirGraded = false;
+  /* 结局评级(在 writeSave 顶部调一次;幂等) */
+  function settleDirective(){
+    if (S.dirGraded) return; S.dirGraded = true;
+    const met = !!(S.directive && S.directive.met());
+    S.dirMet = met;
+    const extra = (S.beats && S.beats.truthDone) || S.cacheVal >= CACHE_TARGET * 1.5;
+    S.grade = !met ? 'fail' : (extra ? 'praise' : 'pass');
+    if (!met) S.cacheVal = Math.round(S.cacheVal * 0.8);   // 硬性:未达标缓存 −20%
+  }
+  const GRADE_CN = { praise: '赏识', pass: '合格', fail: '失望' };
+
   /* 关系通道状态(M28 §3:自由文本短信,局内 ≤3 条,零玩家收益、有真实成本) */
   S.rouChat = [];        // {who:'me'|'rou', text}
   S.msgQuota = 3;
@@ -1005,6 +1033,7 @@ const CONTENT = (() => {
   /* 结局落地时写存档(死亡不清零认知) */
   function writeSave(ending){
     if (S._saved) return; S._saved = true;
+    settleDirective();                                   // 采样官评级(D-101):在存档前结算,应用硬性后果
     const base = SV || {};
     SAVE.store({
       runCount: (base.runCount || 0) + 1,
@@ -1031,6 +1060,10 @@ const CONTENT = (() => {
       disposalHistory: (base.disposalHistory || []).concat(S.disposal ? [S.disposal] : []),
       momLocked: base.momLocked ||
         (S.disposal === 'tell' ? 'told' : S.disposal === 'delete' ? 'deleted' : null),
+      /* 采样官(D-101):本局评级 + 累计赏识数(驱动下局加码 GRADER_TIER) */
+      lastGrade: S.grade || null,
+      lastDirective: (S.directive && S.directive.id) || null,
+      praiseCount: ((base.praiseCount || 0) + (S.grade === 'praise' ? 1 : 0)),
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -1178,7 +1211,7 @@ const CONTENT = (() => {
     key(k){
       if (k === 'Enter' || k === 'softL'){
         if ((performance.now() - this.t0) < 1000) return;
-        go('inbox', true);
+        go('saymaster', true);
       }
     }
   };
@@ -1394,7 +1427,28 @@ const CONTENT = (() => {
       L.drawText(4, y, '03:00 之后,小心。');
       option(H - 42, '开始接入', 'Enter');
     },
-    key(k){ if (k === 'Enter') go('inbox', true); }
+    key(k){ if (k === 'Enter') go('saymaster', true); }
+  };
+
+  /* ---- 采样官下令屏(D-101 块1a):母体开口,下本局采样指令 ---- */
+  SCREENS.saymaster = {
+    transient: true,
+    enter(){ this.scroll = 0; ENGINE.logEv('directive', { id: S.directive && S.directive.id, tier: GRADER_TIER }); },
+    render(){
+      statusBar();
+      L.drawText(4, 16, '交付核验单元 · 采样官');
+      L.hline(30, 4, W - 5, 2);
+      const taunt = ['又一个。别磨蹭。', '你上次那点表现,我记着。',
+                     '这次别再让我失望。', '你已经很熟了。所以标准我提了。'][GRADER_TIER];
+      const lines = L.wrap(taunt, SCROLL_W)
+        .concat(['', '本局指令:'])
+        .concat(L.wrap(S.directive.line, SCROLL_W))
+        .concat(['', '达标=评级。不达标=降档。']);
+      scrollView(lines, 36, H - 46, this);
+      option(H - 42, '接入', 'Enter');
+      hit(0, 0, W, H - 46, 'Enter');
+    },
+    key(k){ if (scrollKey(this, k)) return; if (k === 'Enter' || k === 'softL') go('inbox', true); }
   };
 
   /* ---- 收件箱 ---- */
@@ -1486,9 +1540,11 @@ const CONTENT = (() => {
     render(){
       statusBar();
       if (!this._done){
-        /* 协议正文进固定视口可滚,两个选项钉在底(v2 协议偏长,窄屏不越软键) */
+        /* 协议正文进固定视口可滚,两个选项钉在底(v2 协议偏长,窄屏不越软键)。
+           顶部挂本局采样官指令,方便随时复读(D-101)。 */
         const optTop = H - 15 - 2 * (LH + 2) - 4;
-        scrollView(L.wrap(PROTO_TXT, SCROLL_W), 16, optTop - 4, this);
+        const body = ['采样官: ' + S.directive.line, ''].concat(L.wrap(PROTO_TXT, SCROLL_W));
+        scrollView(body, 16, optTop - 4, this);
         let y = optSlim(optTop, '1 回复「收到」', '1');
         optSlim(y, '2 不回,返回', '2');
       } else {
@@ -2802,6 +2858,8 @@ const CONTENT = (() => {
     const evN = Object.keys(S.evidence).length;
     const bottles = (s && Array.isArray(s.seenBottles)) ? s.seenBottles.length : 0;
     const prog = ['', '本账号 · 未闭合项:'];
+    /* 采样官评级(D-101):把这一局的分数冷冷挂上 */
+    if (s && s.lastGrade) prog.push('采样官评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
     /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
     const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
     if (lock === 'told') prog.push('阿帆的名义 已交还 · 不可撤回');
