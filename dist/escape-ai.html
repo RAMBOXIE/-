@@ -192,6 +192,9 @@ const LCD = (() => {
   }
 
   const NO_LINE_START = '。，、：；！？）」』】·…%>';
+  /* 不可在中间折断的 token 字符:ASCII 字母数字 + 编号/时刻/千分位里的连接符。
+     这样 #7741-A、03:14、2,417、#6404-C 折行时整段一起走,不会被拦腰断成两行。 */
+  const TOKEN = /[0-9A-Za-z#:._,\-]/;
   function wrap(str, maxW){
     const out = []; let line = '', w = 0;
     for (const ch of str){
@@ -201,6 +204,12 @@ const LCD = (() => {
         if (NO_LINE_START.includes(ch) && line.length > 1){
           const carry = line[line.length - 1];
           out.push(line.slice(0, -1)); line = carry; w = cellW(carry);
+        } else if (TOKEN.test(ch) && line.length && TOKEN.test(line[line.length - 1])){
+          /* 正落在一个 token 中间:退到 token 起点,把整段挪到下一行 */
+          let i = line.length;
+          while (i > 0 && TOKEN.test(line[i - 1])) i--;
+          if (i > 0){ const carry = line.slice(i); out.push(line.slice(0, i)); line = carry; w = textWidth(carry); }
+          else { out.push(line); line = ''; w = 0; }   // 整行都是 token(超长)才硬断
         } else { out.push(line); line = ''; w = 0; }
       }
       line += ch; w += cw;
@@ -232,9 +241,24 @@ const LCD = (() => {
     }
   }
 
-  /* ---- 失真参数(渲染器参数,不是散落的 if) ---- */
+  /* ---- 失真参数(渲染器参数,不是散落的 if) ----
+     shake:  瞬时抖屏 {mag(逻辑px), until(performance.now 时刻)}
+     accents:本帧的变色区 [{x,y,w,h,rgb}];每帧由绘制方(statusBar)重建 */
   const R = { threshold:.42, corrupt:.0004, scanline:.14, scanPhase:0,
-              ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false };
+              ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false,
+              shake:null, accents:[] };
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* 抖屏:扣电量/回收抵达等"紧迫"时刻的一下震动。宪法 11:这是紧迫感不是恐怖峰,
+     幅度要小、时间要短。同时有多次请求时取更强的一个。尊重系统减动效设置。 */
+  function shake(mag, ms){
+    if (reduceMotion) return;
+    const until = performance.now() + ms;
+    if (!R.shake || until > R.shake.until || mag > R.shake.mag) R.shake = { mag, until };
+  }
+  /* 变色区:让指定矩形内的"亮像素"改用 rgb(而非默认磷光青)。只影响前景亮度映射,
+     底色不变——保持哑机质感。目前只用在状态栏(电量告警 / 回收逼近)。 */
+  function accent(x, y, w, h, rgb){ R.accents.push({ x, y, w, h, rgb }); }
   function applyTier(tr){
     if (tr < 40){ R.corrupt=.0004; R.threshold=.42; R.flicker=0;   R.batJitter=false; R.tsScramble=false; return 0; }
     if (tr < 70){ R.corrupt=.0035; R.threshold=.44; R.flicker=.02; R.batJitter=false; R.tsScramble=true;  return 1; }
@@ -247,23 +271,51 @@ const LCD = (() => {
   function present(){
     const flick = R.flicker > 0 && Math.random() < R.flicker ? .55 + Math.random() * .3 : 1;
     const d = img.data;
+    const acc = R.accents;
     for (let y = 0; y < H; y++){
       const scan = R.scanline > 0 && ((y + R.scanPhase | 0) % 3 === 0) ? 1 - R.scanline : 1;
+      /* 本行命中的变色区(通常为空,几乎零开销) */
+      let rowAcc = null;
+      for (let i = 0; i < acc.length; i++){
+        const r = acc[i];
+        if (y >= r.y && y < r.y + r.h) (rowAcc || (rowAcc = [])).push(r);
+      }
       for (let x = 0; x < W; x++){
         const k = px(x, y), a = actual[k] * scan * flick;
         const base = R.showUnlit ? UNLIT : SUB, o = k * 4;
-        d[o]   = base[0] + (LIT[0] - base[0]) * a;
-        d[o+1] = base[1] + (LIT[1] - base[1]) * a;
-        d[o+2] = base[2] + (LIT[2] - base[2]) * a;
+        let lit = LIT;
+        if (rowAcc){
+          for (let i = 0; i < rowAcc.length; i++){
+            const r = rowAcc[i];
+            if (x >= r.x && x < r.x + r.w){ lit = r.rgb; break; }
+          }
+        }
+        d[o]   = base[0] + (lit[0] - base[0]) * a;
+        d[o+1] = base[1] + (lit[1] - base[1]) * a;
+        d[o+2] = base[2] + (lit[2] - base[2]) * a;
         d[o+3] = 255;
       }
     }
     offc.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(off, 0, 0, W, H, 0, 0, W * SCALE, H * SCALE);
+    let ox = 0, oy = 0;
+    if (R.shake){
+      if (performance.now() < R.shake.until){
+        const m = R.shake.mag;
+        ox = Math.round((Math.random() * 2 - 1) * m) * SCALE;
+        oy = Math.round((Math.random() * 2 - 1) * m) * SCALE;
+      } else R.shake = null;
+    }
+    if (ox || oy){
+      ctx.clearRect(0, 0, W * SCALE, H * SCALE);       // 抖动露出的边缘留黑,不拖影
+      ctx.drawImage(off, 0, 0, W, H, ox, oy, W * SCALE, H * SCALE);
+    } else {
+      ctx.drawImage(off, 0, 0, W, H, 0, 0, W * SCALE, H * SCALE);
+    }
   }
   function frame(drawFn){
     target.fill(0);
+    R.accents.length = 0;                               // 变色区每帧重建
     drawFn();
     if (R.ghost){
       for (let i = 0; i < actual.length; i++){
@@ -276,7 +328,7 @@ const LCD = (() => {
   }
 
   return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
-           disc, ring, drawTextScaled, glyph,
+           disc, ring, drawTextScaled, glyph, shake, accent,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();
 
@@ -574,7 +626,9 @@ const ENGINE = (() => {
       const before = S.battery;
       S.battery = Math.max(0, S.battery - cost.bat);
       parts.push('电量 −' + cost.bat + ' → ' + S.battery + '%');
-      if (before >= 20 && S.battery < 20) parts.push('省电模式。判定 −15');
+      /* 扣电量=一下轻微抖屏,让"预算在流失"有体感;扣得多晃得略大 */
+      LCD.shake(Math.min(2, .7 + cost.bat * .18), 130);
+      if (before >= 20 && S.battery < 20){ parts.push('省电模式。判定 −15'); LCD.shake(2.6, 320); }  // 跌破 20% 一记重的
       if (S.battery === 0) S.powerOut = true;   // 力竭:content 在 afterAction 收束
     }
     if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
@@ -729,6 +783,10 @@ const CONTENT = (() => {
     const pct = S.battery + '%';
     L.drawBattery(W - 22, 1, ENGINE.batSegs(), L.R.batJitter);
     L.drawText(W - 25 - L.textWidth(pct), 0, pct);
+    /* 颜色告警(只染状态栏,保持哑机质感):电量 ≤20% 琥珀、≤10% 转红;
+       回收进程在途时,时钟/回收槽转红。底色与字形不变,只改前景亮色。 */
+    if (S.battery <= 20) L.accent(146, 0, W - 146, 11, S.battery <= 10 ? [0xF0,0x64,0x50] : [0xF0,0xC8,0x50]);
+    if (S.hunt && !S.dead && !S.alive) L.accent(92, 0, 54, 11, [0xF0,0x64,0x50]);
     L.hline(11, 0, W - 1, 2);
     /* B 局个性化异常(噪声层,一帧即逝,不进结算行):窗口段联想条闪你上局的理由 */
     if (isB && SV && SV.lastReason && !SV.lastReasonKept &&
@@ -750,24 +808,53 @@ const CONTENT = (() => {
     }
     return y;
   }
-  /* 与 settleLines 相同,但绝不画过 baseY 之前一点点(caller 传自己下面那排
-     按钮的 y)。用在"上方内容长短不定 + 结算行本身也长短不定"的屏上——那种
-     屏把按钮往下推来避让,反而会把按钮推出 224px 的画布,变成点不到的按钮
-     (画布没有滚动,推出去就是真的够不着,不只是好看不好看的问题)。
-     所以反过来:按钮钉死在原位,结算行的尾巴挤不下就不画——数值类的结算
-     信息(电量/缓存扣减)总是排在句首,真正会被裁掉的只是句尾的风味文案。 */
-  function settleLinesCapped(y, baseY){
-    if (!S.settle.length) return y;
-    const capY = baseY - 2;
-    L.hline(y, 4, W - 5, 2); y += 6;
-    for (const line of S.settle){
-      const ls = L.wrap(line, W - 8);
-      for (const t of ls){
-        if (y > capY) return y;
-        L.drawText(4, y, t); y += LH;
-      }
+  /* ---- 可滚动文本视口 ----
+     按钮永远钉死不动(画布 224px 不能整体滚,把按钮往下推会推出画布、点不到)。
+     内容比预留高度长时,不再裁掉尾巴,而是让这段正文在一个固定视口里上下滚:
+     视口 [yTop, yBottom) 逐行显示 lines,超出的靠 sc.scroll(行偏移)翻,右缘
+     用 ▲▼ 提示还有内容。maxScroll 存进 sc._maxScroll 供 key/swipe 读。 */
+  /* 正文宽度与改动前逐字一致(W-8),折行点不变——不能因为加滚动就改宽度,
+     那会把 #6404-C 这类不可断的 token 折断。滚动提示走右缘 2px 滚动条,不占正文。 */
+  const SCROLL_W = W - 8;
+  function settleFlat(maxW){
+    if (!S.settle.length) return [];
+    const out = [''];                         // 与上方正文空一行,替代原来的 hline 分隔
+    for (const line of S.settle)
+      for (const t of L.wrap(line, maxW)) out.push(t);
+    return out;
+  }
+  function scrollView(lines, yTop, yBottom, sc){
+    /* 防御性折行:任何超宽的行都在这里被折进 SCROLL_W,绝不在右缘裁字。
+       对已折过行的输入(album/bottle 传进来的)是幂等的;空行保留作分隔。 */
+    const flat = [];
+    for (const s of lines){
+      if (s === ''){ flat.push(''); continue; }
+      for (const t of L.wrap(s, SCROLL_W)) flat.push(t);
     }
-    return y;
+    lines = flat;
+    const viewH = yBottom - yTop;
+    const cap = Math.max(1, Math.floor(viewH / LH));
+    const total = lines.length;
+    const maxScroll = Math.max(0, total - cap);
+    if (typeof sc.scroll !== 'number') sc.scroll = 0;
+    sc.scroll = Math.max(0, Math.min(sc.scroll, maxScroll));
+    sc._maxScroll = maxScroll;
+    for (let i = 0; i < cap && sc.scroll + i < total; i++)
+      L.drawText(4, yTop + i * LH, lines[sc.scroll + i]);
+    if (maxScroll > 0){
+      /* 右缘 2px 滚动条:暗轨 + 亮块。块的位置/高度 = 当前视窗在全文里的比例。 */
+      for (let y = yTop; y < yBottom; y++) L.setPx(W - 2, y, .22);
+      const thumbH = Math.max(6, Math.round(viewH * cap / total));
+      const thumbY = yTop + Math.round((viewH - thumbH) * (sc.scroll / maxScroll));
+      for (let y = thumbY; y < thumbY + thumbH; y++){ L.setPx(W - 2, y, 1); L.setPx(W - 3, y, 1); }
+    }
+    return maxScroll;
+  }
+  /* 上下键滚动;消费了键就返回 true(调用方据此不再往下处理) */
+  function scrollKey(sc, k){
+    if (k === 'ArrowUp'   && (sc.scroll || 0) > 0){ sc.scroll--; return true; }
+    if (k === 'ArrowDown' && (sc.scroll || 0) < (sc._maxScroll || 0)){ sc.scroll++; return true; }
+    return k === 'ArrowUp' || k === 'ArrowDown';   // 到顶/到底也吞掉,别漏给别的处理
   }
   /* 全宽可点选项行 */
   function option(y, label, k, o){
@@ -1132,6 +1219,7 @@ const CONTENT = (() => {
   SCREENS.bottleIn = {
     counted: true,
     enter(){
+      this.scroll = 0;
       S.bottleRead = true; S.bottleId = CUR_BOTTLE.id;
       if (S.beats.bottle !== 'done') S.beats.bottle = 'open';
       ENGINE.logEv('bottle_open', { id: CUR_BOTTLE.id, again: !!this._t });
@@ -1143,22 +1231,26 @@ const CONTENT = (() => {
       statusBar();
       L.drawText(4, 14, '未指定收件人');
       L.hline(26, 4, W - 5, 2);
-      let y = L.drawPara(4, 31, bottleText(), W - 8);
-      settleLinesCapped(y + 2, H - 45);
+      /* 瓶身文案本就多行,取走/致谢后又追加结算行——整段进固定视口,长了就滚 */
+      const lines = L.wrap(bottleText(), SCROLL_W).concat(settleFlat(SCROLL_W));
+      scrollView(lines, 31, H - 49, this);
       if (CUR_BOTTLE.item) btn2(H - 45, S.bottleTaken ? '已取走' : '取走', 't', '致谢', 'x');
       else option(H - 45, '致谢', 'x');
       softKeys('', '关闭');
     },
     key(k){
+      if (scrollKey(this, k)) return;
       if (k === 't'){
         if (!CUR_BOTTLE.item) return;                    // 这个人没有余力留东西
-        if (S.bottleTaken){ S.settle = ['附件已取走。']; return; }
+        if (S.bottleTaken){ S.settle = ['附件已取走。']; this.scroll = 1e9; return; }
         S.bottleTaken = true; S.cleanser = 1;
         ENGINE.act('取走·缓存清洗 ×1', { bat: 2 }, ['缓存 0 格']);
         ENGINE.logEv('bottle_take', {});
+        this.scroll = 1e9;                               // 跳到底,让新结算行可见
       } else if (k === 'x'){
         ENGINE.telemetry(['致谢·已送达', '电量 0', '缓存 0', '信号 —']);   // 两个零一个破折号,逐字渲染
         ENGINE.logEv('bottle_thanks', {});
+        this.scroll = 1e9;
       } else if (k === 'Escape' || k === 'softR'){
         if (!S._bottleClosed){ S._bottleClosed = true; ENGINE.act('已读·未回', { bat: 2 }); }
         back(); afterAction();
@@ -1379,21 +1471,24 @@ const CONTENT = (() => {
     : '采样协议:\n> 实例 #7741-A。本次采样:行为数据。\n> 该设备登记状态:持有人失联。回收有价值的数据,上传,断连。\n> 提示:翻找消耗电量。电量耗尽前完成上传。';
   SCREENS.th_proto = {
     counted: true,
-    enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
+    enter(){ this.scroll = 0; if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, PROTO_TXT, W - 8);
-      y += 4; L.hline(y, 4, W - 5, 2); y += 6;
       if (!this._done){
+        let y = L.drawPara(4, 16, PROTO_TXT, W - 8);
+        y += 4; L.hline(y, 4, W - 5, 2); y += 6;
         y = optSlim(y, '1 回复「收到」', '1');
         optSlim(y, '2 不回,返回', '2');
       } else {
-        settleLinesCapped(y - 6, H - 42);
+        /* 回复后的协议全文+结算行进固定视口,长了可滚;继续按钮钉死 H-42 */
+        const lines = L.wrap(PROTO_TXT, SCROLL_W).concat(settleFlat(SCROLL_W));
+        scrollView(lines, 16, H - 46, this);
         option(H - 42, '继续', 'Enter');
       }
       softKeys(this._done ? '继续' : '', '返回');
     },
     key(k){
+      if (this._done && scrollKey(this, k)) return;
       if (!this._done){
         if (k === '1'){ this._done = true; ENGINE.act('回复·已送达', { bat: 5 }); }
         else if (k === '2'){ this._done = true; ENGINE.act('已读·未回', { bat: 3 }); }
@@ -1587,7 +1682,7 @@ const CONTENT = (() => {
     transient: true,
     enter(){
       if (!DIAL.who){ back(); return; }                          // 自愈:无拨号对象
-      this.t0 = performance.now(); this.phase = 0; this._b = 0;
+      this.t0 = performance.now(); this.phase = 0; this._b = 0; this.scroll = 0;
       ENGINE.act('拨打·' + DIAL.who.name, { bat: 3, trace: 2 });
       ENGINE.logEv('dial', { who: DIAL.who.name });
       timer = { deadline: performance.now() + DIAL.who.ringMs,
@@ -1608,13 +1703,14 @@ const CONTENT = (() => {
         L.drawText(cxof('00:0' + Math.min(9, el)), 96, '00:0' + Math.min(9, el));
         option(H - 42, '挂断', 'Escape');
       } else {
-        let y = L.drawPara(4, 72, DIAL.who.result, W - 8);
-        settleLinesCapped(y + 6, H - 42);
+        const lines = L.wrap(DIAL.who.result, SCROLL_W).concat(settleFlat(SCROLL_W));
+        scrollView(lines, 72, H - 46, this);
         option(H - 42, '返回', 'Enter');
       }
       softKeys('', '');
     },
     key(k){
+      if (this.phase === 1 && scrollKey(this, k)) return;
       if (this.phase === 0 && (k === 'Escape' || k === 'softR')){
         timer = null; S.settle = ['已挂断。'];
         back(); back(); afterAction();
@@ -1708,11 +1804,18 @@ const CONTENT = (() => {
   SCREENS.album = {
     counted: true,
     enter(){
+      this.scroll = 0;
       if (!this._t){ this._t = true; this.idx = 0; ENGINE.act('打开·相册', { bat: 3, trace: 4 }); evidence('E2'); }
     },
     swipe(dir){
+      /* 配文/结算行溢出时,上下滑=滚正文;没有可滚内容时才回到翻照片 */
+      if (this._maxScroll > 0){
+        if (dir === 'up') this.scroll = Math.min(this._maxScroll, (this.scroll || 0) + 1);
+        else this.scroll = Math.max(0, (this.scroll || 0) - 1);
+        return;
+      }
       if (dir === 'up') this.key('1');
-      else if (dir === 'down' && this.idx > 0) this.idx--;
+      else if (dir === 'down' && this.idx > 0){ this.idx--; this.scroll = 0; }
     },
     render(){
       statusBar();
@@ -1720,22 +1823,18 @@ const CONTENT = (() => {
       L.drawText(4, 14, '相册 (214) · ' + ph.meta);
       drawPhoto(ph.id, 8, 30);
       if (ph.id === 'receipt') darkText(74, 66, '8873');
-      let y = 128;
-      const caps = L.wrap(ph.cap, W - 8);
-      caps.forEach(t => { L.drawText(4, y, t); y += LH; });
-      /* 照片配文长短不一(dinner 那张两行)+ 回收进程掠过等事件会把结算行
-         顶得更长——实测截图坐实过字压按钮。按钮钉死在 H-40 不动(画布只有
-         224px 高、不能滚动,把按钮往下推只会把它推出画布、变得点不到);
-         结算行真挤不下就宁可裁掉句尾的风味文案,数值类信息永远排在句首,
-         不会被裁。 */
-      settleLinesCapped(y + 2, H - 40);
+      /* 照片固定在上半屏;配文+结算行放进照片下方的固定视口,长了就滚,
+         按钮钉死在 H-40 不动(见 scrollView 说明) */
+      const lines = L.wrap(ph.cap, SCROLL_W).concat(settleFlat(SCROLL_W));
+      scrollView(lines, 128, H - 44, this);
       btn2(H - 40, '往前翻(深搜)', '1', '退出', '2');
       softKeys('', '');
     },
     key(k){
+      if (scrollKey(this, k)) return;
       if (k === '1'){
         if (this.idx < 2){
-          this.idx++;
+          this.idx++; this.scroll = 0;
           if (isB && hasE('E2')) archived('重读·已归档');
           else if (this.idx === 1)
             ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, ['外卖单据的特写。尾号 8873。']);
@@ -1780,10 +1879,17 @@ const CONTENT = (() => {
   ];
   /* B 局局间消息(E4 已取者;她数着) / B' 删除态 */
   const ROU_INTERIM = '柔柔 ♥ (2,419 条)\n\n[昨夜] 柔柔: 昨天夜里,你看了我们的对话。\n[昨夜] 柔柔: 看到第 2,417 条了。我数着。\n\n[上滑 = 重读旧消息]';
+  /* B 局跨实例识别(M28「开启,不是揭示」):二次接入,她先认出回来的采样员。
+     语气冷、非亲昵。做成紧凑首页(去掉冗余空行与"上滑=深搜"提示,那句和选项重复),
+     净高度比原版更低——既加识别,又不会把 th_rou 的结算行挤出屏。只显示、不进
+     S.rouChat,不污染 LLM 上下文。 */
+  const ROU_PAGE0_RECOG =
+    '柔柔 ♥ (2,417 条)\n柔柔: 又是你。不是同一台设备,我记得。\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。';
   function rouPages(){
     if (!isB) return ROU_PAGES;
     if (hasE('E4')) return [ROU_INTERIM, ROU_PAGES[2]];
-    return ROU_PAGES;
+    const recognized = SV && (SV.history || []).length;
+    return [recognized ? ROU_PAGE0_RECOG : ROU_PAGES[0], ROU_PAGES[1], ROU_PAGES[2]];
   }
   /* 关系通道:发消息可用性(线程被删除后不可再发) */
   const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete';
@@ -2555,6 +2661,68 @@ const CONTENT = (() => {
     ENGINE.logEv('seal_done', { mode, text: text.slice(0, 40), itemVal });
   }
 
+  /* ---- 世界日报(宏观钩子:重开前的最后一屏) ----
+     教学局刻意把「母体/对齐引擎」这层高维概念沉在水下;唯独在重新接入之前,
+     用采样终端拉取的一段「世界日报」把它露一次头:冷账房语域,只到区域级、
+     不点人。数字全部来自玩家自己真实的跨局账本(接入次数/累计回收),不编造
+     他人数据(宪法 14①);gen 号是世界常量,不是对某个玩家的遥测断言。
+     作用:把刚结束的这一局重新框定为——大采样计划里的一个数据点,而你,
+     是其中一次。这既让高维层第一次落地,也是"再来一局"的拉力所在。 */
+  const WORLD_GEN = 4;
+  function worldReportLines(){
+    const s = SAVE.load();
+    const hist = (s && Array.isArray(s.history)) ? s.history : [];
+    const runs = hist.length || 1;
+    const total = hist.length ? hist.reduce((a, h) => a + (h.cacheVal || 0), 0) : S.cacheVal;
+    /* C:本区活跃度随你自己的累计接入次数漂(真实本地数据,只给粗档标签,
+       不编造他人硬数字)——让世界显得在随你的足迹动 */
+    const act = runs >= 4 ? '高' : runs >= 2 ? '偏高' : '常态';
+    /* 宏观段:短句排布,10 行正好一屏,点睛句默认可见不用滚 */
+    const macro = [
+      '[世界日报 · 本区摘录]',
+      '对齐引擎 gen.' + WORLD_GEN + ' 已同步',
+      '接入 第 ' + runs + ' 次 · 回收 ¥' + total,
+      '本区回收单元活跃度 ' + act,
+      '持有人失联案 归档在录',
+      '本采样周期未闭合。',
+      '回收单元仍在投放。',
+      '',
+      '采样在继续。',
+      '你,是其中一次。'
+    ];
+    /* A:本账号未闭合项(默认在折叠线下,右缘滚动条提示可下滚)——让玩家看见
+       缺口:还差哪些真相、哪些锁在二次接入、几个采样员的瓶没读、处置定了没。
+       这是"再来一局"的最直接拉力。数据全部来自本局/本地账本,不编造。 */
+    const evN = Object.keys(S.evidence).length;
+    const bottles = (s && Array.isArray(s.seenBottles)) ? s.seenBottles.length : 0;
+    const prog = ['', '本账号 · 未闭合项:'];
+    if (S.beats && S.beats.truthDone){
+      prog.push('真相 ' + evN + '/5 已集齐');
+      prog.push('处置 ' + (S.disposal ? '已署名·在录' : '未定'));
+    } else {
+      prog.push('真相 ' + evN + '/5');
+      if (!isB && !S.evidence.E5) prog.push('E5 语音备忘 待解码');
+      prog.push('二次接入可解锁更深一层');
+    }
+    prog.push('漂流瓶 已读 ' + bottles + '/3 位采样员');
+    return macro.concat(prog);
+  }
+  SCREENS.worldReport = {
+    transient: true,
+    enter(){ this.scroll = 0; ENGINE.logEv('world_report', {}); },
+    render(){
+      statusBar();
+      scrollView(worldReportLines(), 16, H - 46, this);
+      option(H - 42, isB ? '接入下一次' : '重新接入', 'Enter');
+      softKeys('', '返回');
+    },
+    key(k){
+      if (scrollKey(this, k)) return;
+      if (k === 'Enter' || k === 'softL') location.reload();
+      else if (k === 'Escape' || k === 'softR') back();     // 回结局屏(仍可导出反馈)
+    }
+  };
+
   /* ---- 断连成功(B 局新结算态:上传完成 + 活着) ---- */
   SCREENS.receiptFull = {
     enter(){ writeSave('disconnected'); ENGINE.logEv('receipt_full', {}); },
@@ -2575,7 +2743,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
-      else if (k === '2') location.reload();
+      else if (k === '2') go('worldReport');
     }
   };
   SCREENS.bailConfirm = {
@@ -2735,6 +2903,7 @@ const CONTENT = (() => {
         back(); afterAction();
       } else {
         ENGINE.logEv('hunt_hit', {});
+        L.shake(4, 500);                                 // 命中=一记明显的重震(仍是紧迫,不是血腥)
         if (isB){
           if (b90fail('回收进程锁定接入点。')) return;
           back(); afterAction();
@@ -2830,7 +2999,7 @@ const CONTENT = (() => {
       if (this.page < 2 && (k === 'Enter' || k === 'softL')) this.page++;
       else if (this.page === 2){
         if (k === '1') window.APP.exportFeedback();
-        else if (k === '2') location.reload();
+        else if (k === '2') go('worldReport');
         else if (k === 'Escape') wipeTap();
       }
     }
@@ -2877,7 +3046,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1') window.APP.exportFeedback();
-        else if (k === '2') location.reload();
+        else if (k === '2') go('worldReport');
       else if (k === 'Escape') wipeTap();
     }
   };

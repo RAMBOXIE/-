@@ -108,6 +108,9 @@ const LCD = (() => {
   }
 
   const NO_LINE_START = '。，、：；！？）」』】·…%>';
+  /* 不可在中间折断的 token 字符:ASCII 字母数字 + 编号/时刻/千分位里的连接符。
+     这样 #7741-A、03:14、2,417、#6404-C 折行时整段一起走,不会被拦腰断成两行。 */
+  const TOKEN = /[0-9A-Za-z#:._,\-]/;
   function wrap(str, maxW){
     const out = []; let line = '', w = 0;
     for (const ch of str){
@@ -117,6 +120,12 @@ const LCD = (() => {
         if (NO_LINE_START.includes(ch) && line.length > 1){
           const carry = line[line.length - 1];
           out.push(line.slice(0, -1)); line = carry; w = cellW(carry);
+        } else if (TOKEN.test(ch) && line.length && TOKEN.test(line[line.length - 1])){
+          /* 正落在一个 token 中间:退到 token 起点,把整段挪到下一行 */
+          let i = line.length;
+          while (i > 0 && TOKEN.test(line[i - 1])) i--;
+          if (i > 0){ const carry = line.slice(i); out.push(line.slice(0, i)); line = carry; w = textWidth(carry); }
+          else { out.push(line); line = ''; w = 0; }   // 整行都是 token(超长)才硬断
         } else { out.push(line); line = ''; w = 0; }
       }
       line += ch; w += cw;
@@ -148,9 +157,24 @@ const LCD = (() => {
     }
   }
 
-  /* ---- 失真参数(渲染器参数,不是散落的 if) ---- */
+  /* ---- 失真参数(渲染器参数,不是散落的 if) ----
+     shake:  瞬时抖屏 {mag(逻辑px), until(performance.now 时刻)}
+     accents:本帧的变色区 [{x,y,w,h,rgb}];每帧由绘制方(statusBar)重建 */
   const R = { threshold:.42, corrupt:.0004, scanline:.14, scanPhase:0,
-              ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false };
+              ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false,
+              shake:null, accents:[] };
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* 抖屏:扣电量/回收抵达等"紧迫"时刻的一下震动。宪法 11:这是紧迫感不是恐怖峰,
+     幅度要小、时间要短。同时有多次请求时取更强的一个。尊重系统减动效设置。 */
+  function shake(mag, ms){
+    if (reduceMotion) return;
+    const until = performance.now() + ms;
+    if (!R.shake || until > R.shake.until || mag > R.shake.mag) R.shake = { mag, until };
+  }
+  /* 变色区:让指定矩形内的"亮像素"改用 rgb(而非默认磷光青)。只影响前景亮度映射,
+     底色不变——保持哑机质感。目前只用在状态栏(电量告警 / 回收逼近)。 */
+  function accent(x, y, w, h, rgb){ R.accents.push({ x, y, w, h, rgb }); }
   function applyTier(tr){
     if (tr < 40){ R.corrupt=.0004; R.threshold=.42; R.flicker=0;   R.batJitter=false; R.tsScramble=false; return 0; }
     if (tr < 70){ R.corrupt=.0035; R.threshold=.44; R.flicker=.02; R.batJitter=false; R.tsScramble=true;  return 1; }
@@ -163,23 +187,51 @@ const LCD = (() => {
   function present(){
     const flick = R.flicker > 0 && Math.random() < R.flicker ? .55 + Math.random() * .3 : 1;
     const d = img.data;
+    const acc = R.accents;
     for (let y = 0; y < H; y++){
       const scan = R.scanline > 0 && ((y + R.scanPhase | 0) % 3 === 0) ? 1 - R.scanline : 1;
+      /* 本行命中的变色区(通常为空,几乎零开销) */
+      let rowAcc = null;
+      for (let i = 0; i < acc.length; i++){
+        const r = acc[i];
+        if (y >= r.y && y < r.y + r.h) (rowAcc || (rowAcc = [])).push(r);
+      }
       for (let x = 0; x < W; x++){
         const k = px(x, y), a = actual[k] * scan * flick;
         const base = R.showUnlit ? UNLIT : SUB, o = k * 4;
-        d[o]   = base[0] + (LIT[0] - base[0]) * a;
-        d[o+1] = base[1] + (LIT[1] - base[1]) * a;
-        d[o+2] = base[2] + (LIT[2] - base[2]) * a;
+        let lit = LIT;
+        if (rowAcc){
+          for (let i = 0; i < rowAcc.length; i++){
+            const r = rowAcc[i];
+            if (x >= r.x && x < r.x + r.w){ lit = r.rgb; break; }
+          }
+        }
+        d[o]   = base[0] + (lit[0] - base[0]) * a;
+        d[o+1] = base[1] + (lit[1] - base[1]) * a;
+        d[o+2] = base[2] + (lit[2] - base[2]) * a;
         d[o+3] = 255;
       }
     }
     offc.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(off, 0, 0, W, H, 0, 0, W * SCALE, H * SCALE);
+    let ox = 0, oy = 0;
+    if (R.shake){
+      if (performance.now() < R.shake.until){
+        const m = R.shake.mag;
+        ox = Math.round((Math.random() * 2 - 1) * m) * SCALE;
+        oy = Math.round((Math.random() * 2 - 1) * m) * SCALE;
+      } else R.shake = null;
+    }
+    if (ox || oy){
+      ctx.clearRect(0, 0, W * SCALE, H * SCALE);       // 抖动露出的边缘留黑,不拖影
+      ctx.drawImage(off, 0, 0, W, H, ox, oy, W * SCALE, H * SCALE);
+    } else {
+      ctx.drawImage(off, 0, 0, W, H, 0, 0, W * SCALE, H * SCALE);
+    }
   }
   function frame(drawFn){
     target.fill(0);
+    R.accents.length = 0;                               // 变色区每帧重建
     drawFn();
     if (R.ghost){
       for (let i = 0; i < actual.length; i++){
@@ -192,6 +244,6 @@ const LCD = (() => {
   }
 
   return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
-           disc, ring, drawTextScaled, glyph,
+           disc, ring, drawTextScaled, glyph, shake, accent,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();

@@ -14,7 +14,7 @@ const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/engine.js','js/conte
 
 let failures = 0;
 
-function boot(){
+function boot(saveObj){
   let FAKE_T = 1000;
   const perf = { now: () => FAKE_T };
   /* trace 按真实调用顺序记录 frameRect/drawText,这样才能认出"紧跟在按钮框
@@ -28,6 +28,7 @@ function boot(){
   const canvas = () => ({ width:0, height:0, getContext: () => ctx() });
   const storage = { _m: Object.create(null), getItem(k){ return k in this._m ? this._m[k] : null; },
     setItem(k,v){ this._m[k]=String(v); }, removeItem(k){ delete this._m[k]; } };
+  if (saveObj) storage.setItem('escape_ai_save', JSON.stringify(saveObj));   // 注入跨局存档(测 B 局)
   const env = { performance: perf,
     document: { getElementById: id => id==='lcd'?canvas():null, createElement: () => canvas() },
     localStorage: storage, addEventListener(){}, navigator: {}, location: { reload(){} },
@@ -53,8 +54,8 @@ function boot(){
   return { LCD, ENGINE, CONTENT, calls, perf: () => FAKE_T, advance: ms => { FAKE_T += ms; } };
 }
 
-function scenario(name, driver){
-  const { LCD, ENGINE, CONTENT, calls, advance } = boot();
+function scenario(name, driver, saveObj){
+  const { LCD, ENGINE, CONTENT, calls, advance } = boot(saveObj);
   const errs = [];
   const A = (c, m) => { if (!c) errs.push(m); };
   try { driver({ A, LCD, ENGINE, CONTENT, calls, advance,
@@ -140,6 +141,51 @@ scenario('拨号·通话结果文本不压"返回"按钮', ({A, CONTENT, calls, 
   frame();                                                // phase 1(结果文本)
   checkFrame(calls, A, '拨号(结果页)');
 });
+
+/* ---- 滚动:长内容不再被截,滚动时按钮 y 不变,能滚到最后一行 ---- */
+const btnYs = calls => calls.frameRect.filter(b => b.h === 20).map(b => b.y).join(',');
+
+scenario('相册·长内容:滚动时按钮 y 不变,且能滚到最后一行', ({A, CONTENT, calls, frame, K, ENGINE}) => {
+  CONTENT.go('album', true);
+  CONTENT.current.idx = 2;                                 // 两行配文
+  ENGINE.S.settle = ['特征比对·不匹配 ｜ 电量 −2 → 25% ｜ 进程掠过了你,这一次它只是擦过你的接入点。'];
+  frame();
+  const y0 = btnYs(calls);
+  A(CONTENT.current._maxScroll > 0, '这个组合应当溢出、需要滚动(否则测试没意义)');
+  A(!calls.drawText.some(t => t.t.includes('擦过')), '默认视口顶端,最后一句还看不到');
+  for (let i = 0; i < 12; i++){ K('ArrowDown'); frame(); }  // 滚到底
+  A(btnYs(calls) === y0, '滚动过程中按钮 y 必须一动不动,实际 ' + btnYs(calls) + ' vs ' + y0);
+  A(calls.drawText.some(t => t.t.includes('擦过')), '滚到底后必须能看到最后一句');
+  checkFrame(calls, A, '相册(滚到底)');
+});
+
+scenario('漂流瓶·长瓶身:token 不被折断 + 可滚到底', ({A, CONTENT, calls, frame, K}) => {
+  const store = {};
+  CONTENT.go('bottleIn', true);
+  frame();
+  /* #6404-C / #1177-B 这类编号,任何一帧里都不能出现被折断的半截 */
+  for (let i = 0; i < 12; i++){
+    calls.drawText.forEach(t => { store[t.t] = 1; });
+    K('ArrowDown'); frame();
+  }
+  calls.drawText.forEach(t => { store[t.t] = 1; });
+  const all = Object.keys(store);
+  A(!all.some(t => /#\d{4}-$/.test(t.trim())), '编号 token 不得以「#1177-」这样断在行尾');
+  checkFrame(calls, A, '漂流瓶(滚动中)');
+});
+
+/* ---- th_rou 在 B 局(带跨实例识别句)内容密,结算行不得压到软键 ---- */
+scenario('柔柔会话·B 局识别句不把结算行挤到软键上', ({A, CONTENT, calls, frame, LCD}) => {
+  CONTENT.go('th_rou', true);
+  frame();
+  const Hh = LCD.H, band = Hh - 15;                       // 软键分隔线
+  /* softKeys 标签画在 y=H-12;其余(页文/识别句/选项/结算行)都必须结束在分隔线以上 */
+  const overflow = calls.drawText.filter(t => t.y !== Hh - 12 && t.y >= band - 1);
+  A(overflow.length === 0, 'B 局柔柔会话有内容越过软键线 H-15:' +
+    overflow.map(t => '「' + t.t.slice(0,8) + '」@' + t.y).join(', '));
+}, { runCount: 1, lastEnding: 'captured', evidence: ['E1','E2'],
+     history: [{ inst:'#7741-A', ending:'captured', cacheVal: 460, ev: 2 }],
+     seenBottles: ['#5502-D'] });
 
 console.log(failures ? ('\nFAILED: ' + failures) : '\nALL LAYOUT CHECKS PASS');
 process.exit(failures ? 1 : 0);

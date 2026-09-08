@@ -60,7 +60,9 @@ const ENGINE = (() => {
       const before = S.battery;
       S.battery = Math.max(0, S.battery - cost.bat);
       parts.push('电量 −' + cost.bat + ' → ' + S.battery + '%');
-      if (before >= 20 && S.battery < 20) parts.push('省电模式。判定 −15');
+      /* 扣电量=一下轻微抖屏,让"预算在流失"有体感;扣得多晃得略大 */
+      LCD.shake(Math.min(2, .7 + cost.bat * .18), 130);
+      if (before >= 20 && S.battery < 20){ parts.push('省电模式。判定 −15'); LCD.shake(2.6, 320); }  // 跌破 20% 一记重的
       if (S.battery === 0) S.powerOut = true;   // 力竭:content 在 afterAction 收束
     }
     if (cost.slots){ S.cacheSlots += cost.slots; S.cacheVal += cost.val || 0;
