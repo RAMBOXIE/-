@@ -57,9 +57,9 @@ const HIST2 = [{ inst:'#7741-A', ending:'captured', cacheVal:400, ev:2 },
 const bMom = (extra) => Object.assign({ runCount:3, evidence:['E1','E2'], caseOpen:true, history:HIST2 }, extra);
 
 /* ---- 妈线程 · 弱察觉四档 ---- */
-[ [0,'刚吃过,妈你早点睡', null],
-  [1,'不冷。早点睡',     null],
-  [2,'嗯。睡吧',         '你最近'],
+[ [0,'吃过了,睡吧',       null],
+  [1,'不冷。睡吧',       null],
+  [2,'嗯。睡吧',         '越来越快'],
   [3,'嗯。',             '你还是你吗']
 ].forEach(([cont, reply, aware]) => {
   scenario('妈线程 decay·继续×' + cont + ' → 回复降档' + (aware?' + 察觉':''),
@@ -125,9 +125,9 @@ scenario('世界日报·回收记录随局数(第一次不显示)', null, ({A}) 
 scenario('结局回声·receiptAlive / receiptFull', bMom({ momLocked:null, evidence:['E1'] }),
   ({A, CONTENT, fullScroll}) => {
     CONTENT.go('receiptAlive', true);
-    A(fullScroll().includes('你会以另一个编号回到这里'), 'receiptAlive 应含结局回声');
+    A(fullScroll().includes('下一个编号,还是你'), 'receiptAlive 应含结局回声');
     CONTENT.go('receiptFull', true);
-    A(fullScroll().includes('你会以另一个编号回到这里'), 'receiptFull 应含结局回声');
+    A(fullScroll().includes('下一个编号,还是你'), 'receiptFull 应含结局回声');
   });
 
 /* ---- 抹除屏加句 ---- */
@@ -144,7 +144,7 @@ scenario('你自己的信·runCount≥2 可出、读过进 seenBottles', null, (
     const g = mkEnv(bMom({ runCount:2, seenBottles:['#5502-D','#3120-K','#1177-B'] }));  // NPC 都读过 → 只剩自己的信
     g.CONTENT.go('bottleIn', true);
     const t = g.frame();
-    if (t.includes('你自己') || t.includes('别以为这次不一样')){ hit = true;
+    if (t.includes('你自己') || t.includes('下一个编号,还会读一遍')){ hit = true;
       A(g.ENGINE.S.bottleId === '#SELF', '选中的应是自己的信'); }
   }
   A(hit, 'NPC 瓶读全后,runCount≥2 应能抽到你自己的信');

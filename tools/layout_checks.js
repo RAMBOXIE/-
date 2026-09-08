@@ -194,6 +194,15 @@ scenario('preDeath·#6404-C 回收单不压"接入"按钮', ({A, CONTENT, calls,
   checkFrame(calls, A, 'preDeath');
 });
 
+/* 采样协议(未回复态,v2 长协议)选项不越软键线 */
+scenario('采样协议·长协议不把选项顶到软键', ({A, CONTENT, calls, frame, LCD}) => {
+  CONTENT.go('th_proto', true);
+  frame();
+  const H = LCD.H, band = H - 15;
+  const over = calls.drawText.filter(t => t.y !== H - 12 && t.y >= band - 1);
+  A(over.length === 0, '协议选项/正文越过软键线 H-15:' + over.map(t => '「'+t.t.slice(0,6)+'」@'+t.y).join(', '));
+});
+
 scenario('bootB·B 开机不压"接入"按钮', ({A, CONTENT, calls, frame, advance}) => {
   CONTENT.go('bootB', true);
   advance(1500); frame();                                 // t>1s 后"接入"按钮才出
