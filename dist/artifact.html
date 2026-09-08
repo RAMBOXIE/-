@@ -875,6 +875,24 @@ const CONTENT = (() => {
     }
     return maxScroll;
   }
+  /* ---- 受限裁决(D-105 · canon §3.2)----
+     引擎给"结果集"(每个分支自带引擎数值副作用 apply + 叙述 line + 权重 w),
+     选择器挑一个分支,数值一律由引擎回填,叙述可多变。
+     块2:离线加权随机。块3:LLM 给分支 id,`resolveBranch` 保证只能落在集内(越界回退默认,防越狱)。 */
+  function pickBranch(branches){
+    const tot = branches.reduce((a, b) => a + (b.w || 1), 0);
+    let r = Math.random() * tot;
+    for (const b of branches){ r -= (b.w || 1); if (r <= 0) return b; }
+    return branches[branches.length - 1];
+  }
+  function resolveBranch(branches, id){          // LLM 侧入口:id 必须在集内,否则回退第一个
+    return branches.find(b => b.id === id) || branches[0];
+  }
+  function verdict(branches, chosenId){          // 统一裁决:挑分支 → 引擎执行数值 → 返回分支
+    const b = (chosenId != null) ? resolveBranch(branches, chosenId) : pickBranch(branches);
+    if (b.apply) b.apply();
+    return b;
+  }
   /* 上下键滚动;消费了键就返回 true(调用方据此不再往下处理) */
   function scrollKey(sc, k){
     if (k === 'ArrowUp'   && (sc.scroll || 0) > 0){ sc.scroll--; return true; }
@@ -3068,8 +3086,15 @@ const CONTENT = (() => {
       if (k !== 'Enter' && k !== 'softL') return;      // 其他键无效:必须亲手按
       S.hunt = null; S.huntDone = true;                // 每局只抵达一次,不再循环
       if (ENGINE.roll('c90')){
-        ENGINE.act('特征比对·不匹配', { bat: 2 }, ['进程掠过了你。']);
-        ENGINE.logEv('hunt_miss', {});
+        /* 受限裁决(D-105):判定归引擎(c90 决定擦过/命中),擦过的叙述在引擎批准的
+           分支集里挑一个——每次不同,但数值恒定(都是 bat:2 的擦过),不动死亡率。 */
+        const b = verdict([
+          { id: 'graze', line: '进程掠过了你。' },
+          { id: 'brush', line: '它擦着你的接入点过去了。' },
+          { id: 'near',  line: '差一点。它没认出你。' }
+        ]);
+        ENGINE.act('特征比对·不匹配', { bat: 2 }, [b.line]);
+        ENGINE.logEv('hunt_miss', { branch: b.id });
         back(); afterAction();
       } else {
         ENGINE.logEv('hunt_hit', {});
@@ -3447,6 +3472,7 @@ const CONTENT = (() => {
     get currentId(){ return cur; },
     get timer(){ return timer; },
     key, tap,
+    _verdict: { pickBranch, resolveBranch, verdict },   // 门禁用:验受限裁决边界(prod 不调用)
     exportExtra(){
       return {
         scenario: RUN.scen,
