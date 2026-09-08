@@ -20,7 +20,7 @@ const ENGINE = (() => {
     evidence: {}, caseOpen: false, clues: {},
     violations: 0,
     // 节拍
-    beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false },
+    beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
     reasons: [], lastWords: null, disposal: null,

@@ -580,7 +580,7 @@ const ENGINE = (() => {
     evidence: {}, caseOpen: false, clues: {},
     violations: 0,
     // 节拍
-    beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false },
+    beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
     reasons: [], lastWords: null, disposal: null,
@@ -1042,6 +1042,7 @@ const CONTENT = (() => {
       const visited = Object.keys(seen).filter(id => SCREENS[id] && SCREENS[id].counted).length;
       if (!S.beats.anomaly && visited >= 5) S.beats.anomaly = 'ready';
       /* 遭遇只看探索深度与时钟:不再依赖玩家是否二次回到收件箱(否则直奔上传者永不遭遇) */
+      if (!S.beats.dilemma && visited >= 4){ S.beats.dilemma = true; pendingInterrupt = 'dilemma'; }   // D-106 两难探针
       if (!S.beats.midEnc && visited >= 6 && S.clock >= 2 * 60 + 48) pendingInterrupt = 'midEnc';
       if (S.beats.midEnc && !S.beats.trial && S.clock >= 3 * 60){ ENGINE.setClock(3, 2); pendingInterrupt = 'trial'; }
     } else {
@@ -1146,6 +1147,7 @@ const CONTENT = (() => {
     if (huntTick()) return true;
     if (pendingInterrupt){
       const t = pendingInterrupt; pendingInterrupt = null;
+      if (t === 'dilemma'){ push('dilemma'); return true; }
       if (t === 'midEnc'){ ENGINE.setClock(2, 52); S.beats.midEnc = true; push('midEnc1'); return true; }
       if (t === 'trial'){ S.beats.trial = 'active'; push('trial'); return true; }
       if (t === 'trialB'){ S.beats.trial = 'active'; push('trialB'); return true; }
@@ -3304,6 +3306,44 @@ const CONTENT = (() => {
     key(k){ if (k === 'Enter' || k === 'softL' || k === 'softR' || k === 'Escape') back(); }
   };
 
+  /* D-106 两难探针:骨架固定位插一条良心/风险取舍,降低纯电量空点击。
+     从 2 条里随机一条;每条两个分支各自由引擎回填数值(替他撒谎→溯源;抢窗口→信号)。 */
+  SCREENS.dilemma = {
+    transient: true,
+    enter(){
+      if (!this._d){
+        const POOL = [
+          { id:'mom_reply',
+            text:'「妈」跳出一条:\n\n阿帆,到家了吗。\n路上冷,加件衣服。',
+            a:['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat:1, trace:3, mins:2 },
+                ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+            b:['2 不回', '2', () => ENGINE.act('未回', { bat:1, mins:2 },
+                ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+          { id:'window_greed',
+            text:'一格缓存卡在违规窗口里:\n\n值 ¥120。现在取,\n信号会被顶上去。',
+            a:['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots:1, val:120, trace:3, mins:2 },
+                ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+            b:['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots:1, val:60, mins:4 },
+                ['你等了。', '窗口关上时,只剩一半。'])] }
+        ];
+        this._d = POOL[Math.floor(Math.random() * POOL.length)];
+      }
+      ENGINE.logEv('dilemma', { id: this._d.id });
+    },
+    render(){
+      statusBar();
+      L.drawPara(4, 20, this._d.text, W - 8);
+      let y = 150;
+      y = option(y, this._d.a[0], this._d.a[1]);
+      option(y, this._d.b[0], this._d.b[1]);
+      softKeys('选择', '');
+    },
+    key(k){
+      const d = this._d;
+      if (k === d.a[1]){ d.a[2](); this._d = null; S.riskLabels = true; back(); }
+      else if (k === d.b[1]){ d.b[2](); this._d = null; S.riskLabels = true; back(); }
+    }
+  };
   SCREENS.midEnc1 = {
     transient: true,
     enter(){
