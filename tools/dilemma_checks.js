@@ -4,7 +4,7 @@
    秘匿:两难叙述里不泄窗口/概率。先用未修复代码验证会报警,再信它。 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const FILES = ['js/lcd.js','js/save.js','js/companion.js','js/engine.js','js/content.js'];
+const FILES = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/engine.js','js/content.js'];
 const SRC = FILES.map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 const CONTENT_SRC = fs.readFileSync(ROOT + '/js/content.js', 'utf8');
 

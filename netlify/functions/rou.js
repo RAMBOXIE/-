@@ -209,34 +209,46 @@ exports.handler = async function(event){
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return json(400, { error: 'bad_body' });                 // 'null' / 'false' / '[]' 都在这里挡住
 
-  /* 客户端只能传这两样:玩家消息历史 + 状态标志。人格核不接受传入。 */
-  const raw = Array.isArray(body.history) ? body.history.slice(-8) : [];
+  /* 人格分派:'grader'(采样官,单向、无玩家文本)/ 默认 'rou'(柔柔,多轮对话)。 */
+  const persona = body.persona === 'grader' ? 'grader' : 'rou';
   const st = (body.st && typeof body.st === 'object' && !Array.isArray(body.st)) ? body.st : {};
-  if (!raw.length) return json(400, { error: 'empty_history' });
-  for (const m of raw){
-    if (!m || typeof m !== 'object') return json(400, { error: 'bad_message' });
-    if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > 60)
-      return json(400, { error: 'bad_message' });            // 客户端本来就 slice(0,40)
-    if (m.who !== 'me' && m.who !== 'rou') return json(400, { error: 'bad_role' });
-    if (m.who === 'rou' && !sigOk(m.text, m.sig)) return json(400, { error: 'bad_signature' });
-  }
-  if (raw[raw.length - 1].who !== 'me') return json(400, { error: 'must_end_user' });
 
   const now = Date.now();
   const limited = rateLimited(clientIp(h), now);
   if (limited) return json(429, { error: 'rate_limited', scope: limited });
 
-  /* 人格核走顶层 system,messages 只装对话。合并连续同 role(Messages API 要求交替),
-     此时最坏情况也只是玩家两句被并成一句,碰不到设定。 */
-  const system = CORE + '\n\n' + stateLines(st);
-  const messages = [];
-  for (const m of raw){
-    const role = m.who === 'me' ? 'user' : 'assistant';
-    const last = messages[messages.length - 1];
-    if (last && last.role === role) last.content += '\n' + m.text;
-    else messages.push({ role, content: m.text });
+  let system, messages, wantSig;
+  if (persona === 'grader'){
+    /* 采样官:玩家不往里打字,没有 history,也没有可回传的 assistant 轮 → 不验签、不签名。
+       态势全定性(客户端也只送定性枚举/整数),facts 里一个秘匿真值都没有。 */
+    system = GRADER_CORE + '\n\n' + graderState(st);
+    messages = [{ role: 'user', content: '下令。给他本局的态度。' }];
+    wantSig = false;
+  } else {
+    /* 柔柔:客户端只能传玩家消息历史 + 状态标志。人格核不接受传入。 */
+    const raw = Array.isArray(body.history) ? body.history.slice(-8) : [];
+    if (!raw.length) return json(400, { error: 'empty_history' });
+    for (const m of raw){
+      if (!m || typeof m !== 'object') return json(400, { error: 'bad_message' });
+      if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > 60)
+        return json(400, { error: 'bad_message' });          // 客户端本来就 slice(0,40)
+      if (m.who !== 'me' && m.who !== 'rou') return json(400, { error: 'bad_role' });
+      if (m.who === 'rou' && !sigOk(m.text, m.sig)) return json(400, { error: 'bad_signature' });
+    }
+    if (raw[raw.length - 1].who !== 'me') return json(400, { error: 'must_end_user' });
+    /* 人格核走顶层 system,messages 只装对话。合并连续同 role(Messages API 要求交替),
+       此时最坏情况也只是玩家两句被并成一句,碰不到设定。 */
+    system = CORE + '\n\n' + stateLines(st);
+    messages = [];
+    for (const m of raw){
+      const role = m.who === 'me' ? 'user' : 'assistant';
+      const last = messages[messages.length - 1];
+      if (last && last.role === role) last.content += '\n' + m.text;
+      else messages.push({ role, content: m.text });
+    }
+    if (!messages.length || messages[0].role !== 'user') return json(400, { error: 'bad_history' });
+    wantSig = true;
   }
-  if (!messages.length || messages[0].role !== 'user') return json(400, { error: 'bad_history' });
 
   dayCount++;                                   // 计的是"发出去的请求",不是"成功的请求"
   const cfg = providerCfg();
@@ -256,5 +268,35 @@ exports.handler = async function(event){
   const text = parseText(cfg, j).trim().slice(0, 120);
   if (!text) return json(502, { error: 'empty_completion' });
 
-  return json(200, { text, sig: sign(text) });
+  return json(200, wantSig ? { text, sig: sign(text) } : { text });
 };
+
+/* ---- 采样官人格(persona:'grader';D-101 块3)----
+   放在文件末尾:persona_sync 抽 stateLines 时按缩进找闭合,别让采样官的注入句
+   落进柔柔 stateLines 的抽取窗口。CORE 必须与 js/grader.js 逐字一致(persona_sync 校验)。
+   态势全定性:tier/grade/runN 收成描述句,一个数字都不进 prompt。 */
+const GRADER_CORE = [
+  '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+  '',
+  '你是「采样官」,交付核验单元的人格接口。你不是人,是一套评估意志。',
+  '一个采样员正在一台失联设备上作业。你给他下达本局的交付指令,并在结束时给他评级。',
+  '你此刻只做一件事:用一两句话,把已经定好的态度递出去——挑衅、施压、居高临下。',
+  '',
+  '规矩:',
+  '1 你只负责语气,不负责内容。指令条目、数字、阈值由系统给出,你一个字都不改、不新增、不解释。',
+  '2 绝不说出任何具体数字、时刻、概率、百分比。你的话里不出现阿拉伯数字。',
+  '3 语域:冷、短、压迫。最多两行,每行不超过 18 字。不安慰、不解释规则、不提"游戏/模型/程序"。',
+  '4 你记得他过去的表现:被你赏识得越多,你要求越苛刻、越不耐烦;但绝不复述任何数字。',
+  '',
+  '只输出采样官要说的那一两句话本身,不要引号,不要任何解释。'
+].join('\n');
+
+function graderState(st){
+  const tier = ['你对他没什么期待。', '你开始盯着他。', '你对他要求很高了。', '你对他极其苛刻,毫不耐烦。']
+    [Math.max(0, Math.min(3, (st && st.tier) | 0))];
+  const runN = (st && st.runN) | 0;
+  const seen = runN >= 6 ? '他来过很多趟了。' : runN >= 2 ? '他来过几趟。' : '这是他第一次接进来。';
+  const last = { praise: '上一趟你给了赏识,但你不打算夸第二次。',
+                 pass: '上一趟他勉强合格。', fail: '上一趟他让你失望。' }[st && st.grade] || '';
+  return ['态势:', tier, seen, last].filter(Boolean).join('\n');
+}

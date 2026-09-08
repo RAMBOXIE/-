@@ -804,13 +804,25 @@ const CONTENT = (() => {
   /* ---- 采样官下令屏(D-101 块1a):母体开口,下本局采样指令 ---- */
   SCREENS.saymaster = {
     transient: true,
-    enter(){ this.scroll = 0; ENGINE.logEv('directive', { id: S.directive && S.directive.id, tier: GRADER_TIER }); },
+    enter(){
+      this.scroll = 0;
+      ENGINE.logEv('directive', { id: S.directive && S.directive.id, tier: GRADER_TIER });
+      /* D-101 块3:采样官挑衅措辞交给 LLM(仅语气,数字/指令仍归引擎),先上模板兜底,
+         LLM 回来再替换。玩家不往这屏打字 = 零注入面。失败静默用模板。 */
+      if (S.graderTaunt === undefined){
+        S.graderTaunt = null;                                    // 标记已发起,避免重复请求
+        GRADER.taunt({ tier: GRADER_TIER, grade: (SV && SV.lastGrade) || 'none', runN: (SV && SV.runCount) || 0 })
+          .then(t => { if (t) S.graderTaunt = t; })
+          .catch(() => {});
+      }
+    },
     render(){
       statusBar();
       L.drawText(4, 16, '交付核验单元 · 采样官');
       L.hline(30, 4, W - 5, 2);
-      const taunt = ['又一个。别磨蹭。', '你上次那点表现,我记着。',
-                     '这次别再让我失望。', '你已经很熟了。所以标准我提了。'][GRADER_TIER];
+      const taunt = S.graderTaunt ||
+        ['又一个。别磨蹭。', '你上次那点表现,我记着。',
+         '这次别再让我失望。', '你已经很熟了。所以标准我提了。'][GRADER_TIER];
       let lines = L.wrap(taunt, SCROLL_W)
         .concat(['', '本局指令:'])
         .concat(L.wrap(S.directive.line, SCROLL_W));
