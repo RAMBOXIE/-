@@ -8,8 +8,20 @@
 [functions]
   node_bundler = "esbuild"
 
-# 关系通道代理未配 ANTHROPIC_API_KEY 时返回 501,前端永久降级到手写模板池,
-# 游戏其余部分不受影响。配好 key 后无需改代码,重新部署即可生效。
+# 关系通道代理未配 key 时返回 501,前端永久降级到手写模板池,游戏其余部分不受影响。
+# 配好 key 后无需改代码,重新部署即可生效。
+#
+# ── 换便宜模型:只设站点级环境变量,不改代码 ────────────────────────────
+#   默认(Anthropic):  netlify env:set ANTHROPIC_API_KEY sk-ant-...
+#   换 OpenAI 兼容源(DeepSeek / Kimi / 通义 / OpenRouter / Groq / Together / 本地 vLLM …):
+#     netlify env:set LLM_PROVIDER openai
+#     netlify env:set LLM_API_KEY  <你的 key>
+#     netlify env:set LLM_BASE_URL https://api.deepseek.com/v1   # 该服务的接口根地址(不含路径)
+#     netlify env:set LLM_MODEL    deepseek-chat                 # 模型名
+#   可选:LLM_MAX_TOKENS(默认 150)。老的 ROU_MODEL 仍兼容(等价 LLM_MODEL)。
+#   注:openai 模式打 {LLM_BASE_URL}/chat/completions、Bearer 鉴权、system 作首条消息;
+#       anthropic 模式打 {LLM_BASE_URL||api.anthropic.com}/v1/messages。安全姿态两者一致。
+#   支出硬上限仍只有一个 —— 去对应服务商控制台给这把 key 设消费上限。
 #
 # Node 运行时钉不进这份文件——zip-it-and-ship-it 只认站点级环境变量,写在
 # 这里是 no-op。首次部署后手动跑一次(或在站点设置里勾 Node 版本):

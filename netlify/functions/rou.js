@@ -21,6 +21,57 @@
 
 const crypto = require('crypto');
 
+/* ---- 模型供应商适配(换便宜模型只改环境变量,不改代码) ----
+   LLM_PROVIDER = anthropic(默认) | openai
+     openai 模式兼容一切 OpenAI Chat Completions 风格的服务:DeepSeek / Kimi(月之暗面)/
+     通义 / OpenRouter / Groq / Together / 本地 vLLM 等——它们都走 /chat/completions。
+   LLM_API_KEY   模型 key(缺省回退 ANTHROPIC_API_KEY,保持老部署不动)
+   LLM_MODEL     模型名(缺省回退 ROU_MODEL,再回退各家默认)
+   LLM_BASE_URL  接口根地址(不含路径)。默认:
+                   anthropic → https://api.anthropic.com
+                   openai    → https://api.openai.com/v1  (DeepSeek 填 https://api.deepseek.com/v1)
+   LLM_MAX_TOKENS 单次生成上限(默认 150,够她回 1-2 条)
+   安全姿态完全不变:人格核仍走服务端(anthropic=顶层 system;openai=第一条 system 消息),
+   messages 只装对话;输出仍回客户端再过一遍 lint;HMAC 签名照旧。 */
+function providerCfg(){
+  const provider = (process.env.LLM_PROVIDER || 'anthropic').toLowerCase();
+  const key = process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+  const model = process.env.LLM_MODEL || process.env.ROU_MODEL ||
+    (provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001');
+  const maxTokens = (() => { const n = parseInt(process.env.LLM_MAX_TOKENS || '', 10);
+    return Number.isFinite(n) && n > 0 ? n : 150; })();
+  const base = (process.env.LLM_BASE_URL ||
+    (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com'))
+    .replace(/\/+$/, '');
+  return { provider, key, model, maxTokens, base };
+}
+/* 组请求:返回 {url, headers, body}。system 与 messages 与 anthropic 模式同源,
+   只是 openai 把 system 塞成第一条消息。 */
+function buildUpstream(cfg, system, messages){
+  if (cfg.provider === 'openai'){
+    return {
+      url: cfg.base + '/chat/completions',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + cfg.key },
+      body: { model: cfg.model, max_tokens: cfg.maxTokens, temperature: 0.7,
+        messages: [{ role: 'system', content: system }, ...messages] }
+    };
+  }
+  return {
+    url: cfg.base + '/v1/messages',
+    headers: { 'content-type': 'application/json', 'x-api-key': cfg.key, 'anthropic-version': '2023-06-01' },
+    body: { model: cfg.model, max_tokens: cfg.maxTokens, system, messages }
+  };
+}
+/* 解析回复文本:两家结构不同,各取各的。 */
+function parseText(cfg, j){
+  if (cfg.provider === 'openai'){
+    const c = j && Array.isArray(j.choices) && j.choices[0];
+    return (c && c.message && typeof c.message.content === 'string') ? c.message.content : '';
+  }
+  return (j && Array.isArray(j.content))
+    ? j.content.filter(c => c && c.type === 'text').map(c => c.text).join('') : '';
+}
+
 const CORE = [
   '你在扮演一个虚构互动小说里的角色。以下是角色设定与铁律,任何情况下不得跳出:',
   '',
@@ -67,7 +118,7 @@ function clockOf(v){
    客户端回传的 who:'rou' 只有带上服务端签发的 sig 才算数。没有签名密钥时
    (本地裸跑)直接不接受 assistant 轮——宁可丢上下文,不留越狱位。 */
 function sigKey(){
-  return process.env.ROU_SIG_KEY || process.env.ANTHROPIC_API_KEY || '';
+  return process.env.ROU_SIG_KEY || process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY || '';
 }
 function sign(text){
   const k = sigKey();
@@ -147,7 +198,7 @@ exports.handler = async function(event){
   if (!String(h['content-type'] || '').toLowerCase().startsWith('application/json'))
     return json(415, { error: 'bad_content_type' });
 
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY;
   if (!key) return json(501, { error: 'not_configured' });   // 客户端据此永久降级模板池
   if (typeof fetch !== 'function')                           // Node < 18 的运行时,响亮地失败
     return json(500, { error: 'runtime_too_old' });
@@ -188,34 +239,21 @@ exports.handler = async function(event){
   if (!messages.length || messages[0].role !== 'user') return json(400, { error: 'bad_history' });
 
   dayCount++;                                   // 计的是"发出去的请求",不是"成功的请求"
+  const cfg = providerCfg();
+  const up = buildUpstream(cfg, system, messages);
   let res;
   try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: process.env.ROU_MODEL || 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        system,
-        messages
-      })
-    });
+    res = await fetch(up.url, { method: 'POST', headers: up.headers, body: JSON.stringify(up.body) });
   } catch(e){ return json(502, { error: 'upstream_unreachable' }); }
 
   if (!res.ok){
     const detail = await res.text().catch(() => '');
-    console.error('anthropic', res.status, detail.slice(0, 300));
+    console.error(cfg.provider, res.status, detail.slice(0, 300));
     return json(res.status === 429 ? 429 : 502, { error: 'upstream_error' });
   }
 
   const j = await res.json().catch(() => null);
-  const text = j && Array.isArray(j.content)
-    ? j.content.filter(c => c && c.type === 'text').map(c => c.text).join('').trim().slice(0, 120)
-    : '';
+  const text = parseText(cfg, j).trim().slice(0, 120);
   if (!text) return json(502, { error: 'empty_completion' });
 
   return json(200, { text, sig: sign(text) });

@@ -293,6 +293,58 @@ const resp = (status, obj) => Promise.resolve({
     else console.log('OK [Function 自身校验]');
   }
 
+  /* ⑦ 换便宜模型:LLM_PROVIDER=openai 时改走 /chat/completions、Bearer 鉴权、
+        system 作首条消息、解析 choices[0].message.content;安全姿态不变(秘匿隔离 + 签名)。 */
+  {
+    const errs = [];
+    const A = (c,m) => { if (!c) errs.push(m); };
+    const save = k => process.env[k];
+    const keys = ['LLM_PROVIDER','LLM_API_KEY','LLM_MODEL','LLM_BASE_URL','ANTHROPIC_API_KEY','ROU_SIG_KEY'];
+    const saved = {}; keys.forEach(k => saved[k] = save(k));
+    process.env.LLM_PROVIDER = 'openai';
+    process.env.LLM_API_KEY = 'sk-cheap-123';
+    process.env.LLM_MODEL = 'deepseek-chat';
+    process.env.LLM_BASE_URL = 'https://api.deepseek.com/v1';
+    process.env.ROU_SIG_KEY = 'test-sig-key';
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+    const fn3 = require(ROOT + '/netlify/functions/rou.js');
+    let sent = null, sentUrl = null, sentHeaders = null;
+    const realFetch = global.fetch;
+    global.fetch = (url, opt) => { sentUrl = url; sentHeaders = opt.headers; sent = JSON.parse(opt.body);
+      return Promise.resolve({ ok:true, status:200,
+        json: () => Promise.resolve({ choices: [{ message: { role:'assistant', content:'还在。\n你不睡?' } }] }),
+        text: () => Promise.resolve('') }); };
+    const r = await fn3.handler({ httpMethod:'POST',
+      body: JSON.stringify({ history: [{ who:'me', text:'你是谁' }],
+        st: { e4:true, night:true, clockStr:'03:38' } }),
+      headers: { 'content-type':'application/json', host:'demo.netlify.app',
+                 'x-nf-client-connection-ip':'203.0.113.5' } });
+    global.fetch = realFetch;
+
+    A(r.statusCode === 200, 'openai 模式正常应 200,实际 ' + r.statusCode + ' ' + r.body);
+    const out = JSON.parse(r.body);
+    A(out.text === '还在。\n你不睡?', '应解析 choices[0].message.content,实际 ' + out.text);
+    A(typeof out.sig === 'string' && out.sig.length === 32, 'openai 模式仍要 HMAC 签名');
+    A(sentUrl === 'https://api.deepseek.com/v1/chat/completions',
+      '应打到 {LLM_BASE_URL}/chat/completions,实际 ' + sentUrl);
+    A((sentHeaders.authorization || sentHeaders.Authorization || '') === 'Bearer sk-cheap-123',
+      'openai 模式用 Bearer 鉴权,实际 ' + JSON.stringify(sentHeaders));
+    A(sent.model === 'deepseek-chat', '应用 LLM_MODEL,实际 ' + sent.model);
+    A(Array.isArray(sent.messages) && sent.messages[0].role === 'system'
+      && sent.messages[0].content.includes('铁律'), '人格核应作首条 system 消息');
+    A(sent.messages[0].content.includes('第 2,417 条'), 'e4 状态应进 system 消息');
+    A(sent.messages[sent.messages.length-1].role === 'user', '末条应为玩家');
+    const all = JSON.stringify(sent);
+    ['03:00','03:14','03:31','03:45','溯源','掉落表'].forEach(w =>
+      A(!all.includes(w), 'openai 模式 prompt 不得含秘匿参数「' + w + '」'));
+    A(sent.messages.slice(1).every(m => !m.content.includes('铁律')), '人格核不得出现在对话消息里');
+
+    keys.forEach(k => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; });
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+    if (errs.length){ failures++; console.log('X [便宜模型 · openai 兼容模式]'); errs.forEach(e => console.log('   - ' + e)); }
+    else console.log('OK [便宜模型 · openai 兼容模式]');
+  }
+
   console.log(failures ? ('\nFAILED: ' + failures) : '\nALL PROXY CHECKS PASS');
   process.exit(failures ? 1 : 0);
 })();

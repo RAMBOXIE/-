@@ -47,6 +47,21 @@ netlify env:set AWS_LAMBDA_JS_RUNTIME nodejs22.x --scope functions   # 见下方
 netlify deploy --prod --no-build --dir=dist/site --functions=netlify/functions
 ```
 
+**想用便宜模型(DeepSeek / Kimi / 通义 / OpenRouter / Groq / 本地 vLLM …):**
+不改代码,只设环境变量。它们都兼容 OpenAI 的 `/chat/completions`:
+
+```bash
+netlify env:set LLM_PROVIDER openai
+netlify env:set LLM_API_KEY  <你的key>
+netlify env:set LLM_BASE_URL https://api.deepseek.com/v1   # 该服务接口根地址(不含路径)
+netlify env:set LLM_MODEL    deepseek-chat                 # 模型名
+netlify deploy --prod --no-build --dir=dist/site --functions=netlify/functions
+```
+
+不设 `LLM_PROVIDER` 就是默认的 Anthropic 路径。可选 `LLM_MAX_TOKENS`(默认 150)。
+安全姿态两条路一致:人格核在服务端、`messages` 只装对话、输出过 lint、HMAC 签名。
+支出硬上限去对应服务商控制台给这把 key 设——限流只挡突发,不是账务级配额。
+
 **之后改内容重新上线,固定两步:**
 
 ```bash
