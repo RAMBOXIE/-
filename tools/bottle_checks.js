@@ -103,20 +103,35 @@ scenario('轮换4: 三张都读过 -> 仍能给出一张(不空)', save({ seenBo
 });
 
 /* ---- 2. 三条 14③ 文案纪律(逐张核对) ---- */
-scenario('文案纪律: 三张都用「我那次」句式 + 都不是恶意', save({}), g => {
+scenario('文案纪律: 三张 NPC 瓶用「我那次」句式 + 都不是恶意', save({}), g => {
   const { A } = g;
   const src = fs.readFileSync(ROOT + '/js/content.js', 'utf8');
-  const block = src.slice(src.indexOf('const BOTTLES = ['), src.indexOf('/* 选瓶'));
+  /* 精确框定 BOTTLES 数组本身(到它自己的 `];`),不吃后面的 OWN_BOTTLE */
+  const start = src.indexOf('const BOTTLES = [');
+  const block = src.slice(start, src.indexOf('\n  ];', start));
   ['#5502-D','#3120-K','#1177-B'].forEach(id => {
     A(block.includes(id), '瓶 ' + id + ' 应在表中');
   });
   const bodies = block.split('body:').slice(1);
-  A(bodies.length === 3, '应有 3 条 body,实际 ' + bodies.length);
+  A(bodies.length === 3, '三张 NPC 瓶应有 3 条 body,实际 ' + bodies.length);
   bodies.forEach((b, i) => {
     A(/我那次/.test(b), '第 ' + (i+1) + ' 张必须含「我那次」(归因载体),实际: ' + b.slice(0, 60));
   });
-  /* 不许出现断言全局真理的口气 */
   A(!/一定|必须|永远都/.test(block), '瓶面不得断言全局真理');
+});
+
+/* ---- 2b. 恐怖游轮化 · 你自己的信:另一套纪律(只种钉子,不套 NPC 句式) ---- */
+scenario('文案纪律: 你自己的信只两句、不解释机制、非恶意', save({}), g => {
+  const { A } = g;
+  const src = fs.readFileSync(ROOT + '/js/content.js', 'utf8');
+  const m = src.match(/const OWN_BOTTLE = \{[\s\S]*?body:\s*'([^']*)'/);
+  A(!!m, '应能取到 OWN_BOTTLE.body');
+  const body = m ? m[1] : '';
+  A(body.split('\\n').length <= 2, '只两句(≤2 行),实际: ' + body);
+  A(!/我那次/.test(body), '不套用 NPC 的「我那次」句式');
+  A(!/窗口|信号|查扣|概率|03:|删除那个/.test(body), '不解释任何机制(只种钉子)');
+  A(!/[!！]/.test(body), '无感叹号');
+  A(/self:\s*true/.test(src), 'OWN_BOTTLE 应标记 self');
 });
 
 /* ---- 3. 无附件的瓶:取走键不给东西 ---- */

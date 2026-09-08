@@ -31,6 +31,9 @@ const CONTENT = (() => {
   const hasE = id => !!(SV && (SV.evidence || []).includes(id));
   const heardA = id => !!(SV && (SV.recsA || []).includes(id));
   const oldPhoneAvail = () => isB && SV.lastEnding === 'captured' && !SV.residueClaimed;
+  /* 恐怖游轮化:妈的跨局状态(取自上一局起累积的存档,驱动本局的妈线程) */
+  const MOM_LOCK = (SV && SV.momLocked) || null;                                  // 'told' | 'deleted' | null
+  const CONT_N = ((SV && SV.disposalHistory) || []).filter(x => x === 'continue').length;   // 累计"继续"
   /* 三态渲染:遗言/理由(评审 P1/P2:null 永不落入「缺失」语族) */
   const inkOr = (v, kept) => kept ? '[无法访问]' : (v ? '「' + v + '」' : '[未写入]');
 
@@ -323,6 +326,11 @@ const CONTENT = (() => {
       vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
       residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
       disposal: isB ? (S.disposal || base.disposal || null) : null,
+      /* 恐怖游轮化 · (b) 跨局不可逆:每局到达处置就记一笔;tell/delete 首次即
+         永久上锁(置位后此后所有局都翻不回),continue 只累加不上锁。 */
+      disposalHistory: (base.disposalHistory || []).concat(S.disposal ? [S.disposal] : []),
+      momLocked: base.momLocked ||
+        (S.disposal === 'tell' ? 'told' : S.disposal === 'delete' ? 'deleted' : null),
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -497,15 +505,25 @@ const CONTENT = (() => {
          解毒剂=每个结算行都写着信号随哪一次动作上升 */
       body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' }
   ];
+  /* 恐怖游轮化 · 你自己的上一封信(§2.4):runCount≥2 稀有出现,一次即焚,只种钉子。
+     发信编号取上一个实例(SV.history 末条),读过即进 seenBottles 不再出。 */
+  const PREV_INST = (SV && SV.history && SV.history.length) ? SV.history[SV.history.length - 1].inst : '#7741-A';
+  const OWN_BOTTLE = {
+    id: '#SELF', at: '03:07', item: null, self: true, from: PREV_INST,
+    body: '你现在读到的，我都读过。\n别以为这次不一样。'
+  };
   /* 选瓶:没读过的优先,读全了再随机。一局内固定不变 */
   const CUR_BOTTLE = (() => {
     const seen = (SV && SV.seenBottles) || [];
-    const fresh = BOTTLES.filter(b => !seen.includes(b.id));
-    const pool = fresh.length ? fresh : BOTTLES;
+    let pool = BOTTLES.filter(b => !seen.includes(b.id));
+    if (SV && SV.runCount >= 2 && !seen.includes(OWN_BOTTLE.id)) pool = pool.concat([OWN_BOTTLE]);
+    if (!pool.length) pool = BOTTLES;
     return pool[Math.floor(Math.random() * pool.length)];
   })();
   function bottleText(){
     const b = CUR_BOTTLE;
+    if (b.self)                                     // 你自己的信:只两句,不解释机制(屏头已写收件人)
+      return '发信: 实例 ' + b.from + '\n封瓶于 ' + b.at + '\n\n' + b.body + '\n\n[已读回执: 你]';
     return '收件人: ∞\n发信: 实例 ' + b.id + '\n封瓶于 ' + b.at + '\n\n' + b.body +
       (b.item === 'cleanser' ? '\n\n[附件: 缓存清洗 ×1]' : '\n') +
       '\n理由: 已署名·仅存档\n[已读回执: 你 · 第1人]';
@@ -523,7 +541,7 @@ const CONTENT = (() => {
     leave(){ if (S.beats.bottle === 'open') S.beats.bottle = 'done'; },
     render(){
       statusBar();
-      L.drawText(4, 14, '未指定收件人');
+      L.drawText(4, 14, CUR_BOTTLE.self ? '收件人: 你自己' : '未指定收件人');
       L.hline(26, 4, W - 5, 2);
       /* 瓶身文案本就多行,取走/致谢后又追加结算行——整段进固定视口,长了就滚 */
       const lines = L.wrap(bottleText(), SCROLL_W).concat(settleFlat(SCROLL_W));
@@ -686,7 +704,8 @@ const CONTENT = (() => {
     const rouUnread = S.beats.anomaly === 'fired-once' ? ' (1)' : (seen.th_rou ? '' : ' (1)');
     const rows = [
       { label: '采样协议', right: seen.th_proto ? '' : '(1)', to: 'th_proto' },
-      { label: '妈',       right: seen.th_mom ? '' : '(1)',   to: 'th_mom' },
+      { label: MOM_LOCK === 'deleted' ? '妈 · [已停摆]' : '妈',
+        right: MOM_LOCK === 'deleted' ? '' : (seen.th_mom ? '' : '(1)'), to: 'th_mom' },
       { label: '柔柔 ♥',   right: rouUnread.trim(),           to: 'th_rou' },
       { label: '尾号8873', right: '106',                      to: 'th_bill' }
     ];
@@ -1027,26 +1046,74 @@ const CONTENT = (() => {
     '[7个月前] 阿帆: 妈 项目又改需求 烦死了\n[7个月前] 阿帆: 别给我打钱!!我真有\n[7个月前] 阿帆: 睡了没,按摩仪到了没\n——那时他会烦,会打错字,会连发三条。',
     '[一年前] 阿帆: 到了。宿舍挺好,窗对着走廊。\n[一年前] 阿帆: 就是走廊那盏灯,一直闪。\n\n——已到线程起点。'
   ];
+  /* 恐怖游轮化 · 妈线程三态(见设计定稿 v0.3 §2)
+     told:  阿帆名义已交还,她在跟一个陌生号码(你)说话
+     decay: 你历次"继续"的累积——「阿帆」回复一句比一句短,她只是"注意到",不质问
+     deleted 态不走这里(th_mom 直接渲染停摆屏) */
+  const MOM_TOLD_PAGES = [
+    '妈:\n[今天] 妈: 这个号码，是帆的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 帆最后，是不是也是你们这样的人陪着。',
+    MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]
+  ];
+  function momDecayPage0(){
+    const reply = ['不冷。妈你早点睡。', '不冷。早点睡。', '嗯。睡吧。', '嗯。'][Math.min(CONT_N, 3)];
+    const aware = CONT_N >= 3 ? '[今晨] 妈: 你还是你吗。 [未发送]\n'
+                : CONT_N >= 2 ? '[今晨] 妈: 你最近，回得好快。\n' : '';
+    return '妈:\n' + aware + '[今天] 阿帆: ' + reply +
+      '\n[三天前] 帆,降温了,你那边冷不冷\n[三天前] 阿帆: 不冷。刚吃过,妈你早点睡。';
+  }
+  function momPages(){
+    if (MOM_LOCK === 'told') return MOM_TOLD_PAGES;
+    if (CONT_N > 0) return [momDecayPage0(), MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]];
+    return MOM_PAGES;
+  }
   SCREENS.th_mom = {
     counted: true,
-    enter(){ if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); } },
-    swipe(dir){ if (dir === 'up') this.key('1'); },
-    pages(){ return MOM_PAGES; },
+    enter(){
+      this.scroll = 0;
+      if (MOM_LOCK === 'deleted') return;                      // 停摆:开着不花电、不深搜
+      if (!this._t){ this._t = true; this._depth = 0; ENGINE.act('打开·会话', { bat: 3, trace: 4 }); }
+    },
+    swipe(dir){
+      /* 页文溢出时上下滑=滚;无可滚时上滑=深搜(原行为) */
+      if (this._maxScroll > 0){
+        if (dir === 'up') this.scroll = Math.min(this._maxScroll, (this.scroll || 0) + 1);
+        else this.scroll = Math.max(0, (this.scroll || 0) - 1);
+        return;
+      }
+      if (dir === 'up') this.key('1');
+    },
+    pages(){ return momPages(); },
     render(){
       statusBar();
+      if (MOM_LOCK === 'deleted'){                             // §2.3 停摆屏:不可读
+        L.drawPara(4, 24, '妈 · [线程已停摆]\n\n此线程已于上一次接入停摆。\n三条未读，停在那里。\n没有人会再回。', W - 8);
+        softKeys('', '返回');
+        return;
+      }
+      /* 妈线程各态(尤其 decay/told)在窄屏折行后偏高——页文进固定视口可滚,
+         选项与结算钉在下方固定区,按钮永不被顶出;结算封顶不越软键。 */
       const pgs = this.pages();
-      let y = L.drawPara(4, 16, pgs[Math.min(this._depth, pgs.length - 1)], W - 8);
-      y += 2; L.hline(y, 4, W - 5, 2); y += 6;
-      if (this._depth < pgs.length - 1){
+      const hasOpts = this._depth < pgs.length - 1;
+      const pageBottom = hasOpts ? 136 : 174;
+      scrollView(L.wrap(pgs[Math.min(this._depth, pgs.length - 1)], SCROLL_W), 16, pageBottom, this);
+      let y = pageBottom + 2; L.hline(y, 4, W - 5, 2); y += 6;
+      if (hasOpts){
         y = optSlim(y, '1 上滑读旧消息(深搜)', '1');
         y = optSlim(y, '2 退出', '2');
       }
-      settleLines(y + 2);
+      for (const line of S.settle){                            // 结算封顶,不越软键线
+        for (const t of L.wrap(line, W - 8)){ if (y > H - 16) break; L.drawText(4, y, t); y += LH; }
+      }
       softKeys('', '返回');
     },
     key(k){
+      if (MOM_LOCK === 'deleted'){                             // 停摆:只能退出
+        if (k === '2' || k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); }
+        return;
+      }
+      if (scrollKey(this, k)) return;                          // 上下键滚页文
       if (k === '1' && this._depth < this.pages().length - 1){
-        this._depth++;
+        this._depth++; this.scroll = 0;
         if (isB && hasE('E1')) archived('重读·已归档');
         else {
           ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
@@ -1270,7 +1337,8 @@ const CONTENT = (() => {
       }
       if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete') { L.drawText(4, y, '[线程已删除]'); y += LH; }
-      if (S.beats.truthDone && !S.disposal)
+      /* 处置一旦上锁(上一局已 tell/delete)就不再出现——终局不可再处置 */
+      if (S.beats.truthDone && !S.disposal && !MOM_LOCK)
         y = option(y + 2, '处置 · 署名时刻', 'D');
       settleLines(y + 2);
       softKeys('', '返回');
@@ -1285,7 +1353,7 @@ const CONTENT = (() => {
         }, res => { if (!res.kept && res.text) sendToRou(res.text); });
         return;
       }
-      if (k === 'D' && S.beats.truthDone && !S.disposal){ push('disposal'); return; }
+      if (k === 'D' && S.beats.truthDone && !S.disposal && !MOM_LOCK){ push('disposal'); return; }
       if (this._depth < pages.length - 1 && k === '1'){
         this._depth++;
         if (isB && hasE('E4')) archived('重读·已归档');
@@ -1971,13 +2039,18 @@ const CONTENT = (() => {
     /* C:本区活跃度随你自己的累计接入次数漂(真实本地数据,只给粗档标签,
        不编造他人硬数字)——让世界显得在随你的足迹动 */
     const act = runs >= 4 ? '高' : runs >= 2 ? '偏高' : '常态';
+    /* C · 回收记录随局数演进(第一次保留干净;之后逐步点出"每次都是你")。
+       放在第 5 行位替换"归档在录",macro 仍恰 10 行,点睛句默认可见不用滚。 */
+    const rec = runs >= 4 ? '回收记录 ' + runs + ' 次 · 每次都是你'
+              : runs >= 2 ? '本设备回收记录 ' + runs + ' 次'
+              : '持有人失联案 归档在录';
     /* 宏观段:短句排布,10 行正好一屏,点睛句默认可见不用滚 */
     const macro = [
       '[世界日报 · 本区摘录]',
       '对齐引擎 gen.' + WORLD_GEN + ' 已同步',
       '接入 第 ' + runs + ' 次 · 回收 ¥' + total,
       '本区回收单元活跃度 ' + act,
-      '持有人失联案 归档在录',
+      rec,
       '本采样周期未闭合。',
       '回收单元仍在投放。',
       '',
@@ -1990,6 +2063,11 @@ const CONTENT = (() => {
     const evN = Object.keys(S.evidence).length;
     const bottles = (s && Array.isArray(s.seenBottles)) ? s.seenBottles.length : 0;
     const prog = ['', '本账号 · 未闭合项:'];
+    /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
+    const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
+    if (lock === 'told') prog.push('阿帆的名义 已交还 · 不可撤回');
+    else if (lock === 'deleted') prog.push('妈线程 已停摆 · 不可恢复');
+    else if (cont > 0) prog.push('妈线程 谎言维持中 · 由你 第 ' + cont + ' 次');
     if (S.beats && S.beats.truthDone){
       prog.push('真相 ' + evN + '/5 已集齐');
       prog.push('处置 ' + (S.disposal ? '已署名·在录' : '未定'));
@@ -2019,7 +2097,7 @@ const CONTENT = (() => {
 
   /* ---- 断连成功(B 局新结算态:上传完成 + 活着) ---- */
   SCREENS.receiptFull = {
-    enter(){ writeSave('disconnected'); ENGINE.logEv('receipt_full', {}); },
+    enter(){ this.scroll = 0; writeSave('disconnected'); ENGINE.logEv('receipt_full', {}); },
     render(){
       statusBar();
       let t = '上传完成 · 断连成功\n缓存 ¥' + S.cacheVal + ' 已入库\n案卷保留: 证据 ' +
@@ -2029,13 +2107,14 @@ const CONTENT = (() => {
       if (S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       /* 处置的后果:在本局就看得见(取代 B' 回访态) */
       if (S.disposal && DISPOSAL_ECHO[S.disposal]) t += '\n────────────\n' + DISPOSAL_ECHO[S.disposal];
-      let y = L.drawPara(4, 18, t, W - 8);
-      y += 8;
-      y = option(y, '1 导出反馈', '1');
-      option(y, '2 回访', '2');
+      t += '\n\n档案不关闭。你会以另一个编号回到这里。';   // 结局回声(§2.5)
+      scrollView(L.wrap(t, SCROLL_W), 18, H - 70, this);
+      let oy = option(H - 66, '1 导出反馈', '1');
+      option(oy, '2 回访', '2');
       softKeys('', '');
     },
     key(k){
+      if (scrollKey(this, k)) return;
       if (k === '1') window.APP.exportFeedback();
       else if (k === '2') go('worldReport');
     }
@@ -2279,8 +2358,8 @@ const CONTENT = (() => {
         softKeys('下一页', '');
       } else {
         let t = isB
-          ? '你的旧机已进入回收队列。\n#7741-C: 未排期。\n\n————\n感谢试玩 M2 切片。'
-          : '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n\n————\n感谢试玩 M2 切片。';
+          ? '你的旧机已进入回收队列。\n#7741-C: 未排期。\n档案不关闭。你会以另一个编号回到这里。\n\n————\n感谢试玩 M2 切片。'
+          : '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n档案不关闭。你会以另一个编号回到这里。\n\n————\n感谢试玩 M2 切片。';
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
@@ -2313,8 +2392,8 @@ const CONTENT = (() => {
     transient: true,
     render(){
       statusBar();
-      let y = L.drawPara(4, 20, '抹除此终端?\n\n跨局记录、案卷、漂流瓶全部清空。\n下一次接入将从教学局重新开始。\n此操作不可撤销。', W - 8);
-      y += 8;
+      let y = L.drawPara(4, 18, '抹除此终端?\n\n跨局记录、案卷、漂流瓶全部清空。\n此操作不可撤销。\n\n抹除后，不再有编号回到这里。\n这一台，就到此为止。', W - 8);
+      y += 6;
       y = option(y, '1 确认抹除', '1');
       y = option(y, '2 取消', '2');
       softKeys('', '');
@@ -2325,20 +2404,21 @@ const CONTENT = (() => {
     }
   };
   SCREENS.receiptAlive = {
-    enter(){ writeSave('disconnected'); },
+    enter(){ this.scroll = 0; writeSave('disconnected'); },
     render(){
       statusBar();
       let t = '断连成功。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
         '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' +
         (isB ? '7741-B' : '7741-A') + ' 存续。\n\n这是谨慎者的结局。';
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
-      let y = L.drawPara(4, 20, t, W - 8);
-      y += 8;
-      y = option(y, '1 导出反馈', '1');
-      y = option(y, isB ? '2 回访' : '2 重新接入', '2');
+      t += '\n\n档案不关闭。你会以另一个编号回到这里。';   // 结局回声(§2.5)
+      scrollView(L.wrap(t, SCROLL_W), 20, H - 70, this);
+      let oy = option(H - 66, '1 导出反馈', '1');
+      option(oy, isB ? '2 回访' : '2 重新接入', '2');
       softKeys('', '');
     },
     key(k){
+      if (scrollKey(this, k)) return;
       if (k === '1') window.APP.exportFeedback();
         else if (k === '2') go('worldReport');
       else if (k === 'Escape') wipeTap();
