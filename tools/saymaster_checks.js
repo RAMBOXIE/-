@@ -125,6 +125,51 @@ scenario('世界日报 · 出现采样官评级行', { runCount:2, lastGrade:'pr
     A(all.includes('采样官评级') && all.includes('赏识'), '世界日报应含采样官评级·赏识');
   });
 
+/* ---- 块1b 破局:未达标伪造署名,没被识破=白嫖(视作达标但只 pass 不 praise) ---- */
+scenario('破局 · 伪造未被识破=白嫖(pass,不记赏识)', null, ({A, C, S, rnd}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met:()=>Object.keys(S.evidence).length>=4 };
+  S.dirGraded=false; S.evidence={E1:true}; S.cacheVal=1000; S.forged=true; S.trap=null;
+  rnd(0.99);                              // 不被识破(caughtP 首次=0.2,0.99>0.2)
+  C.go('receiptAlive', true);
+  A(S.dirMet === true, '白嫖应视作达标');
+  A(S.grade === 'pass', '破局只 pass,不记赏识,实际 '+S.grade);
+  A(S.cacheVal === 1000, '白嫖不扣缓存');
+});
+
+scenario('破局 · 伪造被识破=失望 + 溯源 +8', null, ({A, C, S, rnd}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met:()=>Object.keys(S.evidence).length>=4 };
+  S.dirGraded=false; S.evidence={E1:true}; S.cacheVal=1000; S.forged=true; S.trap=null;
+  const tr0 = S.trace;
+  rnd(0.01);                              // 被识破(0.01<0.2)
+  C.go('receiptAlive', true);
+  A(S.grade === 'fail', '破局被识破应 fail,实际 '+S.grade);
+  A(S.trace === Math.min(120, tr0 + 8), '破局被识破溯源 +8');
+  A(S.cacheVal === 800, '被识破按 fail 扣 20%');
+});
+
+scenario('破局 · forgedSeen 累积推高识破概率', null, ({A}) => {
+  const g = mkEnv({ runCount:2, forgedSeen:3 });   // caughtP=0.2+3*0.15=0.65
+  g.C.go('saymaster', true);
+  const S = g.S;
+  S.directive = { id:'D_CASE', met:()=>false }; S.dirGraded=false; S.forged=true; S.trap=null; S.cacheVal=1000;
+  Math.random = () => 0.6;                          // 0.6<0.65 → 这次被识破
+  g.C.go('receiptAlive', true);
+  A(S.grade === 'fail', 'forgedSeen 高→识破概率高,0.6 应被抓');
+});
+
+/* ---- 块1b 陷阱:触发陷阱条款=失望(即便主指令达标) ---- */
+scenario('陷阱 · 触发条款则 fail(压过主指令达标)', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met:()=>true };      // 主指令达标
+  S.trap = { id:'T_WINDOW', detect:()=>S.violations>0 };
+  S.dirGraded=false; S.violations=1; S.cacheVal=1000; S.beats={truthDone:true};
+  C.go('receiptAlive', true);
+  A(S.trapHit === true, '应判触发陷阱');
+  A(S.grade === 'fail', '触陷阱即便主指令达标也 fail,实际 '+S.grade);
+});
+
 /* ---- 离线:无 LLM(平台能力/代理都不在)时,下令与评级仍走模板,机制不缺 ---- */
 scenario('离线兜底 · 下令屏用模板措辞、机制在场', null, ({A, C, frame}) => {
   C.go('saymaster', true);

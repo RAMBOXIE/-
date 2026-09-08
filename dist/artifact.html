@@ -754,14 +754,38 @@ const CONTENT = (() => {
   const DIR_POOL = DIRECTIVE_LIB.filter(d => d.ab === 'ab' || d.ab === S_TIER);
   S.directive = DIR_POOL[Math.floor(Math.random() * DIR_POOL.length)];   // 本局指令(状态机定)
   S.dirGraded = false;
+  S.forged = false;                      // 破局(伪造署名)本局是否用过
+
+  /* 块1b · 陷阱条款(先给限制后给破绽)。detect() 用现有状态判是否触发=违规。
+     tier≥1 才挂陷阱。检测口径接现有 hook,不新增秘匿状态。 */
+  const TRAP_LIB = [
+    { id: 'T_WINDOW', line: '附加:03:00 后回复任何消息,算违规。', detect: () => S.violations > 0 },
+    { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
+  ];
+  const TRAP_POOL = TRAP_LIB.filter(t => !t.ab || t.ab === S_TIER);
+  S.trap = (GRADER_TIER >= 1 && Math.random() < 0.7) ? TRAP_POOL[Math.floor(Math.random() * TRAP_POOL.length)] : null;
+
+  /* 破局识破概率:首次低、多用爬升(canon:破局=全额奖励不付真代价,但会被检伪) */
+  const forgeCaughtP = () => Math.min(0.7, 0.2 + ((SV && SV.forgedSeen) || 0) * 0.15);
+
   /* 结局评级(在 writeSave 顶部调一次;幂等) */
   function settleDirective(){
     if (S.dirGraded) return; S.dirGraded = true;
-    const met = !!(S.directive && S.directive.met());
+    let met = !!(S.directive && S.directive.met());
+    S.trapHit = !!(S.trap && S.trap.detect());
+    /* 破局:未达标时伪造署名——赌一把。没被识破=白嫖(视作达标,但不记赏识);被识破=fail+溯源 */
+    S.forgeCaught = false;
+    if (!met && S.forged){
+      if (Math.random() < forgeCaughtP()){ S.forgeCaught = true; }   // 被识破
+      else met = true;                                                // 白嫖成功
+    }
     S.dirMet = met;
-    const extra = (S.beats && S.beats.truthDone) || S.cacheVal >= CACHE_TARGET * 1.5;
-    S.grade = !met ? 'fail' : (extra ? 'praise' : 'pass');
-    if (!met) S.cacheVal = Math.round(S.cacheVal * 0.8);   // 硬性:未达标缓存 −20%
+    const clean = met && !S.trapHit && !S.forged;                     // 干净达标才有资格赏识
+    const extra = clean && ((S.beats && S.beats.truthDone) || S.cacheVal >= CACHE_TARGET * 1.5);
+    if (S.trapHit || S.forgeCaught) S.grade = 'fail';                 // 触陷阱/破局被识破=失望
+    else S.grade = !met ? 'fail' : (extra ? 'praise' : 'pass');
+    if (S.grade === 'fail') S.cacheVal = Math.round(S.cacheVal * 0.8);
+    if (S.forgeCaught) S.trace = Math.min(120, S.trace + 8);          // 破局被抓:溯源 +8
   }
   const GRADE_CN = { praise: '赏识', pass: '合格', fail: '失望' };
 
@@ -1082,6 +1106,7 @@ const CONTENT = (() => {
       lastGrade: S.grade || null,
       lastDirective: (S.directive && S.directive.id) || null,
       praiseCount: ((base.praiseCount || 0) + (S.grade === 'praise' ? 1 : 0)),
+      forgedSeen: ((base.forgedSeen || 0) + (S.forged ? 1 : 0)),   // 破局用过就累积(下局识破概率↑)
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -1458,10 +1483,11 @@ const CONTENT = (() => {
       L.hline(30, 4, W - 5, 2);
       const taunt = ['又一个。别磨蹭。', '你上次那点表现,我记着。',
                      '这次别再让我失望。', '你已经很熟了。所以标准我提了。'][GRADER_TIER];
-      const lines = L.wrap(taunt, SCROLL_W)
+      let lines = L.wrap(taunt, SCROLL_W)
         .concat(['', '本局指令:'])
-        .concat(L.wrap(S.directive.line, SCROLL_W))
-        .concat(['', '达标=评级。不达标=降档。']);
+        .concat(L.wrap(S.directive.line, SCROLL_W));
+      if (S.trap) lines = lines.concat(L.wrap(S.trap.line, SCROLL_W));
+      lines = lines.concat(['', '达标=评级。不达标=降档。']);
       scrollView(lines, 36, H - 46, this);
       option(H - 42, '接入', 'Enter');
       hit(0, 0, W, H - 46, 'Enter');
@@ -1566,12 +1592,19 @@ const CONTENT = (() => {
         let y = optSlim(optTop, '1 回复「收到」', '1');
         optSlim(y, '2 不回,返回', '2');
       } else {
-        /* 回复后的协议全文+结算行进固定视口,长了可滚;继续按钮钉死 H-42 */
-        const lines = L.wrap(PROTO_TXT, SCROLL_W).concat(settleFlat(SCROLL_W));
-        scrollView(lines, 16, H - 46, this);
-        option(H - 42, '继续', 'Enter');
+        /* 回复后:顶部挂本局指令+陷阱(可复读);未达标时给"伪造署名"破局赌一把(D-101 块1b) */
+        let head = ['采样官: ' + S.directive.line];
+        if (S.trap) head = head.concat(L.wrap(S.trap.line, SCROLL_W));
+        const canForge = !S.forged && !S.directive.met();
+        const rows = canForge ? 2 : 1;
+        const lines = head.concat(['']).concat(L.wrap(PROTO_TXT, SCROLL_W)).concat(settleFlat(SCROLL_W));
+        scrollView(lines, 16, H - 15 - rows * 23 - 4, this);
+        let y = H - 15 - rows * 23;
+        if (canForge) y = option(y, '伪造署名达标 · 赌一把', 'F');
+        else if (S.forged) { L.drawText(4, y - 2, S.forgeCaught ? '[署名已被核验:伪造露馅]' : '[已伪造署名 · 待核验]'); }
+        option(y, '继续', 'Enter');
       }
-      softKeys(this._done ? '继续' : '', '返回');
+      softKeys('', '返回');
     },
     key(k){
       if (scrollKey(this, k)) return;
@@ -1579,6 +1612,10 @@ const CONTENT = (() => {
         if (k === '1'){ this._done = true; ENGINE.act('回复·已送达', { bat: 5 }); }
         else if (k === '2'){ this._done = true; ENGINE.act('已读·未回', { bat: 3 }); }
         else if (k === 'softR' || k === 'Escape') back();
+      } else if (k === 'F' && !S.forged && !S.directive.met()){
+        S.forged = true;                                     // 破局:伪造署名交付,赌不被识破
+        S.settle = ['署名已伪造。等它核验。'];
+        ENGINE.logEv('forge', {});
       } else if (k === 'Enter' || k === 'softL' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
     }
   };
