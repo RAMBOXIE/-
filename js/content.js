@@ -3003,6 +3003,11 @@ const CONTENT = (() => {
         const t = timer; timer = null; t.onTimeout();
       }
     },
+    /* D-108 自查:「现实打断致死」对策=失焦冻结仲裁。app.js 在标签页从隐藏变可见时
+       算出隐藏了多久,喂给这里——把当前 timer 的 deadline 整体后移同样的量,等于
+       冻结了那段被现实打断的时间,不吃掉玩家的真实反应窗口。适用于所有真实倒计时
+       (终局来电/中段遭遇/试炼等),不只是 finalCall 一处。 */
+    freezeAdjust(hiddenMs){ if (timer && hiddenMs > 0) timer.deadline += hiddenMs; },
     go, back, SCREENS
   };
 })();

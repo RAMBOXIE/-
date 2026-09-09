@@ -220,6 +220,16 @@
     }
   };
 
+  /* ---- 失焦冻结仲裁(D-108:附录A「现实打断致死」对策)----
+     标签页切走后 setInterval 仍会(受限地)继续跑,真实倒计时(终局来电/中段遭遇/
+     试炼等)原样在背后消耗;玩家接个电话回来可能已经死了。切走时记下时刻,回来时
+     把隐藏掉的这段时长整体喂回当前 timer 的 deadline——等于冻结,不是暂停判定本身。 */
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) hiddenAt = performance.now();
+    else if (hiddenAt){ CONTENT.freezeAdjust(performance.now() - hiddenAt); hiddenAt = 0; }
+  });
+
   /* ---- 循环 ---- */
   setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
   function loop(){
