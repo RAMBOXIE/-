@@ -44,15 +44,31 @@ art = '<title>逃离AI</title>\n' + style + '\n' + body
 io.open('dist/artifact.html', 'w', encoding='utf-8', newline='\n').write(art)
 
 # ---- 公网静态站 ----
+# D-108 自查:老检查只看剥离总数 >=2,某一个文件(尤其后加的 mom.js/stranger.js)
+# 哪怕 SITE-STRIP 标记打漏/打错/顺序颠倒导致它那处 0 命中,只要 companion.js+app.js
+# 两处还在,总和依旧 >=2,检查照样通过——公网站会静默夹带该文件的完整秘密。
+# 现在按文件逐个核:①每个文件"剥掉的块数"必须等于它源码里 BEGIN 标记数(标记没配对
+# 干净会在这里露出来);②已知必须携带秘密的文件(4 个 LLM 人格核 + app.js 调试钩子)
+# 逐一确认至少剥到一处,不再只看总和。残留风险:未来新增第 6 个人格文件若忘了加进
+# MUST_STRIP,这道门禁不会自动认得它——那时得记得把它加进下面这个列表。
 STRIP = re.compile(r'/\*\[SITE-STRIP-BEGIN\]\*/.*?/\*\[SITE-STRIP-END\]\*/', re.S)
-chunks, stripped = [], 0
+BEGIN_MARK = '/*[SITE-STRIP-BEGIN]*/'
+MUST_STRIP = ['js/companion.js', 'js/grader.js', 'js/mom.js', 'js/stranger.js', 'js/app.js']
+chunks, stripped, per_file = [], 0, {}
 for p in paths:
     src = read(p)
+    begin_count = src.count(BEGIN_MARK)
     src, n = STRIP.subn('', src)
     stripped += n
+    per_file[p] = n
+    if begin_count != n:
+        raise SystemExit('SITE-STRIP 标记在 %s 里没有配对干净:源码里 %d 处 BEGIN,实际只剥掉 %d 处' % (p, begin_count, n))
     chunks.append('/* ' + p + ' */\n' + src)
-if stripped < 2:
-    raise SystemExit('SITE-STRIP 标记只剥到 %d 处,应至少 2 处(companion.js 人格核 + app.js 调试钩子)' % stripped)
+for p in MUST_STRIP:
+    if p not in per_file:
+        raise SystemExit('SITE-STRIP 必剥文件 %s 不在 index.html 的 <script> 列表里,门禁失去意义' % p)
+    if per_file[p] < 1:
+        raise SystemExit('SITE-STRIP 必剥文件 %s 一处都没剥到' % p)
 
 os.makedirs('dist/site', exist_ok=True)
 tmp = 'dist/site/_bundle.js'

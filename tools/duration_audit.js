@@ -621,3 +621,26 @@ const out = {
 const outPath = path.join(__dirname, 'duration_audit_result.json');
 fs.writeFileSync(outPath, JSON.stringify(out, null, 2), 'utf8');
 console.log('\n结果已写入 ' + outPath + '\n');
+
+/* ================= 断言(D-108 自查:此前这个文件只算数、从不判定——
+   注释里说是为验证项2/M1出口条件服务,但 npm test 从不因内容膨胀而报警。
+   现在把 canon 里明确钉了数字、且能从现有 results 直接算出的两条floor钉上:
+   ①M2 v0.2「B≥12min(普通画像)」— 路径 D(剧本B)。
+   ②M2 v0.2「会话红线 ≥24min」— 路径 C(A局全内容线)+ D(剧本B)合计,普通画像。
+   残留缺口(诚实记账,不是这次顺手能补的):canon §10「首个结算行必须 ≤60 秒」
+   与 M2「B 局首结算 ≤45s、瓶卡 ≤90s」需要的是"到第一条结算行出现的真实耗时"这个
+   完全不同的指标——这个文件算的是"整条路径读完要多久"的启发式估算,不是逐步骤
+   真实计时回放,没法从现有 results 里安全推出这两条,留待专门加一层耗时埋点。 */
+let assertFail = 0;
+const assertGE = (label, actual, min) => {
+  if (actual < min){ assertFail++; console.log('X [断言] ' + label + ':实际 ' + actual.toFixed(2) + ' 分钟,应 ≥ ' + min); }
+  else console.log('OK [断言] ' + label + ':' + actual.toFixed(2) + ' 分钟 ≥ ' + min);
+};
+const pathD = results.find(r => r.id === 'D');
+if (!pathD){ assertFail++; console.log('X [断言] 找不到路径 D(剧本B),数值口径已变,门禁需要跟着更新'); }
+else {
+  assertGE('B 局(路径D)· 普通画像 ≥12min(M2 v0.2)', pathD.minutes['普通'].total, 12);
+  if (rc && rd) assertGE('会话 = C+D · 普通画像 ≥24min 红线(M2 v0.2)', rc.minutes['普通'].total + rd.minutes['普通'].total, 24);
+}
+console.log(assertFail ? ('\nFAILED: ' + assertFail + ' 条时长断言未过') : '\n时长断言全部通过');
+process.exit(assertFail ? 1 : 0);
