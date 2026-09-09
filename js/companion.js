@@ -174,6 +174,7 @@ const COMPANION = (() => {
   const MECH_ASK = /(几点|什么时候|时间|窗口|规则|违规|信号|平台|系统|协议|不能|禁止|封|监控|追踪|设备|之外|外面|外界|机子外|手机外)/;
   const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}|凌晨\s*\d|\d\s*点/;
   function lintOk(t, lastPlayerMsg){
+    if (CRISIS.test(t)) return false;                        // 输出侧危机 break-glass:命中即拦,绝不上屏(D-108)
     if (LINT.some(r => r.test(t))) return false;
     if (/[!！]/.test(t)) return false;                       // 语域:不用感叹号
     /* 拒答句只能整条独占,不许加料 */

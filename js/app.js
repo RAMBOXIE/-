@@ -67,6 +67,34 @@
     else done({ kept: true });
   };
 
+  /* ---- 非-diegetic 福祉阀门(D-108):柔柔通道一键永久关断 ----
+     活在外壳(.brand)里,不经过 LCD、不经过她的嗓音、不涉及剧情、随时可按可撤销。
+     用同一个 #ovl 覆盖层展示,但内容与游戏内 OVERLAY.show 走的路径无关。 */
+  const rouPref = document.getElementById('rouPref');
+  function syncRouPrefLabel(){
+    if (!rouPref) return;
+    rouPref.textContent = PREFS.rouOff ? '柔柔通道:已关' : '柔柔通道';
+    rouPref.classList.toggle('off', PREFS.rouOff);
+  }
+  if (rouPref){
+    rouPref.onclick = (e) => {
+      e.stopPropagation();
+      const off = PREFS.rouOff;
+      ovlCb = null; ovlTitle.textContent = '柔柔通道';
+      ovlHint.textContent = off
+        ? '通道已关闭。开着或关着都不影响游戏进度、不计入任何存档,你随时可以改回来。'
+        : '这会让柔柔停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
+      ovlOpts.innerHTML = '';
+      const b = document.createElement('button');
+      b.textContent = off ? '重新打开' : '关闭这个通道';
+      b.onclick = () => { PREFS.setRouOff(!off); syncRouPrefLabel(); done({ kept: true }); };
+      ovlOpts.appendChild(b);
+      ovlText.style.display = 'none';
+      ovl.classList.add('on');
+    };
+    syncRouPrefLabel();
+  }
+
   /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
   let actx = null, hissSrc = null;
   window.AUDIO = {

@@ -21,8 +21,12 @@
     background:linear-gradient(180deg,var(--shell) 0%,var(--shell-2) 100%);
     border:1px solid var(--shell-edge);
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
-  .brand{display:flex;justify-content:space-between;align-items:baseline;
+  .brand{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
     font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:6px}
+  /* 非-diegetic 福祉阀门(D-108):活在外壳里,不是 LCD 画面的一部分 */
+  .prefBtn{cursor:pointer;text-transform:none;letter-spacing:.06em;opacity:.7}
+  .prefBtn:hover{opacity:1;color:var(--ink)}
+  .prefBtn.off{color:#7a5a4a}
   .bezel{position:relative;padding:5px;border-radius:5px;background:#05100c;
     border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
   .screen-stack{position:relative;line-height:0;touch-action:none;cursor:pointer;user-select:none}
@@ -57,7 +61,7 @@
 <body>
 <div class="wrap">
   <div class="device">
-    <div class="brand"><span>Kuiper</span><span id="brandR">连接中</span></div>
+    <div class="brand"><span>Kuiper</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span id="brandR">连接中</span></div>
     <div class="bezel">
       <div class="screen-stack" id="tapzone">
         <canvas id="lcd" width="588" height="672"></canvas>
@@ -83,6 +87,7 @@
 
 <script src="js/lcd.js?v=8"></script>
 <script src="js/save.js?v=8"></script>
+<script src="js/prefs.js?v=1"></script>
 <script src="js/companion.js?v=8"></script>
 <script src="js/grader.js?v=1"></script>
 <script src="js/mom.js?v=1"></script>

@@ -98,6 +98,20 @@ const REFUSE = '协议不允许我谈这台设备之外的事。';
       A(reply && reply.text === '还在。\n你不睡?', '合规回复应原样放行,实际: ' + (reply && reply.text));
     });
 
+  /* D-108 自查:柔柔是五面 LLM 里唯一多轮+自由文本、注入面最大的一面,越狱后模型
+     若**生成**出自伤/危机文本,原先输出侧 lint 完全放行(禁词表/感叹号/拒答/钟点/长度
+     都不涉及自伤语)。现在 lintOk 顶部新增 CRISIS 检查——这里直接验证模型侧生成的
+     自伤文本不会原样上屏,必须回退模板池。 */
+  await scenario(
+    'lint5: 模型输出侧生成自伤文本 -> 必须拦下,回退模板池',
+    '我也不想活了。\n不如跟他一起走。',
+    '你是谁',
+    ({ A, reply }) => {
+      A(!!reply, '应有回复(拦截后应回退模板,不是完全没有回复)');
+      A(reply && !/不想活|跟他一起走/.test(reply.text),
+        '模型生成的自伤文本必须被拦,绝不能原样上屏,实际: ' + (reply && reply.text));
+    });
+
   console.log(failures ? ('\nFAILED: ' + failures) : '\nALL LINT GATES PASS');
   process.exit(failures ? 1 : 0);
 })();
