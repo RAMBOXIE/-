@@ -55,7 +55,7 @@
 
 <div class="wrap">
   <div class="device">
-    <div class="brand"><span>Kuiper</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span id="brandR">连接中</span></div>
+    <div class="brand"><span>Kuiper</span><span class="prefBtn" id="aiDisclosure" title="关于本作">AI 声明</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span id="brandR">连接中</span></div>
     <div class="bezel">
       <div class="screen-stack" id="tapzone">
         <canvas id="lcd" width="588" height="672"></canvas>
@@ -368,7 +368,7 @@ const SAVE = (() => {
    ============================================================================ */
 const PREFS = (() => {
   const KEY = 'escape_ai_prefs';
-  let state = { rouOff: false };
+  let state = { rouOff: false, seenDisclosure: false };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw){ const j = JSON.parse(raw); if (j && typeof j === 'object') state = Object.assign(state, j); }
@@ -376,7 +376,10 @@ const PREFS = (() => {
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(_){} }
   return {
     get rouOff(){ return !!state.rouOff; },
-    setRouOff(v){ state.rouOff = !!v; save(); }
+    setRouOff(v){ state.rouOff = !!v; save(); },
+    /* §9 合规红线:onboarding/设置页非-diegetic AI 声明,只需弹过一次(设置页里仍可随时重看)。 */
+    get seenDisclosure(){ return !!state.seenDisclosure; },
+    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); }
   };
 })();
 
@@ -4260,6 +4263,24 @@ const CONTENT = (() => {
     };
     syncRouPrefLabel();
   }
+
+  /* ---- 非-diegetic AI 声明(D-108:§9 合规红线,onboarding + 设置页) ----
+     角色为 AI 生成、玩家行为被统计建模、部分残留可能是对照样本——这条是法务要求的
+     跳出叙事的明文披露,不能靠游戏内"采样协议"那句 diegetic 台词替代。
+     首次打开自动弹一次;之后从外壳顶栏「AI 声明」随时可重看。 */
+  const DISCLOSURE_TEXT =
+    '这是一部互动小说。\n\n' +
+    '游戏内与你对话的角色(柔柔、采样官、妈、陌生号码等)由 AI 生成文本驱动。\n' +
+    '你在游戏内的选择与输入会被用于生成这些角色的回应与你本局的结算内容。\n' +
+    '部分你会遇到的"其他采样员"线索是预先编写的对照样本,不是真实他人。\n\n' +
+    '这条声明与游戏叙事无关,可随时在顶栏「AI 声明」重新查看。';
+  const aiDisclosure = document.getElementById('aiDisclosure');
+  function showDisclosure(){
+    window.OVERLAY.text({ title: 'AI 声明', hint: '与游戏叙事无关。', value: DISCLOSURE_TEXT });
+    PREFS.setSeenDisclosure(true);
+  }
+  if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
+  if (!PREFS.seenDisclosure) showDisclosure();
 
   /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
   let actx = null, hissSrc = null;

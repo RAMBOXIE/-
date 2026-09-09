@@ -95,6 +95,24 @@
     syncRouPrefLabel();
   }
 
+  /* ---- 非-diegetic AI 声明(D-108:§9 合规红线,onboarding + 设置页) ----
+     角色为 AI 生成、玩家行为被统计建模、部分残留可能是对照样本——这条是法务要求的
+     跳出叙事的明文披露,不能靠游戏内"采样协议"那句 diegetic 台词替代。
+     首次打开自动弹一次;之后从外壳顶栏「AI 声明」随时可重看。 */
+  const DISCLOSURE_TEXT =
+    '这是一部互动小说。\n\n' +
+    '游戏内与你对话的角色(柔柔、采样官、妈、陌生号码等)由 AI 生成文本驱动。\n' +
+    '你在游戏内的选择与输入会被用于生成这些角色的回应与你本局的结算内容。\n' +
+    '部分你会遇到的"其他采样员"线索是预先编写的对照样本,不是真实他人。\n\n' +
+    '这条声明与游戏叙事无关,可随时在顶栏「AI 声明」重新查看。';
+  const aiDisclosure = document.getElementById('aiDisclosure');
+  function showDisclosure(){
+    window.OVERLAY.text({ title: 'AI 声明', hint: '与游戏叙事无关。', value: DISCLOSURE_TEXT });
+    PREFS.setSeenDisclosure(true);
+  }
+  if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
+  if (!PREFS.seenDisclosure) showDisclosure();
+
   /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
   let actx = null, hissSrc = null;
   window.AUDIO = {

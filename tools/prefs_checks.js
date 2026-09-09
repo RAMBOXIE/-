@@ -63,6 +63,19 @@ scenario('PREFS · 默认关闭(rouOff=false)', ({A}) => {
   A(P.rouOff === false, '默认应未关闭,实际 ' + P.rouOff);
 });
 
+/* ---- §9 合规:AI 声明只需弹一次,状态持久且独立于游戏存档 ---- */
+scenario('PREFS · seenDisclosure 默认 false,setSeenDisclosure 持久化', ({A}) => {
+  const storage = makeStorage();
+  const P1 = bootPrefsOnly(storage);
+  A(P1.seenDisclosure === false, '首次应未看过,实际 ' + P1.seenDisclosure);
+  P1.setSeenDisclosure(true);
+  const P2 = bootPrefsOnly(storage);
+  A(P2.seenDisclosure === true, '看过后重新加载应仍记得,实际 ' + P2.seenDisclosure);
+  storage.removeItem('escape_ai_save');
+  const P3 = bootPrefsOnly(storage);
+  A(P3.seenDisclosure === true, '清游戏存档不应影响这条偏好,实际 ' + P3.seenDisclosure);
+});
+
 scenario('PREFS · setRouOff 持久化到独立 localStorage key', ({A}) => {
   const storage = makeStorage();
   const P1 = bootPrefsOnly(storage);

@@ -14,7 +14,7 @@
    ============================================================================ */
 const PREFS = (() => {
   const KEY = 'escape_ai_prefs';
-  let state = { rouOff: false };
+  let state = { rouOff: false, seenDisclosure: false };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw){ const j = JSON.parse(raw); if (j && typeof j === 'object') state = Object.assign(state, j); }
@@ -22,6 +22,9 @@ const PREFS = (() => {
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(_){} }
   return {
     get rouOff(){ return !!state.rouOff; },
-    setRouOff(v){ state.rouOff = !!v; save(); }
+    setRouOff(v){ state.rouOff = !!v; save(); },
+    /* §9 合规红线:onboarding/设置页非-diegetic AI 声明,只需弹过一次(设置页里仍可随时重看)。 */
+    get seenDisclosure(){ return !!state.seenDisclosure; },
+    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); }
   };
 })();
