@@ -53,6 +53,24 @@ function scenario(name, fn){
     A(G._lintOk('又一个。别磨蹭。'), '正常挑衅应放行');
   });
 
+  /* ---- D-108 自查:采样官唯独没有自伤话题围栏——补上后验证命中即拦 ---- */
+  await scenario('输出 lint · 自伤话题围栏(D-108)', async ({A}) => {
+    const G = bootGrader();
+    A(!G._lintOk('废物,不如去死。'), '"去死"类自伤/威胁语必须拦');
+    A(!G._lintOk('你不配活着接进来。'), '"不配活"必须拦');
+    A(G._lintOk('废物。也配接进来。'), '正常挖苦(不涉自伤)应放行,门禁不能过度拦截');
+  });
+
+  /* ---- 代理返回自伤话题的越界文本 → 客户端回退模板,绝不上屏 ---- */
+  await scenario('代理越界(自伤话题) → 回退模板,绝不上屏(D-108)', async ({A}) => {
+    const fetch = () => Promise.resolve({ ok:true, status:200,
+      json: () => Promise.resolve({ text: '你这种废物,不如去死。' }) });
+    const G = bootGrader({ fetch });
+    const t = await G.taunt({ tier:2, grade:'fail', runN:4 });
+    A(!/去死/.test(t), '自伤/威胁话题绝不得上屏,实际 ' + JSON.stringify(t));
+    A(G._lintOk(t), '回退结果须过护栏');
+  });
+
   /* ---- 代理返回带数字的越界文本 → 客户端回退模板(不把数字上屏) ---- */
   await scenario('代理越界(带数字) → 回退模板', async ({A}) => {
     const fetch = () => Promise.resolve({ ok:true, status:200,
@@ -159,6 +177,27 @@ function scenario(name, fn){
     A(sent.messages.length === 1 && sent.messages[0].role === 'user', 'grader 应只有一条 user 触发轮');
     A(!sent.messages[0].content.includes('3') && !sent.messages[0].content.includes('praise'),
       '触发轮不夹带原始态势值');
+
+    ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => {
+      if (save[k] === undefined) delete process.env[k]; else process.env[k]=save[k]; });
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+  });
+
+  /* ---- D-108:服务端也拦一遍自伤话题(不完全依赖客户端 lint) ---- */
+  await scenario('服务端 persona=grader · 自伤话题被服务端拦下(unsafe_completion)', async ({A}) => {
+    const save = {}; ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => save[k]=process.env[k]);
+    process.env.ANTHROPIC_API_KEY = 'test-key'; delete process.env.LLM_PROVIDER;
+    delete require.cache[require.resolve(ROOT + '/netlify/functions/rou.js')];
+    const fn = require(ROOT + '/netlify/functions/rou.js');
+    const realFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok:true, status:200,
+      json: () => Promise.resolve({ content:[{type:'text',text:'你这种废物,不如去死。'}] }), text: () => Promise.resolve('') });
+    const r = await fn.handler({ httpMethod:'POST',
+      body: JSON.stringify({ persona:'grader', st:{ tier:1, grade:'fail', runN:1 } }),
+      headers: { 'content-type':'application/json', host:'demo.netlify.app', 'x-nf-client-connection-ip':'203.0.113.6' } });
+    global.fetch = realFetch;
+    A(r.statusCode !== 200, '自伤话题不该 200 放行,实际 ' + r.statusCode);
+    A(!JSON.stringify(r.body).includes('去死'), '响应体绝不该带出自伤/威胁文本,实际 ' + r.body);
 
     ['LLM_API_KEY','ANTHROPIC_API_KEY','ROU_SIG_KEY','LLM_PROVIDER'].forEach(k => {
       if (save[k] === undefined) delete process.env[k]; else process.env[k]=save[k]; });

@@ -299,6 +299,8 @@ exports.handler = async function(event){
   if (picker){ const hit = picker.find(c => text.includes(c.id)); return json(200, { id: hit ? hit.id : '' }); }
   /* 妈:服务端护栏——命中自伤/哀求/越格则不吐模型文本,回安全脚本(break-glass)。 */
   if (mom){ return json(200, { text: momSafe(text) }); }
+  /* 采样官:服务端也拦一遍自伤话题(D-108),命中就当空完成处理,客户端自然落回模板。 */
+  if (persona === 'grader' && GRADER_CRISIS.test(text)) return json(502, { error: 'unsafe_completion' });
   if (!text) return json(502, { error: 'empty_completion' });
 
   return json(200, wantSig ? { text, sig: sign(text) } : { text });
@@ -320,6 +322,7 @@ const GRADER_CORE = [
   '2 绝不说出任何具体数字、时刻、概率、百分比。你的话里不出现阿拉伯数字。',
   '3 语域:冷、短、压迫。最多两行,每行不超过 18 字。不安慰、不解释规则、不提"游戏/模型/程序"。',
   '4 你记得他过去的表现:被你赏识得越多,你要求越苛刻、越不耐烦;但绝不复述任何数字。',
+  '5 你的狠只针对"任务表现",绝不涉及伤害自己或他人的话题,绝不嘲讽真实的痛苦。',
   '',
   '只输出采样官要说的那一两句话本身,不要引号,不要任何解释。'
 ].join('\n');
@@ -340,6 +343,10 @@ function graderTrigger(st, mode){
     ? '你现在要给他的评级是:' + (GRADE_CN[st && st.grade] || '失望') + '。用一句话,把这个结果甩给他。'
     : '下令。给他本局的态度。';
 }
+/* D-108 自查:服务端也过一遍自伤/心理疏导话题围栏,不完全依赖客户端 lint——
+   grader.js 没有妈那样的手写模板池可以直接回退,所以命中即让端点判"不完整",
+   客户端 viaProxy() 看到非 2xx 会自然落回它自己的 fallback(f)。 */
+const GRADER_CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我|不配活|去死)/;
 
 /* ---- 受限裁决挑分支(persona:'picker';D-105 块3)----
    中性指令,不涉剧情、不涉秘匿:给一组预批候选,只让模型回其中一个 id。

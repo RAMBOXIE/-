@@ -34,6 +34,7 @@ const GRADER = (() => {
     '2 绝不说出任何具体数字、时刻、概率、百分比。你的话里不出现阿拉伯数字。',
     '3 语域:冷、短、压迫。最多两行,每行不超过 18 字。不安慰、不解释规则、不提"游戏/模型/程序"。',
     '4 你记得他过去的表现:被你赏识得越多,你要求越苛刻、越不耐烦;但绝不复述任何数字。',
+    '5 你的狠只针对"任务表现",绝不涉及伤害自己或他人的话题,绝不嘲讽真实的痛苦。',
     '',
     '只输出采样官要说的那一两句话本身,不要引号,不要任何解释。'
   ].join('\n');
@@ -98,10 +99,15 @@ const GRADER = (() => {
   function fallback(f){ return rand(TAUNT[Math.max(0, Math.min(3, f.tier | 0))]); }
   function fbVerdict(f){ return rand(VERDICT[f.grade] || VERDICT.fail); }
 
-  /* 输出 lint:采样官的话里绝不该有数字/长句/平台词 */
+  /* 输出 lint:采样官的话里绝不该有数字/长句/平台词/自伤话题。
+     D-108 自查:采样官被设定成"挑衅施压"的人格,唯独没有自伤/心理疏导话题围栏——
+     它没有玩家输入(单向),但被要求的语气本身(苛刻/不耐烦/居高临下)有把"你不配
+     存在"这类压迫语说出口的风险,和 mom.js 的 CRISIS 检查同一道防线,拦住即回退模板。 */
   const BAD = /(游戏|玩家|模型|程序|AI|人工智能|assistant)/i;
+  const CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我|不配活|去死)/;
   function lintOk(t){
     if (!t) return false;
+    if (CRISIS.test(t)) return false;                  // 自伤/心理疏导话题围栏,命中即拦
     if (/[0-9]/.test(t)) return false;                 // 任何阿拉伯数字都可能是秘匿真值
     if (BAD.test(t)) return false;
     const lines = t.split('\n');
