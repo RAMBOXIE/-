@@ -2621,9 +2621,13 @@ const CONTENT = (() => {
         const EV_NAMES = { E1: '秒回避实', E2: '最后的照片', E3: '停摆的账单', E4: '第2417条', E5: '语音备忘' };
         const evList = Object.keys(EV_NAMES)
           .map(id => (S.evidence[id] ? '■' : '□') + EV_NAMES[id]).join(' ');
+        /* D-108 自查:此前 A 局这里印"可解析度: 首次建档"/"世界回声: 已计入 Stage 1"——
+           M1 v0.4 文档头自己把这两个数值列为"无背书,v0.4 删去"(可解析度主刻度纸面无从
+           计算、Stage 是全服级世界层状态,单机教学局没有任何系统在维护它)。账本永真
+           (宪法14①)= 系统绝不编造它没有的数据,这里只印引擎真的算出来的东西。 */
         let t = isB
           ? '样本评级: ' + (S.beats.truthDone ? 'S' : 'B') + '\n案卷保留: 证据 ' + ev + '/5\n' + evList + '\n(死亡不清零认知。)'
-          : '样本评级: C·教学基线\n可解析度: 首次建档\n世界回声: 本次死亡已计入 Stage 1。\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n' + evList + '\n(死亡不清零认知。)';
+          : '样本评级: C·教学基线\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n' + evList + '\n(死亡不清零认知。)';
         if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
         if (isB && S.vault) t += '\n保险箱: ' + S.vault.name;
         if (isB && S.disposal && DISPOSAL_ECHO[S.disposal])
