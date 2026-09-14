@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-14T03:29:55.898Z",
+  "generatedAt": "2026-09-14T04:05:06.980Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -326,8 +326,8 @@
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2520,
-      "decisionCount": 16,
+      "readChars": 2606,
+      "decisionCount": 17,
       "decisions": [
         "漂流瓶:取走",
         "漂流瓶:致谢",
@@ -335,6 +335,7 @@
         "D1 饵:标记可信与否",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
+        "归因采集:他为什么写错(14③)",
         "已删除:进入",
         "理由(进已删除)",
         "旧机:读取写入",
@@ -365,7 +366,15 @@
         },
         {
           "screen": "menu",
-          "chars": 166
+          "chars": 176
+        },
+        {
+          "screen": "inbox",
+          "chars": 146
+        },
+        {
+          "screen": "bottleIn",
+          "chars": 144
         },
         {
           "screen": "e5voice",
@@ -380,14 +389,6 @@
           "chars": 130
         },
         {
-          "screen": "inbox",
-          "chars": 119
-        },
-        {
-          "screen": "bottleIn",
-          "chars": 109
-        },
-        {
           "screen": "deleted",
           "chars": 109
         },
@@ -398,22 +399,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.04,
-          "decision": 0.8,
+          "read": 5.21,
+          "decision": 0.85,
           "wait": 0.5,
-          "total": 6.34
+          "total": 6.57
         },
         "普通": {
-          "read": 9,
-          "decision": 1.6,
+          "read": 9.31,
+          "decision": 1.7,
           "wait": 0.5,
-          "total": 11.1
+          "total": 11.51
         },
         "沉浸": {
-          "read": 18.2,
-          "decision": 3.2,
+          "read": 18.82,
+          "decision": 3.4,
           "wait": 0.5,
-          "total": 21.9
+          "total": 22.72
         }
       }
     },

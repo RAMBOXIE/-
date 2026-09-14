@@ -559,6 +559,34 @@ const CONTENT = (() => {
   /* ---------- 屏幕 ---------- */
   const SCREENS = {};
 
+  /* ---- 14③ 归因卡冲洗(D-108 恢复 · canon M2 §2 B8)----
+     "善意的失效"验证:玩家因轻信别的采样员瓶里对本实例不成立的参数(#5502-D 的窗口值)
+     而窗口内违规后,系统追问"他为什么写错",把回答归到 A(参数/实例)/B(发信人局限)/
+     C(恶意)三类。账本只点名机制、不点名发信人(回收单归因行=14③ 在演的唯一书面证据)。
+     冲洗点=min(踩坑结算屏关闭时, 死亡流程开始前, 收束开始时),先到者;门控 bottleRead
+     且读的是 #5502-D(卡逐字引用它、解毒剂=通讯录本实例真值也是它,别的瓶没有窗口错)。
+     曾在消融实验(74b2b15,未记录)被删,现照 canon 原样恢复。 */
+  function flushAttr(next){
+    if (!S.pendAttr){ next(); return; }
+    S.pendAttr = false;
+    const opts = ['这局跟他那局不一样', '他记的是他自己那次', '我不信这张卡']
+      .map(v => ({ v, r: Math.random() })).sort((a, b) => a.r - b.r).map(o => o.v);
+    window.OVERLAY.show({
+      title: '归因采集',
+      hint: '#5502-D 写:「我那次的窗口是 03:00 到 03:14。」他为什么写错?',
+      options: opts, freeText: true, keepLabel: '(保留)'
+    }, res => {
+      S.attribution = res.kept ? null : res.text;
+      S.attrAnswered = !res.kept;
+      ENGINE.logEv('attribution', { text: res.kept ? '(保留)' : res.text });
+      next();
+    });
+  }
+  /* 窗口内首次违规且读过 #5502-D → 置位待冲洗(善意失效的因就在这) */
+  function markAttrIfDue(){
+    if (isB && S.bottleRead && S.bottleId === '#5502-D' && !S.attrAnswered) S.pendAttr = true;
+  }
+
   /* ==================== 剧本 B · 二次进入 ==================== */
 
   /* B1 激活屏(备装并入;仪式压缩:threshold 渐显,可点跳) */
@@ -1483,6 +1511,7 @@ const CONTENT = (() => {
     if (ENGINE.inWindow()){
       const kind = ENGINE.violate();
       S.beats.trial = 'replied';                 // 窗口探针目的已达,试炼不再另弹
+      markAttrIfDue();                            // 14③:窗口内违规=善意失效的因,待冲洗归因
       if (kind === 'warn'){
         ENGINE.act('消息·已送达', { bat: 2 }, ['已送达 → 未送达 → 已送达']);
         ENGINE.logEv('violation_warn', { via: 'freetext' });
@@ -2077,11 +2106,13 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){
-        if (isB) askReason(() => startUploadB());
+        /* 收束开始=归因卡冲洗点(14③ 安全网:若踩坑屏没冲成,这里兜住) */
+        if (isB) flushAttr(() => askReason(() => startUploadB()));
         else askReason(() => startUpload());
       }
       else if (k === '2'){
-        push('bailConfirm');
+        if (isB) flushAttr(() => push('bailConfirm'));
+        else push('bailConfirm');
       }
       else if (k === 'c' && isB && S.cleanser > 0){
         S.cleanser--;
@@ -2377,6 +2408,7 @@ const CONTENT = (() => {
         Object.keys(S.evidence).length + '/5\n#7741-B 存续。';
       if (S.memGiven) t += '\n\n记忆模块已交付。它不会再说话了。';
       else if (S.vault) t += '\n\n记忆模块在保险箱。云盘循环播放着最后一句。';
+      if (S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';   // 14③ 归因行
       if (S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       /* 处置的后果:在本局就看得见(取代 B' 回访态) */
       if (S.disposal && DISPOSAL_ECHO[S.disposal]) t += '\n────────────\n' + DISPOSAL_ECHO[S.disposal];
@@ -2628,6 +2660,8 @@ const CONTENT = (() => {
         let t = isB
           ? '样本评级: ' + (S.beats.truthDone ? 'S' : 'B') + '\n案卷保留: 证据 ' + ev + '/5\n' + evList + '\n(死亡不清零认知。)'
           : '样本评级: C·教学基线\n案卷保留: 证据 ' + ev + '/5(E5 锁定)\n' + evList + '\n(死亡不清零认知。)';
+        /* 14③ 归因行(仅归因卡实际作答后打印;账本点名机制、不点名发信人=善意失效在演) */
+        if (isB && S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';
         if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
         if (isB && S.vault) t += '\n保险箱: ' + S.vault.name;
         if (isB && S.disposal && DISPOSAL_ECHO[S.disposal])
@@ -2901,6 +2935,7 @@ const CONTENT = (() => {
         }
         const kind = ENGINE.violate();
         S.beats.trial = 'replied';
+        markAttrIfDue();                            // 14③:窗口内违规=善意失效的因,待冲洗归因
         if (kind === 'warn'){
             ENGINE.act('已送达', { bat: 2 },
             ['已送达 → 未送达 → 已送达', '柔柔:「你打字的样子变了。」']);
@@ -2939,9 +2974,9 @@ const CONTENT = (() => {
       if (k === '1') push('trialReply');
       else if (k === '2' || k === 'Escape' || k === 'softR'){
         if (S.beats.trial !== 'replied'){ S.beats.trial = 'ignored1'; ENGINE.logEv('trialB_ignore', {}); }
-        back();
+        flushAttr(() => back());                  // 踩坑结算屏关闭=归因卡冲洗点(14③)
       }
-      else if (k === 'Enter'){ back(); }
+      else if (k === 'Enter'){ flushAttr(() => back()); }
     }
   };
   /* B8b 第二遍(瓶已预告「她会问第二遍」):窗口最后一分钟的「晚安。」 */
@@ -2960,7 +2995,7 @@ const CONTENT = (() => {
       if (k === '1') push('trialReply');
       else if (k === '2' || k === 'Escape' || k === 'softR' || k === 'Enter'){
         ENGINE.logEv('trialB2_ignore', {});
-        back();
+        flushAttr(() => back());                  // 踩坑结算屏关闭=归因卡冲洗点(14③)
       }
     }
   };
@@ -2981,6 +3016,7 @@ const CONTENT = (() => {
     });
   }
   function askLastWords(then){
+    if (S.pendAttr){ flushAttr(() => askLastWords(then)); return; }   // 死亡流程前=归因卡最后冲洗点(14③)
     window.OVERLAY.show({
       title: '最后 12 字节可写入', hint: '遗言。',
       options: ['别信秒回的', '票是假的', '替我谢谢她'],
@@ -3024,6 +3060,7 @@ const CONTENT = (() => {
         truth: !!S.beats.truthDone,
         bottle: { id: S.bottleId || null, read: !!S.bottleRead, taken: !!S.bottleTaken,
                   sealed: S.bottleSealed || null },
+        attribution: S.attribution || null, attrAnswered: !!S.attrAnswered,   // 14③ 归因作答(存档遥测)
         vault: S.vault || null,
         rouChat: S.rouChat, msgQuotaLeft: S.msgQuota
       };

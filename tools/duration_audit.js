@@ -383,6 +383,7 @@ const PATHS = [
       lastCacheVal: 2270, lastReason: '我想看看那扇门后面有什么', lastReasonKept: false,
       lastWords: '别信秒回的', violationsA: 1,
       bottleRead: false, bottleTaken: false, bottleReply: null, bottleSealed: null,
+      seenBottles: ['#3120-K', '#1177-B'],         // 只剩 #5502-D 未读 → 本局读它,踩坑后归因卡成立
       attribution: null, vault: null, residueClaimed: false, disposal: null,
       memGiven: false, predsA: [], predsB: []
     },
@@ -392,6 +393,7 @@ const PATHS = [
       '采样协议:回/不回',
       'D1 饵:标记可信与否',
       '试炼:回复 vs 关闭', '试炼回复:选哪句',
+      '归因采集:他为什么写错(14③)',
       '已删除:进入', '理由(进已删除)',
       '旧机:读取写入', '旧机:回收方式',
       '处置:三选', '处置理由',
