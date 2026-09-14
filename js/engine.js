@@ -24,6 +24,7 @@ const ENGINE = (() => {
     predictions: [],          // {target, hit}
     pendingPrediction: null,
     calib: [],                // {tension, control}(反应校准两问;canon M1 格8 验证项1/3 采集点)
+    crisisSilenced: false,    // 自伤 break-glass:触发后本次接入柔柔通道静默(canon §9/M28 危机协议)
     pendAttr: false, attribution: null, attrAnswered: false,   // 14③ 归因卡(B8;canon M2 §2)
     reasons: [], lastWords: null, disposal: null,
     deletedVisited: false,

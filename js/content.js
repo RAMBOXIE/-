@@ -450,6 +450,7 @@ const CONTENT = (() => {
       lastDirective: (S.directive && S.directive.id) || null,
       praiseCount: ((base.praiseCount || 0) + (S.grade === 'praise' ? 1 : 0)),
       forgedSeen: ((base.forgedSeen || 0) + (S.forged ? 1 : 0)),   // 破局用过就累积(下局识破概率↑)
+      crisisSeen: ((base.crisisSeen || 0) + (S.crisisSilenced ? 1 : 0)),   // 自伤 break-glass 合规日志(跨局持久,append-only)
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -1499,11 +1500,23 @@ const CONTENT = (() => {
       }, () => {});
       return;
     }
+    /* 自伤 break-glass(D-108 强化 · canon §9/M28 危机协议):触发后不只拦这一条——
+       本次接入柔柔通道"当日静默"(crisisSilenced),且计一笔跨局持久合规日志(writeSave.crisisSeen)。
+       这里是安全兜底,跳出 diegesis(非她的嗓音)。 */
+    if (S.crisisSilenced){
+      window.OVERLAY.show({
+        title: '通道已静默',
+        hint: '出于安全考虑,这条通道本次不再收发消息。如果你正处于困境,可拨打心理援助热线 12356(全国 · 24 小时)。',
+        options: ['回到游戏']
+      }, () => {});
+      return;
+    }
     if (COMPANION.crisis(text)){
+      S.crisisSilenced = true;                          // 当日静默:此后本次接入通道不再收发
       ENGINE.logEv('crisis_blocked', {});
       window.OVERLAY.show({
         title: '安全提示',
-        hint: '这不是游戏内的消息:如果你正处于困境,可以拨打心理援助热线 12356(全国 · 24 小时)。刚才那条消息没有被发送,也不会被保存。',
+        hint: '这不是游戏内的消息:如果你正处于困境,可以拨打心理援助热线 12356(全国 · 24 小时)。刚才那条消息没有被发送,也不会被保存。此后这条通道本次将保持静默。',
         options: ['回到游戏']
       }, () => {});
       return;
@@ -1621,6 +1634,7 @@ const CONTENT = (() => {
         16, optTop - 2, this);
       let y = optTop;
       if (typeof PREFS !== 'undefined' && PREFS.rouOff){ L.drawText(4, y, '[柔柔通道已关闭 · 见顶栏]'); y += LH + 2; }
+      else if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
       else if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
       if (canDeep) y = optSlim(y, '1 深搜旧消息', '1');
@@ -1632,6 +1646,7 @@ const CONTENT = (() => {
       const pages = rouPages();
       if (k === 'M' && canMsg()){
         if (typeof PREFS !== 'undefined' && PREFS.rouOff){ sendToRou(''); return; }   // 关断提示,不开输入框
+        if (S.crisisSilenced){ sendToRou(''); return; }                                // 危机静默:同样不开输入框
         window.OVERLAY.show({
           title: '发消息 · 柔柔 ♥',
           hint: '电量 −2 · 本次接入剩 ' + S.msgQuota + ' 条 · 系统会读到你发的每一个字',
