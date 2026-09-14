@@ -23,6 +23,7 @@ const ENGINE = (() => {
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
+    calib: [],                // {tension, control}(反应校准两问;canon M1 格8 验证项1/3 采集点)
     reasons: [], lastWords: null, disposal: null,
     deletedVisited: false,
     dead: false, alive: false, exhausted: false, powerOut: false, causeOfDeath: '',

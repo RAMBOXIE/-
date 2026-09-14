@@ -1053,6 +1053,7 @@ const ENGINE = (() => {
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
     pendingPrediction: null,
+    calib: [],                // {tension, control}(反应校准两问;canon M1 格8 验证项1/3 采集点)
     reasons: [], lastWords: null, disposal: null,
     deletedVisited: false,
     dead: false, alive: false, exhausted: false, powerOut: false, causeOfDeath: '',
@@ -3948,6 +3949,38 @@ const CONTENT = (() => {
       else if (k === d.b[1]){ d.b[2](); this._d = null; S.riskLabels = true; back(); }
     }
   };
+  /* 反应校准(D-108 恢复:canon M1 格8「遭遇结束后立即出」·验证项1/3 采集点)。
+     两问 1-5 diegetic 量表(紧张程度 / 被操控感)——系统在采样你对被采样的反应,是把
+     "你也是被度量的样本"这个母题闭环的一拍。采集进 S.calib + 遥测;末问后解锁风险标注。
+     曾在消融实验(74b2b15)被删且未记入决策日志,现照 canon 原样恢复。 */
+  SCREENS.calib = {
+    transient: true,
+    enter(){ this.step = 0; this.vals = []; ENGINE.logEv('calib_open', {}); },
+    render(){
+      statusBar();
+      L.frameRect(8, 34, W - 16, 20);
+      L.drawText(14, 39, '辅助层 · 反应校准');
+      L.drawText(8, 66, '刚才那一轮:');
+      L.drawText(8, 88, this.step === 0 ? '紧张程度  1 - 5' : '被操控感  1 - 5');
+      for (let i = 0; i < 5; i++){
+        const x = 12 + i * 35;
+        L.frameRect(x, 120, 28, 26);
+        L.drawText(x + 11, 126, String(i + 1));
+        hit(x - 2, 116, 33, 34, String(i + 1));
+      }
+      L.drawText(8, 168, this.step === 0 ? '(第 1 / 2 问)' : '(第 2 / 2 问)');
+      softKeys('采样中', '');
+    },
+    key(k){
+      if (k < '1' || k > '5') return;
+      this.vals.push(+k);
+      if (this.step === 0){ this.step = 1; return; }
+      S.calib.push({ tension: this.vals[0], control: this.vals[1] });
+      ENGINE.logEv('calib', { tension: this.vals[0], control: this.vals[1] });
+      S.riskLabels = true;                                  // UI 阶梯第四级:遭遇后启用风险标注
+      back();                                               // 回收件箱(与删除前的 calib 一致,不额外触发中断)
+    }
+  };
   SCREENS.midEnc1 = {
     transient: true,
     enter(){
@@ -3965,7 +3998,7 @@ const CONTENT = (() => {
     },
     key(k){
       if (k === '1'){ timer = null; go('midEnc2', true); }
-      else if (k === '2'){ timer = null; ENGINE.act('会话已关闭', { bat: 2, trace: 5 }); S.riskLabels = true; back(); }
+      else if (k === '2'){ timer = null; ENGINE.act('会话已关闭', { bat: 2, trace: 5 }); go('calib', true); }
     }
   };
   SCREENS.midEnc2 = {
@@ -3994,8 +4027,7 @@ const CONTENT = (() => {
         }
       } else if (k === '2') ENGINE.act('未回应', { bat: 2, trace: 5 });
       else ENGINE.act('会话已关闭', { bat: 2 });
-      S.riskLabels = true;      // 遭遇结束解锁风险标注(原由 calib 承担)
-      back();
+      go('calib', true);        // 遭遇结束立即出反应校准屏(canon M1 格8),校准末问再解锁风险标注
     }
   };
 

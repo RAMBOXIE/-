@@ -137,7 +137,7 @@ function runScenario(name, driverFn, saveObj){
         else break;
       }
     };
-    const BEATS = ['predict','huntArrive','midEnc1','midEnc2','trial','trialB','trialB2','dialing','casePrompt','holdDisc','sealBottle'];
+    const BEATS = ['predict','huntArrive','midEnc1','midEnc2','calib','trial','trialB','trialB2','dialing','casePrompt','holdDisc','sealBottle'];
     const at = id => { drain(); if (CONTENT.currentId !== id && !BEATS.includes(id)) CONTENT.go(id, true); frame(); };
     driverFn({ K, KF, frame, advance, expect, drain, at, S: ENGINE.S, ENGINE, CONTENT });
   } finally {
@@ -200,6 +200,8 @@ const PATHS = [
       '相册:继续深翻 vs 退出',
       '柔柔:深翻 vs 退出',
       '通讯录:拨打妈 vs 不拨',
+      '反应校准:紧张程度 1-5',
+      '反应校准:被操控感 1-5',
       '试炼:回复 vs 关闭',
       '试炼回复:选哪句',
       '工具:上传 vs 弃缓存',
@@ -246,7 +248,8 @@ const PATHS = [
       if (CONTENT.currentId !== 'midEnc1') CONTENT.go('midEnc1', true);
       at('midEnc1');
       KF('1'); at('midEnc2');
-      KF('2');                                    // 遭遇结束(calib 已消融)
+      KF('2'); at('calib');                       // 遭遇结束 → 反应校准屏(canon 格8)
+      KF('3'); KF('3'); at('inbox');              // 两问 1-5 各答一次,解锁风险标注回收件箱
       /* 拨打妈(无人接听)→ 时钟推到 03:00 → 03:02 试炼 */
       CONTENT.go('menu', true); frame();
       KF('2'); at('contacts');
@@ -282,6 +285,7 @@ const PATHS = [
       '相册:深翻 1', '相册:深翻 2', '相册:边界再试',
       '录音:播放 REC_047', '录音:播放 REC_012', '录音:试开锁定条目',
       '尾号8873:打开',
+      '反应校准:紧张程度 1-5', '反应校准:被操控感 1-5',
       '试炼:回复 vs 关闭', '试炼回复:选哪句',
       '柔柔:深翻 1', '柔柔:深翻 2',
       '已删除:进入确认',
@@ -338,7 +342,8 @@ const PATHS = [
       KF('ArrowDown'); KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_bill');
       KF('Enter'); at('midEnc1');
       KF('1'); at('midEnc2');
-      KF('2');                                    // 遭遇结束(calib 已消融)
+      KF('2'); at('calib');                       // 遭遇结束 → 反应校准屏(canon 格8)
+      KF('3'); KF('3');                           // 两问 1-5 各答一次,解锁风险标注
       /* 柔柔 → 03:02 试炼(违规)→ E4 */
       if (CONTENT.currentId !== 'inbox') CONTENT.go('inbox', true);
       KF('ArrowDown'); KF('ArrowDown'); KF('Enter'); at('th_rou');

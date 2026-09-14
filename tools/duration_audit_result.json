@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-09T10:34:31.926Z",
+  "generatedAt": "2026-09-14T03:29:55.898Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -130,14 +130,16 @@
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2085,
-      "decisionCount": 11,
+      "readChars": 2121,
+      "decisionCount": 13,
       "decisions": [
         "采样协议:回「收到」/不回",
         "案卷:记入 vs 只是巧合",
         "相册:继续深翻 vs 退出",
         "柔柔:深翻 vs 退出",
         "通讯录:拨打妈 vs 不拨",
+        "反应校准:紧张程度 1-5",
+        "反应校准:被操控感 1-5",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
         "工具:上传 vs 弃缓存",
@@ -172,7 +174,7 @@
         },
         {
           "screen": "th_rou",
-          "chars": 138
+          "chars": 137
         },
         {
           "screen": "memo2",
@@ -197,30 +199,30 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.17,
-          "decision": 0.55,
+          "read": 4.24,
+          "decision": 0.65,
           "wait": 0.74,
-          "total": 5.46
+          "total": 5.63
         },
         "普通": {
-          "read": 7.45,
-          "decision": 1.1,
+          "read": 7.58,
+          "decision": 1.3,
           "wait": 0.74,
-          "total": 9.28
+          "total": 9.61
         },
         "沉浸": {
-          "read": 15.06,
-          "decision": 2.2,
+          "read": 15.32,
+          "decision": 2.6,
           "wait": 0.74,
-          "total": 18
+          "total": 18.66
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2683,
-      "decisionCount": 22,
+      "readChars": 2674,
+      "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
         "案卷:记入 vs 只是巧合",
@@ -235,6 +237,8 @@
         "录音:播放 REC_012",
         "录音:试开锁定条目",
         "尾号8873:打开",
+        "反应校准:紧张程度 1-5",
+        "反应校准:被操控感 1-5",
         "试炼:回复 vs 关闭",
         "试炼回复:选哪句",
         "柔柔:深翻 1",
@@ -300,22 +304,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.37,
-          "decision": 1.1,
+          "read": 5.35,
+          "decision": 1.2,
           "wait": 1.07,
-          "total": 7.54
+          "total": 7.62
         },
         "普通": {
-          "read": 9.58,
-          "decision": 2.2,
+          "read": 9.55,
+          "decision": 2.4,
           "wait": 1.07,
-          "total": 12.85
+          "total": 13.02
         },
         "沉浸": {
-          "read": 19.38,
-          "decision": 4.4,
+          "read": 19.31,
+          "decision": 4.8,
           "wait": 1.07,
-          "total": 24.85
+          "total": 25.18
         }
       }
     },
