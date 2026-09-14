@@ -231,6 +231,8 @@
   });
 
   /* ---- 循环 ---- */
+  /* 常驻锚点三件套(§1 宪法13):Kuiper(运营商) · 实例编号 · 接入状态。实例编号本局不变,设一次。 */
+  try { document.getElementById('brandInst').textContent = CONTENT.instanceId || ''; } catch(_){}
   setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
   function loop(){
     CONTENT.tickTimer();

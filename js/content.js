@@ -17,6 +17,10 @@ const CONTENT = (() => {
     return { scen: 'B', wFrom: from, wTo: from + 14, clock0: 2 * 60 + 58 };
   })();
   const isB = RUN.scen === 'B';
+  /* 本局实例编号(§1 宪法13 常驻锚点三件套之一:虚构运营商+实例编号+接入中)。
+     与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
+     常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
+  const INSTANCE_ID = '#7741-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
@@ -3095,6 +3099,7 @@ const CONTENT = (() => {
        冻结了那段被现实打断的时间,不吃掉玩家的真实反应窗口。适用于所有真实倒计时
        (终局来电/中段遭遇/试炼等),不只是 finalCall 一处。 */
     freezeAdjust(hiddenMs){ if (timer && hiddenMs > 0) timer.deadline += hiddenMs; },
+    instanceId: INSTANCE_ID,                              // 常驻锚点三件套(§1 宪法13)
     go, back, SCREENS
   };
 })();
