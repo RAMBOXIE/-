@@ -194,6 +194,12 @@ const COMPANION = (() => {
      未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。
      只回传服务端签过名的 rou 轮:没签名的(模板池/lint 兜底)是我们自己编的,
      送上去会被验签打回 400,整条通道从第三句起就废了。 */
+  /* 客户端请求超时(D-108 自查:四条 LLM 通道此前只靠 Netlify 函数超时兜底,慢/挂的
+     请求会把回复吊住)。用 AbortSignal.timeout;老环境无此 API 则退回无超时(不报错)。
+     超时按"这次兜底、下次再试"处理,不像硬网络错那样永久降级通道。 */
+  const REQ_TIMEOUT_MS = 8000;
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(history, st){
     if (proxyOff || typeof fetch !== 'function') return null;
@@ -202,6 +208,7 @@ const COMPANION = (() => {
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' },
+        signal: reqTimeout(),                                  // 客户端超时,别把回复吊死在后端超时上(D-108)
         body: JSON.stringify({
           history: sendable.map(m => ({ who: m.who, text: m.text, sig: m.sig })),
           st
@@ -213,7 +220,7 @@ const COMPANION = (() => {
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim())
         ? { text: j.text, sig: typeof j.sig === 'string' ? j.sig : undefined } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
 
   /* 门禁:平台能力与后端代理的返回走同一道 lint。

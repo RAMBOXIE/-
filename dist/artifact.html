@@ -339,15 +339,30 @@ const LCD = (() => {
    ============================================================================ */
 const SAVE = (() => {
   const KEY = 'escape_ai_save';
+  /* D-108 自查:存档此前无 schema 版本号,跨版本字段漂移会被静默错配(而非报错降级)。
+     现在 store 盖 sv;load 时:无 sv=引入版本号之前的存档(其结构即当前 v1,接受);
+     sv 与当前不一致=跨了一次真实结构变更,宁可弃档从头开始,也不拿旧结构去喂新代码。
+     升级流程:任何一次会改变存档字段含义的改动,把 SCHEMA_VERSION +1(旧档即被安全弃用)。 */
+  const SCHEMA_VERSION = 1;
   function load(){
     try {
       const s = localStorage.getItem(KEY);
-      return s ? JSON.parse(s) : null;
+      if (!s) return null;
+      const o = JSON.parse(s);
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      if (o.sv === undefined) return o;                 // 版本号之前的存档=当前结构,接受
+      if (o.sv !== SCHEMA_VERSION){                     // 真实跨版本:弃档从头开始,不静默错配
+        try { console.warn('[save] 存档版本 ' + o.sv + ' ≠ 当前 ' + SCHEMA_VERSION + ',已弃用旧档,重新开始'); } catch(_){}
+        return null;
+      }
+      return o;
     } catch(_){ return null; }
   }
-  function store(o){ try { localStorage.setItem(KEY, JSON.stringify(o)); } catch(_){} }
+  function store(o){
+    try { localStorage.setItem(KEY, JSON.stringify(Object.assign({}, o, { sv: SCHEMA_VERSION }))); } catch(_){}
+  }
   function clear(){ try { localStorage.removeItem(KEY); } catch(_){} }
-  return { load, store, clear };
+  return { load, store, clear, SCHEMA_VERSION };
 })();
 
 </script>
@@ -581,6 +596,12 @@ const COMPANION = (() => {
      未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。
      只回传服务端签过名的 rou 轮:没签名的(模板池/lint 兜底)是我们自己编的,
      送上去会被验签打回 400,整条通道从第三句起就废了。 */
+  /* 客户端请求超时(D-108 自查:四条 LLM 通道此前只靠 Netlify 函数超时兜底,慢/挂的
+     请求会把回复吊住)。用 AbortSignal.timeout;老环境无此 API 则退回无超时(不报错)。
+     超时按"这次兜底、下次再试"处理,不像硬网络错那样永久降级通道。 */
+  const REQ_TIMEOUT_MS = 8000;
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(history, st){
     if (proxyOff || typeof fetch !== 'function') return null;
@@ -589,6 +610,7 @@ const COMPANION = (() => {
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' },
+        signal: reqTimeout(),                                  // 客户端超时,别把回复吊死在后端超时上(D-108)
         body: JSON.stringify({
           history: sendable.map(m => ({ who: m.who, text: m.text, sig: m.sig })),
           st
@@ -600,7 +622,7 @@ const COMPANION = (() => {
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim())
         ? { text: j.text, sig: typeof j.sig === 'string' ? j.sig : undefined } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
 
   /* 门禁:平台能力与后端代理的返回走同一道 lint。
@@ -757,12 +779,15 @@ const GRADER = (() => {
   }
 
   /* 后端代理(静态托管):persona:'grader' + mode,人格核在服务端。未配 key → 501 → 模板。 */
+  const REQ_TIMEOUT_MS = 8000;                             // 客户端超时(D-108),别吊死在后端超时上
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(f, mode){
     if (proxyOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
         body: JSON.stringify({ persona: 'grader', mode: mode === 'verdict' ? 'verdict' : 'taunt',
           st: { tier: f.tier | 0, grade: f.grade || 'none', runN: f.runN | 0 } })
       });
@@ -770,7 +795,7 @@ const GRADER = (() => {
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
 
   function clean(t){ return String(t).trim().slice(0, 60); }
@@ -882,19 +907,22 @@ const MOMLLM = (() => {
     return lines.every(l => l.trim().length <= 16);
   }
 
+  const REQ_TIMEOUT_MS = 8000;                             // 客户端超时(D-108),别吊死在后端超时上
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(){
     if (proxyOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
         body: JSON.stringify({ persona: 'mom' })
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 
@@ -995,19 +1023,22 @@ const STRANGERLLM = (() => {
     return lines.every(l => l.trim().length <= 18);
   }
 
+  const REQ_TIMEOUT_MS = 8000;                             // 客户端超时(D-108),别吊死在后端超时上
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(kind){
     if (proxyOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
         body: JSON.stringify({ persona: 'stranger', kind: kind === 'bait' ? 'bait' : 'real' })
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 
@@ -1417,18 +1448,20 @@ const CONTENT = (() => {
   /* D-105 块3:遭遇叙述让 LLM 在引擎预批分支里挑一个 id(仅叙述口吻,数值仍归引擎)。
      只回 id,越界/空由 resolveBranch 回退默认=防越狱。代理专用;未配 key → null → 离线加权。 */
   let proxyPickerOff = false;
+  /* 客户端超时(D-108):picker 是"他们到了"停顿时的后台预挑,更不该吊住。超时=这次不用 LLM。 */
+  const pickerTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
   async function pickBranchLLM(branches){
     if (proxyPickerOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: pickerTimeout(),
         body: JSON.stringify({ persona: 'picker', candidates: branches.map(b => ({ id: b.id, line: b.line })) })
       });
       if (r.status === 404 || r.status === 501){ proxyPickerOff = true; return null; }
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.id === 'string' && j.id) ? j.id : null;
-    } catch(_){ proxyPickerOff = true; return null; }
+    } catch(e){ if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) return null; proxyPickerOff = true; return null; }
   }
   /* 上下键滚动;消费了键就返回 true(调用方据此不再往下处理) */
   function scrollKey(sc, k){
@@ -2577,7 +2610,9 @@ const CONTENT = (() => {
           else
             ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
         } else {
-          S.settle = ['已到归档边界。更早的 209 张需要更深权限。'];
+          /* D-108:归档边界=无收益,但深搜成本照扣(README_数值 §相册深翻第3次)。
+             之前这里只写 settle、跳过 ENGINE.act,等于送一次免费深搜。 */
+          ENGINE.act('深搜·归档边界', { bat: 5, trace: 5 }, ['已到归档边界。更早的 209 张需要更深权限。']);
         }
         afterAction();
       }
@@ -3947,7 +3982,9 @@ const CONTENT = (() => {
       statusBar();
       const p = S.pendingPrediction;
       if (!p){ back(); return; }                    // 无待决预测:不该停在这一屏
-      const label = { album: '相册', th_bill: '尾号 8873', th_rou: '柔柔 ♥', deleted: '已删除' }[p.target];
+      /* D-108:预测目标只有 album/deleted 走这张表(oldPhone 有专用文案,见下);
+         原表里 th_bill/th_rou 是 4→2 精简后遗留的死条目(从不作为预测目标),删掉。 */
+      const label = { album: '相册', deleted: '已删除' }[p.target];
       L.frameRect(8, 60, W - 16, 64);
       L.drawText(16, 72, '采样终端·辅助层');
       L.drawText(16, 92, p.target === 'oldPhone'

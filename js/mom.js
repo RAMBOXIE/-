@@ -90,19 +90,22 @@ const MOMLLM = (() => {
     return lines.every(l => l.trim().length <= 16);
   }
 
+  const REQ_TIMEOUT_MS = 8000;                             // 客户端超时(D-108),别吊死在后端超时上
+  const reqTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(REQ_TIMEOUT_MS) : undefined;
+  const isTimeout = e => !!e && (e.name === 'TimeoutError' || e.name === 'AbortError');
   let proxyOff = false;
   async function viaProxy(){
     if (proxyOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
         body: JSON.stringify({ persona: 'mom' })
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.text === 'string' && j.text.trim()) ? { text: j.text } : null;
-    } catch(_){ proxyOff = true; return null; }
+    } catch(e){ if (isTimeout(e)) return null; proxyOff = true; return null; }   // 超时=这次兜底,不永久降级
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 

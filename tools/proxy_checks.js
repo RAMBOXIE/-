@@ -64,6 +64,22 @@ const resp = (status, obj) => Promise.resolve({
 
 (async () => {
 
+  /* ⓪ D-108:客户端请求带超时 signal;超时=这次兜底模板,但不永久降级(下次可再试) */
+  await scenario('客户端超时 · 带 signal + 超时兜底不永久降级',
+    (u, o) => {
+      if (!('signal' in o)) throw new Error('代理请求未带 AbortSignal(客户端无超时)');
+      const e = new Error('timed out'); e.name = 'TimeoutError'; return Promise.reject(e);
+    },
+    async io => {
+      const { A, K, frame, flush, S, CONTENT, calls } = io;
+      CONTENT.go('th_rou', true); frame();
+      K('M'); await flush(); await flush();
+      A(calls.length === 1 && ('signal' in calls[0].opt), '代理请求必须带 signal(客户端超时),实际 ' + JSON.stringify(Object.keys(calls[0].opt)));
+      A(S.rouChat.length === 2 && S.rouChat[1].text.length > 0, '超时应回退模板池给一句');
+      K('M'); await flush(); await flush();
+      A(calls.length === 2, '超时不该永久降级——下一条应再次尝试代理,实际调了 ' + calls.length + ' 次');
+    });
+
   /* ① 未配 key:501 -> 模板池,且不再重试 */
   await scenario('代理未配 key(501) -> 降级模板池且不重试',
     () => resp(501, { error: 'not_configured' }),

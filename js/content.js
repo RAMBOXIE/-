@@ -250,18 +250,20 @@ const CONTENT = (() => {
   /* D-105 块3:遭遇叙述让 LLM 在引擎预批分支里挑一个 id(仅叙述口吻,数值仍归引擎)。
      只回 id,越界/空由 resolveBranch 回退默认=防越狱。代理专用;未配 key → null → 离线加权。 */
   let proxyPickerOff = false;
+  /* 客户端超时(D-108):picker 是"他们到了"停顿时的后台预挑,更不该吊住。超时=这次不用 LLM。 */
+  const pickerTimeout = () => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined;
   async function pickBranchLLM(branches){
     if (proxyPickerOff || typeof fetch !== 'function') return null;
     try {
       const r = await fetch('/.netlify/functions/rou', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: pickerTimeout(),
         body: JSON.stringify({ persona: 'picker', candidates: branches.map(b => ({ id: b.id, line: b.line })) })
       });
       if (r.status === 404 || r.status === 501){ proxyPickerOff = true; return null; }
       if (!r.ok) return null;
       const j = await r.json();
       return (j && typeof j.id === 'string' && j.id) ? j.id : null;
-    } catch(_){ proxyPickerOff = true; return null; }
+    } catch(e){ if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) return null; proxyPickerOff = true; return null; }
   }
   /* 上下键滚动;消费了键就返回 true(调用方据此不再往下处理) */
   function scrollKey(sc, k){
@@ -1410,7 +1412,9 @@ const CONTENT = (() => {
           else
             ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
         } else {
-          S.settle = ['已到归档边界。更早的 209 张需要更深权限。'];
+          /* D-108:归档边界=无收益,但深搜成本照扣(README_数值 §相册深翻第3次)。
+             之前这里只写 settle、跳过 ENGINE.act,等于送一次免费深搜。 */
+          ENGINE.act('深搜·归档边界', { bat: 5, trace: 5 }, ['已到归档边界。更早的 209 张需要更深权限。']);
         }
         afterAction();
       }
@@ -2780,7 +2784,9 @@ const CONTENT = (() => {
       statusBar();
       const p = S.pendingPrediction;
       if (!p){ back(); return; }                    // 无待决预测:不该停在这一屏
-      const label = { album: '相册', th_bill: '尾号 8873', th_rou: '柔柔 ♥', deleted: '已删除' }[p.target];
+      /* D-108:预测目标只有 album/deleted 走这张表(oldPhone 有专用文案,见下);
+         原表里 th_bill/th_rou 是 4→2 精简后遗留的死条目(从不作为预测目标),删掉。 */
+      const label = { album: '相册', deleted: '已删除' }[p.target];
       L.frameRect(8, 60, W - 16, 64);
       L.drawText(16, 72, '采样终端·辅助层');
       L.drawText(16, 92, p.target === 'oldPhone'
