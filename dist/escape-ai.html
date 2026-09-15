@@ -1392,10 +1392,16 @@ const CONTENT = (() => {
   }
   function settleLines(y){
     if (!S.settle.length) return y;
+    /* D-108 全屏扫描:结算行是二级信息,任何时候都不许越过软键线压到底部按钮/推出画布。
+       够长(如回收进程三句叙述)或起点已偏低时,画到软键线为止就截断。 */
+    const BOT = H - 15;
+    if (y + 6 + LH > BOT) return y;                       // 连分隔线+一行都放不下,索性不画
     L.hline(y, 4, W - 5, 2); y += 6;
     for (const line of S.settle){
-      const ls = L.wrap(line, W - 8);
-      ls.forEach(t => { L.drawText(4, y, t); y += LH; });
+      for (const t of L.wrap(line, W - 8)){
+        if (y + LH > BOT) return y;                       // 再画就压软键了,截断
+        L.drawText(4, y, t); y += LH;
+      }
     }
     return y;
   }
