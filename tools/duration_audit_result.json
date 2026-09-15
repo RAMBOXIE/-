@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-15T08:27:41.679Z",
+  "generatedAt": "2026-09-15T08:30:31.688Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -51,7 +51,7 @@
     {
       "id": "A",
       "name": "最短线·中止断连",
-      "readChars": 618,
+      "readChars": 616,
       "decisionCount": 4,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -78,12 +78,12 @@
           "chars": 76
         },
         {
-          "screen": "receiptAlive",
-          "chars": 57
-        },
-        {
           "screen": "tools",
           "chars": 56
+        },
+        {
+          "screen": "receiptAlive",
+          "chars": 55
         },
         {
           "screen": "saymaster",
@@ -108,22 +108,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 1.24,
+          "read": 1.23,
           "decision": 0.2,
           "wait": 0.13,
           "total": 1.57
         },
         "普通": {
-          "read": 2.21,
+          "read": 2.2,
           "decision": 0.4,
           "wait": 0.13,
-          "total": 2.74
+          "total": 2.73
         },
         "沉浸": {
-          "read": 4.46,
+          "read": 4.45,
           "decision": 0.8,
           "wait": 0.13,
-          "total": 5.4
+          "total": 5.38
         }
       }
     },

@@ -3965,7 +3965,10 @@ const CONTENT = (() => {
     enter(){ this.scroll = 0; writeSave('disconnected'); },
     render(){
       statusBar();
-      let t = '断连成功。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
+      /* D-108:canon §2.3 结算态判定表里「裸退」(主动断连不上传·缓存全弃)与「断连成功」
+         (上传完成入库)是两个不同的态。这一屏是"没上传就走"的结局,标题按判定表用「裸退」,
+         不再跟真正入库的断连成功(receiptFull)撞名。 */
+      let t = '裸退。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
         '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' +
         (isB ? '7741-B' : '7741-A') + ' 存续。\n\n这是谨慎者的结局。';
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
