@@ -14,7 +14,7 @@
    ============================================================================ */
 const PREFS = (() => {
   const KEY = 'escape_ai_prefs';
-  let state = { rouOff: false, seenDisclosure: false };
+  let state = { rouOff: false, seenDisclosure: false, muted: false };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw){ const j = JSON.parse(raw); if (j && typeof j === 'object') state = Object.assign(state, j); }
@@ -25,6 +25,9 @@ const PREFS = (() => {
     setRouOff(v){ state.rouOff = !!v; save(); },
     /* §9 合规红线:onboarding/设置页非-diegetic AI 声明,只需弹过一次(设置页里仍可随时重看)。 */
     get seenDisclosure(){ return !!state.seenDisclosure; },
-    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); }
+    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); },
+    /* 静音(D-108:此前 AUDIO 全程自动播放且游戏内无法关闭) */
+    get muted(){ return !!state.muted; },
+    setMuted(v){ state.muted = !!v; save(); }
   };
 })();

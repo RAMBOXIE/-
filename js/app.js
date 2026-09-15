@@ -113,10 +113,31 @@
   if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
   if (!PREFS.seenDisclosure) showDisclosure();
 
-  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
+  /* ---- 静音开关(D-108:AUDIO 全程自动播放,游戏内此前无法关闭)---- */
+  const mutePref = document.getElementById('mutePref');
+  function syncMuteLabel(){
+    if (!mutePref) return;
+    mutePref.textContent = PREFS.muted ? '♪̶' : '♪';
+    mutePref.classList.toggle('off', PREFS.muted);
+    mutePref.title = PREFS.muted ? '已静音 · 点开声' : '静音';
+  }
+  if (mutePref){
+    mutePref.onclick = (e) => {
+      e.stopPropagation();
+      PREFS.setMuted(!PREFS.muted);
+      if (PREFS.muted){ try { window.AUDIO.hiss(false); } catch(_){} }   // 切静音顺手停掉常驻底噪
+      syncMuteLabel();
+    };
+    syncMuteLabel();
+  }
+
+  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ----
+     D-108:静音开关(PREFS.muted)。静音时 ensure 返回 null,hiss/blip 直接不出声;
+     切静音顺手把常驻底噪停掉。开关活在外壳顶栏,不是游戏内选项。 */
   let actx = null, hissSrc = null;
   window.AUDIO = {
     ensure(){
+      if (typeof PREFS !== 'undefined' && PREFS.muted) return null;
       try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
       catch(_){}
       try { if (actx && actx.state === 'suspended') actx.resume(); } catch(_){}
@@ -236,6 +257,7 @@
   setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
   function loop(){
     CONTENT.tickTimer();
+    LCD.setBatteryDim(ENGINE.S.battery);           // 低电量整屏变暗(D-108)
     LCD.frame(() => CONTENT.render());
     document.getElementById('brandR').textContent =
       ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';

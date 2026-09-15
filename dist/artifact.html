@@ -55,7 +55,7 @@
 
 <div class="wrap">
   <div class="device">
-    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span class="prefBtn" id="aiDisclosure" title="关于本作">AI 声明</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span id="brandR">连接中</span></div>
+    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span class="prefBtn" id="aiDisclosure" title="关于本作">AI 声明</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span class="prefBtn" id="mutePref" title="静音">♪</span><span id="brandR">连接中</span></div>
     <div class="bezel">
       <div class="screen-stack" id="tapzone">
         <canvas id="lcd" width="588" height="672"></canvas>
@@ -244,7 +244,12 @@ const LCD = (() => {
      accents:本帧的变色区 [{x,y,w,h,rgb}];每帧由绘制方(statusBar)重建 */
   const R = { threshold:.42, corrupt:.0004, scanline:.14, scanPhase:0,
               ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false,
-              shake:null, accents:[] };
+              shake:null, accents:[], dim:1 };
+  /* D-108:低电量屏幕变暗(canon §7 呈现,此前只有文字+震屏+色彩告警)。
+     省电模式(电量<20%)整屏调暗,极低(<8%)再暗一档——像真机电量不足降亮度。 */
+  function setBatteryDim(bat){
+    R.dim = bat < 8 ? .5 : bat < 20 ? .7 : 1;
+  }
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /* 抖屏:扣电量/回收抵达等"紧迫"时刻的一下震动。宪法 11:这是紧迫感不是恐怖峰,
@@ -279,7 +284,7 @@ const LCD = (() => {
         if (y >= r.y && y < r.y + r.h) (rowAcc || (rowAcc = [])).push(r);
       }
       for (let x = 0; x < W; x++){
-        const k = px(x, y), a = actual[k] * scan * flick;
+        const k = px(x, y), a = actual[k] * scan * flick * R.dim;   // R.dim<1=低电量整屏变暗(D-108)
         const base = R.showUnlit ? UNLIT : SUB, o = k * 4;
         let lit = LIT;
         if (rowAcc){
@@ -325,7 +330,7 @@ const LCD = (() => {
     present();
   }
 
-  return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
+  return { W, H, LINE_H, R, applyTier, setBatteryDim, frame, setPx, rect, frameRect, hline, invertRect,
            disc, ring, drawTextScaled, glyph, shake, accent,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();
@@ -383,7 +388,7 @@ const SAVE = (() => {
    ============================================================================ */
 const PREFS = (() => {
   const KEY = 'escape_ai_prefs';
-  let state = { rouOff: false, seenDisclosure: false };
+  let state = { rouOff: false, seenDisclosure: false, muted: false };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw){ const j = JSON.parse(raw); if (j && typeof j === 'object') state = Object.assign(state, j); }
@@ -394,7 +399,10 @@ const PREFS = (() => {
     setRouOff(v){ state.rouOff = !!v; save(); },
     /* §9 合规红线:onboarding/设置页非-diegetic AI 声明,只需弹过一次(设置页里仍可随时重看)。 */
     get seenDisclosure(){ return !!state.seenDisclosure; },
-    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); }
+    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); },
+    /* 静音(D-108:此前 AUDIO 全程自动播放且游戏内无法关闭) */
+    get muted(){ return !!state.muted; },
+    setMuted(v){ state.muted = !!v; save(); }
   };
 })();
 
@@ -4425,10 +4433,31 @@ const CONTENT = (() => {
   if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
   if (!PREFS.seenDisclosure) showDisclosure();
 
-  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
+  /* ---- 静音开关(D-108:AUDIO 全程自动播放,游戏内此前无法关闭)---- */
+  const mutePref = document.getElementById('mutePref');
+  function syncMuteLabel(){
+    if (!mutePref) return;
+    mutePref.textContent = PREFS.muted ? '♪̶' : '♪';
+    mutePref.classList.toggle('off', PREFS.muted);
+    mutePref.title = PREFS.muted ? '已静音 · 点开声' : '静音';
+  }
+  if (mutePref){
+    mutePref.onclick = (e) => {
+      e.stopPropagation();
+      PREFS.setMuted(!PREFS.muted);
+      if (PREFS.muted){ try { window.AUDIO.hiss(false); } catch(_){} }   // 切静音顺手停掉常驻底噪
+      syncMuteLabel();
+    };
+    syncMuteLabel();
+  }
+
+  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ----
+     D-108:静音开关(PREFS.muted)。静音时 ensure 返回 null,hiss/blip 直接不出声;
+     切静音顺手把常驻底噪停掉。开关活在外壳顶栏,不是游戏内选项。 */
   let actx = null, hissSrc = null;
   window.AUDIO = {
     ensure(){
+      if (typeof PREFS !== 'undefined' && PREFS.muted) return null;
       try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
       catch(_){}
       try { if (actx && actx.state === 'suspended') actx.resume(); } catch(_){}
@@ -4548,6 +4577,7 @@ const CONTENT = (() => {
   setInterval(() => CONTENT.tickTimer(), 250);   // 定时器独立于 rAF(后台标签页 rAF 会暂停)
   function loop(){
     CONTENT.tickTimer();
+    LCD.setBatteryDim(ENGINE.S.battery);           // 低电量整屏变暗(D-108)
     LCD.frame(() => CONTENT.render());
     document.getElementById('brandR').textContent =
       ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';

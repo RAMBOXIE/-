@@ -162,7 +162,12 @@ const LCD = (() => {
      accents:本帧的变色区 [{x,y,w,h,rgb}];每帧由绘制方(statusBar)重建 */
   const R = { threshold:.42, corrupt:.0004, scanline:.14, scanPhase:0,
               ghost:true, showUnlit:true, flicker:0, batJitter:false, tsScramble:false,
-              shake:null, accents:[] };
+              shake:null, accents:[], dim:1 };
+  /* D-108:低电量屏幕变暗(canon §7 呈现,此前只有文字+震屏+色彩告警)。
+     省电模式(电量<20%)整屏调暗,极低(<8%)再暗一档——像真机电量不足降亮度。 */
+  function setBatteryDim(bat){
+    R.dim = bat < 8 ? .5 : bat < 20 ? .7 : 1;
+  }
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /* 抖屏:扣电量/回收抵达等"紧迫"时刻的一下震动。宪法 11:这是紧迫感不是恐怖峰,
@@ -197,7 +202,7 @@ const LCD = (() => {
         if (y >= r.y && y < r.y + r.h) (rowAcc || (rowAcc = [])).push(r);
       }
       for (let x = 0; x < W; x++){
-        const k = px(x, y), a = actual[k] * scan * flick;
+        const k = px(x, y), a = actual[k] * scan * flick * R.dim;   // R.dim<1=低电量整屏变暗(D-108)
         const base = R.showUnlit ? UNLIT : SUB, o = k * 4;
         let lit = LIT;
         if (rowAcc){
@@ -243,7 +248,7 @@ const LCD = (() => {
     present();
   }
 
-  return { W, H, LINE_H, R, applyTier, frame, setPx, rect, frameRect, hline, invertRect,
+  return { W, H, LINE_H, R, applyTier, setBatteryDim, frame, setPx, rect, frameRect, hline, invertRect,
            disc, ring, drawTextScaled, glyph, shake, accent,
            drawText, drawPara, drawSignal, drawBattery, textWidth, wrap };
 })();
