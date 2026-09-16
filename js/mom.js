@@ -41,6 +41,51 @@ const MOMLLM = (() => {
     return '给这个陌生号码发消息。你知道帆已经不在了。说你想说的那几句。';
   }
 
+  /* D-123:machine#2/#3(phone-5029/phone-3319)的妈人格核。手写兜底 TOLD_B/TOLD_C
+     早就定了这位母亲叫儿子"安子"/"屿屿"(比 companion.js 用的正式别名"阿屿"更
+     贴妈的口吻——一个更疏离的登记名,一个是妈嘴里的小名,两处不该是同一个词),
+     这里延续同一个称呼,不改口。死因照 DOSSIER_B/DOSSIER_C 的 meta.deceased.cause。 */
+  const CORE_B = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子周随安(安子)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
+  const CORE_C = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子陈屿(屿屿)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
+  function triggerB(){
+    return '给这个陌生号码发消息。你知道安子已经不在了。说你想说的那几句。';
+  }
+  function triggerC(){
+    return '给这个陌生号码发消息。你知道屿屿已经不在了。说你想说的那几句。';
+  }
+
   let sampleFn;
   let permanentlyOff = false;
   async function ensure(){
@@ -50,10 +95,19 @@ const MOMLLM = (() => {
     catch(_){ sampleFn = null; }
     return sampleFn;
   }
+  /* D-123:三路查表,和下方 fallbackPool() 同一套(dossierId() 声明在文件下方,
+     function 声明提升,调用时机在运行期,不受书写顺序影响)。 */
+  function coreFor(){
+    const id = dossierId();
+    if (id === 'phone-5029') return { core: CORE_B, trig: triggerB };
+    if (id === 'phone-3319') return { core: CORE_C, trig: triggerC };
+    return { core: CORE, trig: trigger };
+  }
   SAMPLE = async function(){
     const s = await ensure();
     if (!s) return null;
-    const turns = [{ role: 'user', content: CORE + '\n\n' + trigger() }];
+    const { core, trig } = coreFor();
+    const turns = [{ role: 'user', content: core + '\n\n' + trig() }];
     try { const r = await s(turns, { modelTier: 'quick', cache: false }); return { text: r.text }; }
     catch(e){
       const code = e && e.code;
@@ -93,7 +147,6 @@ const MOMLLM = (() => {
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
   }
-  function isAltDossier(){ const id = dossierId(); return !!id && id !== 'phone-7741'; }
   function fallbackPool(){
     const id = dossierId();
     if (!id || id === 'phone-7741') return TOLD;
@@ -127,7 +180,7 @@ const MOMLLM = (() => {
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
-        body: JSON.stringify({ persona: 'mom' })
+        body: JSON.stringify({ persona: 'mom', dossierId: dossierId() })   // D-123:代理侧挑 CORE_B/CORE_C
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
@@ -137,12 +190,13 @@ const MOMLLM = (() => {
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 
-  /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。 */
+  /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。
+     D-123:isAltDossier() 原来在这里短路 B/C,逼它们永远走 TOLD_B/TOLD_C 手写兜底
+     (D-110 拍板"先出结构,人格核暂缓")。现在 CORE_B/CORE_C 已经接上,三份底本走
+     同一条 SAMPLE→代理→fallback 的降级链。 */
   async function told(){
-    if (!isAltDossier()){
-      if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
-      const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
-    }
+    if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
+    const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
     return fallback();
   }
 

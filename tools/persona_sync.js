@@ -24,7 +24,15 @@ function extractLines(src, marker){
 function extractFn(src, name){
   const i = src.indexOf('function ' + name + '(');
   if (i < 0) return null;
-  const j = src.indexOf('\n  }', i);
+  /* D-123 修:两条部署路径缩进不一样——companion.js 的 stateLines 套在一层 IIFE 里,
+     闭合花括号缩进 2 格;rou.js 的是顶层函数,闭合花括号缩进 0 格。原来只找
+     '\n  }' 一种,在 rou.js 上会跳过真正的闭合括号,一路扫到后面不相干的代码块
+     (这次新增 CORE_B/CORE_C 后暴露:误把它们的文案也当成 stateLines 的一部分)。
+     两种缩进都找,取先出现的那个。 */
+  const j2 = src.indexOf('\n  }', i);
+  const j0 = src.indexOf('\n}', i);
+  const j = [j2, j0].filter(x => x >= 0).sort((a, b) => a - b)[0];
+  if (j == null) return null;
   return src.slice(i, j).replace(/\s+/g, ' ').trim();
 }
 
@@ -54,10 +62,16 @@ function compareCore(label, srcA, markerA, srcB, markerB){
 }
 /* 柔柔:companion.js CORE ↔ rou.js CORE */
 compareCore('柔柔', cli, 'const CORE = [', fn, 'const CORE = [');
+/* 如愿(machine#2)/阿澄(machine#3):companion.js CORE_B/CORE_C ↔ rou.js CORE_B/CORE_C(D-123) */
+compareCore('如愿', cli, 'const CORE_B = [', fn, 'const CORE_B = [');
+compareCore('阿澄', cli, 'const CORE_C = [', fn, 'const CORE_C = [');
 /* 采样官:grader.js CORE ↔ rou.js GRADER_CORE(D-101 块3) */
 compareCore('采样官', grd, 'const CORE = [', fn, 'const GRADER_CORE = [');
 /* 妈告知态:mom.js CORE ↔ rou.js MOM_CORE(D-103) */
 compareCore('妈告知态', mom, 'const CORE = [', fn, 'const MOM_CORE = [');
+/* 妈告知态(machine#2/#3):mom.js CORE_B/CORE_C ↔ rou.js MOM_CORE_B/MOM_CORE_C(D-123) */
+compareCore('妈告知态-B', mom, 'const CORE_B = [', fn, 'const MOM_CORE_B = [');
+compareCore('妈告知态-C', mom, 'const CORE_C = [', fn, 'const MOM_CORE_C = [');
 /* 陌生人:stranger.js CORE ↔ rou.js STRANGER_CORE(D-104 块3) */
 compareCore('陌生人', stg, 'const CORE = [', fn, 'const STRANGER_CORE = [');
 
@@ -89,6 +103,16 @@ const SECRET = ['03:00', '03:14', '03:31', '03:45', '溯源', '判定', '掉落'
   const mp = mom.slice(mom.indexOf('const CORE'), mom.indexOf('const TOLD'));
   const hit = SECRET.filter(w => mp.includes(w));
   A(hit.length === 0, 'mom.js 妈告知态人格核不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
+}
+/* rou.js 的妈告知态人格区(MOM_CORE/MOM_CORE_B/MOM_CORE_C,D-123 补:原本的服务端
+   扫描区间只到「限流」标记就截止,GRADER_CORE/MOM_CORE/STRANGER_CORE 这些排在
+   限流小节之后的人格核此前从没被这道秘匿扫描照过——这次往 rou.js 加 MOM_CORE_B/C
+   顺手把这条服务端专属的老缺口补上,GRADER_CORE/STRANGER_CORE 的对应缺口仍在,
+   记一笔留给后续)。 */
+{
+  const rmp = fn.slice(fn.indexOf('const MOM_CORE = ['), fn.indexOf('const MOM_CRISIS'));
+  const hit = SECRET.filter(w => rmp.includes(w));
+  A(hit.length === 0, 'rou.js 妈告知态人格区(MOM_CORE/_B/_C)不含秘匿参数' + (hit.length ? ' —— 命中: ' + hit.join(', ') : ''));
 }
 /* 陌生人人格区(stranger.js CORE→BODY 之前) */
 {

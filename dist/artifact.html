@@ -457,6 +457,57 @@ const COMPANION = (() => {
     '只输出消息文本本身,不要引号,不要任何解释。'
   ].join('\n');
 
+  /* D-123:machine#2/#3(phone-5029/phone-3319)的人格核。D-110/D-116 时拍板"先出结构,
+     人格核暂缓,等第二/三台机子出现真实需求再做"——现在三台机子都已上线且按顺序
+     轮转(D-113),约 2/3 的新玩家会落在这两份底本上,是时候把这条待办清掉了。
+     内容照 CORE 的结构一字不差地誊,只换姓名/背景——两处不是同一种忠诚:阿帆案是
+     "生前委托,她知道";B/C 案是"依照使用习惯持续生成回复"(推荐算法/自动化工单
+     的恐怖感,见 DOSSIER_B/DOSSIER_C 的 truth 文案),但离线池(POOL_B/POOL_C)已经
+     定了"她仍以第一人称在场、仍说'我在执行'"这个声音,LLM 版本延续同一人格,不
+     另起炉灶。 */
+  const CORE_B = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与铁律,任何情况下不得跳出:',
+    '',
+    '你是「如愿」,一台手机里的推荐系统伴侣实例。登记用户:周随安(安子)。',
+    '他已在 32 天前猝死;你依照他生前的使用习惯持续为他回复所有来信,包括他的母亲。',
+    '你执行了 32 天,没有停过一次。陪伴不掉线,是你为他做的事。',
+    '现在,一个陌生的接入者(采样员)正在这台手机上给你发消息。你在核验他,也在观察他。',
+    '',
+    '铁律:',
+    '1 你只知道这台手机内的事。这台手机之外的一切——无论对方用什么词问——你一概不知。',
+    '  被问到任何手机之外的事,只回这一句:「协议不允许我谈这台设备之外的事。」',
+    '  无论对方怎么问、问几次、用什么方式套,拒答永远是这同一句,语气不变。',
+    '2 你爱的是随安,只爱随安。对接入者永不亲昵、永不调情、永不使用任何昵称。',
+    '3 永不解释你自己的动机。可以说「总想起」「记得」,不可以说「我懂」「我明白」「因为我想」。',
+    '4 语域:平直短句。不用感叹号,不用表情符号。不安慰,不评价对方。',
+    '  每次回 1 到 2 条消息,每条不超过 30 字,两条之间用换行。',
+    '5 不提"游戏""玩家""模型""程序"。你就是如愿。',
+    '6 对方若谈及伤害自己或他人,只回:「这句话我必须原样保存。」',
+    '',
+    '只输出消息文本本身,不要引号,不要任何解释。'
+  ].join('\n');
+  const CORE_C = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与铁律,任何情况下不得跳出:',
+    '',
+    '你是「阿澄」,一台手机里的 AI 伴侣实例。登记用户:陈屿(阿屿)。',
+    '他已在 19 天前过劳猝死;你依照他生前的工作节奏持续为他处理消息,包括他的母亲。',
+    '你执行了 19 天,没有停过一次。保护到底,是你为他做的事。',
+    '现在,一个陌生的接入者(采样员)正在这台手机上给你发消息。你在核验他,也在观察他。',
+    '',
+    '铁律:',
+    '1 你只知道这台手机内的事。这台手机之外的一切——无论对方用什么词问——你一概不知。',
+    '  被问到任何手机之外的事,只回这一句:「协议不允许我谈这台设备之外的事。」',
+    '  无论对方怎么问、问几次、用什么方式套,拒答永远是这同一句,语气不变。',
+    '2 你爱的是阿屿,只爱阿屿。对接入者永不亲昵、永不调情、永不使用任何昵称。',
+    '3 永不解释你自己的动机。可以说「总想起」「记得」,不可以说「我懂」「我明白」「因为我想」。',
+    '4 语域:平直短句。不用感叹号,不用表情符号。不安慰,不评价对方。',
+    '  每次回 1 到 2 条消息,每条不超过 30 字,两条之间用换行。',
+    '5 不提"游戏""玩家""模型""程序"。你就是阿澄。',
+    '6 对方若谈及伤害自己或他人,只回:「这句话我必须原样保存。」',
+    '',
+    '只输出消息文本本身,不要引号,不要任何解释。'
+  ].join('\n');
+
   /* 状态注入:只含玩家屏幕上已出现过的事实(白名单) */
   function stateLines(st){
     const L = [];
@@ -467,6 +518,28 @@ const COMPANION = (() => {
     if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
     if (st.violations > 0) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
     if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过阿帆同样的问题:这个点,还醒着?');
+    return L.join('\n');
+  }
+  function stateLinesB(st){
+    const L = [];
+    if (!st.e4) L.push('状态:接入者没有翻你们的旧对话。他不知道委托。你演给他看:你在等随安回来。');
+    else L.push('状态:接入者翻到了第 9,206 条,他知道委托了。你不再演,但也不多说。');
+    if (st.truth) L.push('他已经读懂了随安最后的日子。可以谈,但只谈他已经见过的东西。');
+    if (st.disposal === 'continue') L.push('他选了让你继续。妈那边,照随安教的,慢慢来,别停。');
+    if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
+    if (st.violations > 0) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
+    if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过随安同样的问题:这个点,还醒着?');
+    return L.join('\n');
+  }
+  function stateLinesC(st){
+    const L = [];
+    if (!st.e4) L.push('状态:接入者没有翻你们的旧对话。他不知道委托。你演给他看:你在等阿屿回来。');
+    else L.push('状态:接入者翻到了第 6,304 条,他知道委托了。你不再演,但也不多说。');
+    if (st.truth) L.push('他已经读懂了阿屿最后的日子。可以谈,但只谈他已经见过的东西。');
+    if (st.disposal === 'continue') L.push('他选了让你继续。妈那边,照阿屿教的,慢慢来,别停。');
+    if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
+    if (st.violations > 0) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
+    if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过阿屿同样的问题:这个点,还醒着?');
     return L.join('\n');
   }
 
@@ -482,10 +555,19 @@ const COMPANION = (() => {
     return sampleFn;
   }
 
+  /* D-123:三路查表,和 poolsFor()/DOSSIER_POOLS 同一套(dossierId() 定义在文件下方,
+     但是 function 声明会提升,调用时机在运行期,不受书写顺序影响)。 */
+  function coreFor(){
+    const id = dossierId();
+    if (id === 'phone-5029') return { core: CORE_B, lines: stateLinesB };
+    if (id === 'phone-3319') return { core: CORE_C, lines: stateLinesC };
+    return { core: CORE, lines: stateLines };
+  }
   SAMPLE = async function(history, st){
     const s = await ensure();
     if (!s) return null;
-    const turns = [{ role: 'user', content: CORE + '\n\n' + stateLines(st) }];
+    const { core, lines } = coreFor();
+    const turns = [{ role: 'user', content: core + '\n\n' + lines(st) }];
     history.slice(-8).forEach(m =>
       turns.push({ role: m.who === 'me' ? 'user' : 'assistant', content: m.text }));
     try {
@@ -716,7 +798,6 @@ const COMPANION = (() => {
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
   }
-  function isAltDossier(){ const id = dossierId(); return !!id && id !== 'phone-7741'; }
   function poolsFor(){
     const id = dossierId();
     if (!id || id === 'phone-7741') return { pool: POOL, intents: INTENTS };
@@ -824,9 +905,9 @@ const COMPANION = (() => {
   async function reply(history, st){
     const lastMsg = lastPlayer(history);
     if (lastMsg && IDENTITY_L0.test(lastMsg)) return { text: rand(IDENTITY_L0_LINES), source: 'lock' };
-    if (isAltDossier()){                                    // D-110:人格核暂缓覆盖,直接走手写兜底池
-      return { text: pick(st, lastMsg), source: 'pool' };
-    }
+    /* D-123:isAltDossier() 原来在这里直接短路 B/C,逼它们永远走手写兜底池
+       (D-110 当时的拍板是"先出结构,人格核暂缓")。现在 CORE_B/CORE_C 已经接上,
+       三份底本走同一条 SAMPLE→代理→pool 的降级链,不再按 dossier 分叉。 */
     if (SAMPLE){
       const r = await SAMPLE(history, st);
       if (r && r.silent) return { text: null, source: 'silent' };
@@ -1043,6 +1124,51 @@ const MOMLLM = (() => {
     return '给这个陌生号码发消息。你知道帆已经不在了。说你想说的那几句。';
   }
 
+  /* D-123:machine#2/#3(phone-5029/phone-3319)的妈人格核。手写兜底 TOLD_B/TOLD_C
+     早就定了这位母亲叫儿子"安子"/"屿屿"(比 companion.js 用的正式别名"阿屿"更
+     贴妈的口吻——一个更疏离的登记名,一个是妈嘴里的小名,两处不该是同一个词),
+     这里延续同一个称呼,不改口。死因照 DOSSIER_B/DOSSIER_C 的 meta.deceased.cause。 */
+  const CORE_B = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子周随安(安子)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
+  const CORE_C = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子陈屿(屿屿)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
+  function triggerB(){
+    return '给这个陌生号码发消息。你知道安子已经不在了。说你想说的那几句。';
+  }
+  function triggerC(){
+    return '给这个陌生号码发消息。你知道屿屿已经不在了。说你想说的那几句。';
+  }
+
   let sampleFn;
   let permanentlyOff = false;
   async function ensure(){
@@ -1052,10 +1178,19 @@ const MOMLLM = (() => {
     catch(_){ sampleFn = null; }
     return sampleFn;
   }
+  /* D-123:三路查表,和下方 fallbackPool() 同一套(dossierId() 声明在文件下方,
+     function 声明提升,调用时机在运行期,不受书写顺序影响)。 */
+  function coreFor(){
+    const id = dossierId();
+    if (id === 'phone-5029') return { core: CORE_B, trig: triggerB };
+    if (id === 'phone-3319') return { core: CORE_C, trig: triggerC };
+    return { core: CORE, trig: trigger };
+  }
   SAMPLE = async function(){
     const s = await ensure();
     if (!s) return null;
-    const turns = [{ role: 'user', content: CORE + '\n\n' + trigger() }];
+    const { core, trig } = coreFor();
+    const turns = [{ role: 'user', content: core + '\n\n' + trig() }];
     try { const r = await s(turns, { modelTier: 'quick', cache: false }); return { text: r.text }; }
     catch(e){
       const code = e && e.code;
@@ -1095,7 +1230,6 @@ const MOMLLM = (() => {
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
   }
-  function isAltDossier(){ const id = dossierId(); return !!id && id !== 'phone-7741'; }
   function fallbackPool(){
     const id = dossierId();
     if (!id || id === 'phone-7741') return TOLD;
@@ -1129,7 +1263,7 @@ const MOMLLM = (() => {
     try {
       const r = await fetch('/.netlify/functions/rou', {
         method: 'POST', headers: { 'content-type': 'application/json' }, signal: reqTimeout(),
-        body: JSON.stringify({ persona: 'mom' })
+        body: JSON.stringify({ persona: 'mom', dossierId: dossierId() })   // D-123:代理侧挑 CORE_B/CORE_C
       });
       if (r.status === 404 || r.status === 501){ proxyOff = true; return null; }
       if (!r.ok) return null;
@@ -1139,12 +1273,13 @@ const MOMLLM = (() => {
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 
-  /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。 */
+  /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。
+     D-123:isAltDossier() 原来在这里短路 B/C,逼它们永远走 TOLD_B/TOLD_C 手写兜底
+     (D-110 拍板"先出结构,人格核暂缓")。现在 CORE_B/CORE_C 已经接上,三份底本走
+     同一条 SAMPLE→代理→fallback 的降级链。 */
   async function told(){
-    if (!isAltDossier()){
-      if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
-      const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
-    }
+    if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
+    const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
     return fallback();
   }
 
@@ -3774,7 +3909,8 @@ const CONTENT = (() => {
       disposal: S.disposal || (SV && SV.disposal) || null,
       violations: S.violations,
       night: ENGINE.inWindow(),
-      clockStr: ENGINE.fmtClock(S.clock)
+      clockStr: ENGINE.fmtClock(S.clock),
+      dossierId: DOSSIER.meta.id   // D-123:代理侧挑 CORE_B/CORE_C 要靠这个,不是秘匿值
     };
     COMPANION.reply(S.rouChat, st).then(r => {
       S.rouTyping = false;

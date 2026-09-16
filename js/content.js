@@ -2357,7 +2357,8 @@ const CONTENT = (() => {
       disposal: S.disposal || (SV && SV.disposal) || null,
       violations: S.violations,
       night: ENGINE.inWindow(),
-      clockStr: ENGINE.fmtClock(S.clock)
+      clockStr: ENGINE.fmtClock(S.clock),
+      dossierId: DOSSIER.meta.id   // D-123:代理侧挑 CORE_B/CORE_C 要靠这个,不是秘匿值
     };
     COMPANION.reply(S.rouChat, st).then(r => {
       S.rouTyping = false;
