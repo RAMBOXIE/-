@@ -130,5 +130,48 @@ withRandom(0.5, () => {     // 远高于阈值,不该出现
   A(!t.includes('…'), 'M13: 概率没命中时不该出现"…"');
 });
 
+/* ---- D-115 第二阶段:M13 残响对峙(对话版四档怪异度) ---- */
+function openMomDeepTwice(g){
+  g.C.go('th_mom', true); g.frame();
+  g.C.key('1'); g.C.key('1');   // 第一次深搜(设 E1,弹 casePrompt)+ 关闭 casePrompt
+  g.C.key('1');                 // 第二次深搜:maybeEchoConfront 的唯一检查点
+}
+const ECHO_TIER_LINES = [   // 与 content.js 里的 ECHO_TIERS 逐字对应(教学式重复,专防内容漂移)
+  '语气很正常。只是——他报的时间,和你屏上这个,对不上。',
+  '「电量留三成……三成……」他在重复同一句,答非所问。',
+  '只用他写过的那几个词,拼出一句你看得懂、接不上的话。',
+  '它不再回答了。只是把同一句话,一遍一遍地播。',
+];
+withRandom(0.01, () => {        // < 0.15 阈值,必触发
+  const g = mkEnv({ runCount: 1 });
+  openMomDeepTwice(g);
+  A(g.C.currentId === 'echoConfront', 'M13 对话版: th_mom 二次深搜应触发残响对峙,实际 ' + g.C.currentId);
+  const t = g.frame();
+  A(t.includes('残响 ·'), 'M13 对话版: 屏面应含"残响 · <NPC id>",实际: ' + t.slice(0, 60));
+  A(ECHO_TIER_LINES.some(l => t.includes(l)), 'M13 对话版: 应展示四档怪异度文案之一,实际: ' + t.slice(0, 100));
+});
+withRandom(0.9, () => {         // >= 0.15 阈值,不该触发
+  const g = mkEnv({ runCount: 1 });
+  openMomDeepTwice(g);
+  A(g.C.currentId === 'th_mom', 'M13 对话版: 概率没命中时二次深搜不该跳出残响屏,实际 ' + g.C.currentId);
+});
+withRandom(0.01, () => {
+  const g = mkEnv({ runCount: 1 });
+  openMomDeepTwice(g);
+  A(g.S.echoConfronted === true, 'M13 对话版: 触发后应置位 echoConfronted(每局至多1次)');
+  g.C.key('2');                 // 退开:无风险无收益
+  A(g.C.currentId === 'th_mom', '退开后应回到 th_mom,实际 ' + g.C.currentId);
+});
+withRandom(0.01, () => {
+  const g = mkEnv({ runCount: 1 });
+  openMomDeepTwice(g);
+  const cacheBefore = g.S.cacheVal, traceBefore = g.S.trace;
+  g.C.key('1');                 // 对峙:引擎裁决胜负,数值必然变化(胜=缓存+,负=溯源+)
+  const changed = g.S.cacheVal !== cacheBefore || g.S.trace !== traceBefore;
+  A(changed, 'M13 对话版: 对峙后应有数值后果(缓存或溯源变化),实际前后缓存 ' +
+    cacheBefore + '->' + g.S.cacheVal + ' 溯源 ' + traceBefore + '->' + g.S.trace);
+  A(g.C.currentId === 'th_mom', '对峙结算后应回到 th_mom,实际 ' + g.C.currentId);
+});
+
 console.log(failures ? ('\nFAILED: ' + failures) : '\nALL LEGACY-RESIDUE (D-115) CHECKS PASS');
 process.exit(failures ? 1 : 0);

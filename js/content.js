@@ -1388,6 +1388,70 @@ const CONTENT = (() => {
     }
   };
 
+  /* ==================== D-115 第二阶段:M13 残响对峙(对话版) ====================
+     方案 §2.3。四档怪异度是 canon 原文分类,纯手写文案(L0),不需要生成式多样性,
+     不走 LLM——"她"通道(companion.js)才是真人格核,这里是"死者的复读故障",
+     越像故障越对。挑哪一档 / 对峙胜负,复用 D-105 pickBranch 同一套"引擎给结果集,
+     只挑分支,数值回填"写法,不新发明机制。
+     每局至多 1 次,挂在 th_mom 深搜成功之后(残响天然和"翻别人的死"这件事同调,
+     和 M12 三个挂点刻意错开,降低同局撞在一起的概率)。 */
+  const ECHO_TIERS = [
+    { id: 'normal', w: 3, line: '语气很正常。只是——他报的时间,和你屏上这个,对不上。' },
+    { id: 'loop1',  w: 3, line: '「电量留三成……三成……」他在重复同一句,答非所问。' },
+    { id: 'wordset',w: 2, line: '只用他写过的那几个词,拼出一句你看得懂、接不上的话。' },
+    { id: 'giveup', w: 1, line: '它不再回答了。只是把同一句话,一遍一遍地播。' },
+  ];
+  function maybeEchoConfront(){
+    if (S.echoConfronted) return false;
+    if (Math.random() >= 0.15) return false;
+    S.echoConfronted = true;
+    S._echoNpc = LEGACY_ROSTER[Math.floor(Math.random() * LEGACY_ROSTER.length)];
+    S._echoTier = pickBranch(ECHO_TIERS);
+    push('echoConfront');
+    return true;
+  }
+  SCREENS.echoConfront = {
+    transient: true,
+    enter(){
+      if (!S._echoNpc || !S._echoTier) return;   // 自愈:直接跳进来(无前置状态)时不崩
+      ENGINE.logEv('echo_confront', { npc: S._echoNpc.id, tier: S._echoTier.id });
+    },
+    render(){
+      statusBar();
+      const n = S._echoNpc, tier = S._echoTier;
+      if (!n || !tier){ back(); return; }
+      const t = '残响 · ' + n.id + '\n\n' + tier.line;
+      L.drawPara(4, 20, t, W - 8);
+      let y = 150;
+      y = option(y, '1 对峙', '1');
+      option(y, '2 退开', '2');
+      softKeys('选择', '');
+    },
+    key(k){
+      const n = S._echoNpc;
+      if (k === '1'){
+        /* 对峙胜负:D-105 同款"引擎算结果、只挑分支"写法。胜=缓存子集(40–60%),
+           负=小代价(溯源),不联动"回收/归还"的 residueClaimed(残响不是遗物)。 */
+        const branches = [
+          { id: 'win', w: 1, apply: () => {
+              const pct = 40 + Math.floor(Math.random() * 21);   // 40–60%
+              const val = Math.round(n.relicVal * pct / 100);
+              ENGINE.act('对峙·' + n.id, { bat: 3, trace: 4, slots: 1, val },
+                ['它松开了一部分档案。']);
+            } },
+          { id: 'lose', w: 1, apply: () => {
+              ENGINE.act('对峙·未果', { bat: 3, trace: 10 }, ['它没让。']);
+            } },
+        ];
+        verdict(branches);
+        back(); afterAction();
+      } else if (k === '2' || k === 'softR' || k === 'Escape'){
+        ENGINE.act('退开', { bat: 1 }, ['你没有再逼它。']);
+        back(); afterAction();
+      }
+    }
+  };
+
   /* ==================== 剧本 B 屏群结束(收束屏在下方各处分支) ==================== */
 
   /* ---- 开机:握手动画(人手 × 机器手) ---- */
@@ -1996,6 +2060,7 @@ const CONTENT = (() => {
             push('casePrompt');
             return;
           }
+          if (maybeEchoConfront()) return;   // D-115 第二阶段:残响对峙(稀有,每局至多1次)
         }
         afterAction();
       }
