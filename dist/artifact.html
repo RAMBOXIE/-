@@ -1326,6 +1326,7 @@ const CONTENT = (() => {
       dossierCycle: (raw.dossierCycle || 0) + 1,
       history: raw.history || [],
       seenBottles: raw.seenBottles || [],
+      returnedRelics: raw.returnedRelics || [],   // D-115:career 级,和 seenBottles 同待遇
       praiseCount: raw.praiseCount || 0,
       forgedSeen: raw.forgedSeen || 0,
       crisisSeen: raw.crisisSeen || 0,
@@ -2278,6 +2279,8 @@ const CONTENT = (() => {
         const prev = base.seenBottles || [];
         return S.bottleId && prev.indexOf(S.bottleId) < 0 ? prev.concat([S.bottleId]) : prev;
       })(),
+      /* D-115:归还过的 NPC 遗物(career 级,跨局跨机子不清零——归还是"你"做过的事)。 */
+      returnedRelics: (base.returnedRelics || []).concat(S.relicReturned ? [S.relicReturned] : []),
       vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
       residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
       disposal: isB ? (S.disposal || base.disposal || null) : null,
@@ -2515,12 +2518,21 @@ const CONTENT = (() => {
     id: '#SELF', at: '03:07', item: null, self: true, from: PREV_INST,
     body: '你读到的每一条,我都读过。\n下一个编号,还会读一遍。'
   };
+  /* D-115:归还的 NPC 遗物,追加进这个共享池(D-109 拍板③"底本可追加"的第一次
+     兑现)——合成一条"有人把它还回来了"的瓶,经手人不留名(呼应 canon 保留态纪律)。
+     `SV.returnedRelics` 是跨局、跨机子的career级字段,不随 D-110 的机子切换清零
+     (归还是"你"做过的事,不是这台机子的内容)。 */
+  const RETURNED_BOTTLES = [...new Set((SV && SV.returnedRelics) || [])].map(rid => ({
+    id: '#RETURN-' + rid, at: '—', item: null,
+    body: '「' + rid + ' 的遗物,有人还回来了。\n经手人没留名。」'
+  }));
   /* 选瓶:没读过的优先,读全了再随机。一局内固定不变 */
   const CUR_BOTTLE = (() => {
     const seen = (SV && SV.seenBottles) || [];
-    let pool = BOTTLE_POOL.filter(b => !seen.includes(b.id));
+    const FULL_POOL = BOTTLE_POOL.concat(RETURNED_BOTTLES);
+    let pool = FULL_POOL.filter(b => !seen.includes(b.id));
     if (SV && SV.runCount >= 2 && !seen.includes(OWN_BOTTLE.id)) pool = pool.concat([OWN_BOTTLE]);
-    if (!pool.length) pool = BOTTLE_POOL;
+    if (!pool.length) pool = FULL_POOL;
     return pool[Math.floor(Math.random() * pool.length)];
   })();
   function bottleText(){
@@ -2570,6 +2582,103 @@ const CONTENT = (() => {
         if (!S._bottleClosed){ S._bottleClosed = true; ENGINE.act('已读·未回', { bat: 2 }); }
         back(); afterAction();
       }
+    }
+  };
+
+  /* ==================== D-115 死亡→残留注入闭环 · 单机模拟版 ====================
+     方案见 design/死亡残留注入闭环_单机模拟版_设计_v0.1.md。canon §3.6 M12/M13/M14
+     原设计是真多人异步(残留来自其他真实玩家,需要服务端);这里延续 D-109 拍板③
+     `BOTTLE_POOL` 的思路——用一份写死的"历任采样员"名册在单机内模拟同一种体验。
+     `LEGACY_ROSTER` 和 `BOTTLE_POOL` 同一性质:框架共享,不属于任何一台底本,三台
+     机子共用同一份名册。
+     - M12(遗留会话节点):`node` 字段指定挂在哪个已有屏幕的深搜流程里,`predict`
+       是"死者最后预测"(canon 原句式,数字纯叙事装饰,不联动真实活规则参数——
+       hallucination_gate.js 的秘匿隔离扫描面覆盖 evidence,不覆盖这里,但写的时候
+       仍要避免带出真实窗口/概率值)。
+     - M14(墓场遗物,"捡到别人的"那一半):`relicVal` 是回收选项的缓存收益。
+     - M13(残响,本轮只做非语言通道那一半,方案 §2.3):见 inboxItems() 里的
+       th_rou 徽标分支,不在这里。 */
+  const LEGACY_ROSTER = [
+    { id: '#2286-N', node: 'tools', heat: 'stale', relicVal: 180,
+      causeTag: '力竭 · 电量归零',
+      lastWords: '「电量留三成。」他自己没做到。',
+      reason: '案卷补不齐,赌了一把连续深搜。',
+      predict: '系统 88% 确定他会在这一格上传成功。他没有。' },
+    { id: '#9013-F', node: 'th_stranger', heat: 'overnight', relicVal: 140,
+      causeTag: '过滤层查扣',
+      lastWords: '「早知道该先遮挡。」',
+      reason: '高信号硬传,赌了一把运气。',
+      predict: '系统 76% 确定这条传输不会被扣。扣了。' },
+    { id: '#4460-Q', node: 'deleted', heat: 'warm', relicVal: 220,
+      causeTag: '终局遭遇 · 回收组到场',
+      lastWords: '「差一点。」',
+      reason: '满格信号还想再深搜一层。',
+      predict: '系统 82% 确定他会及时撤。没撤。' },
+  ];
+  const HEAT_CN = { warm: '手还温', overnight: '隔夜', stale: '陈迹' };
+  /* M12:每局最多撞见 1 条,概率结构同 D-101 陷阱条款("tier 判定 + 掷骰")一个写法。
+     不按 GRADER_TIER 加码(这条是氛围而非难度),固定低概率。 */
+  function maybeLegacyNode(nodeId){
+    if (S.legacyNodeShown) return false;
+    const cands = LEGACY_ROSTER.filter(n => n.node === nodeId);
+    if (!cands.length || Math.random() >= 0.2) return false;
+    S.legacyNodeShown = true;
+    S._legacyNode = cands[Math.floor(Math.random() * cands.length)];
+    push('legacyNode');
+    return true;
+  }
+  SCREENS.legacyNode = {
+    transient: true,
+    enter(){ ENGINE.logEv('legacy_node', { id: S._legacyNode && S._legacyNode.id }); },
+    render(){
+      statusBar();
+      const n = S._legacyNode;
+      if (!n){ back(); return; }
+      const t = '残留 · ' + n.causeTag + ' · ' + HEAT_CN[n.heat] +
+        '\n\n遗言: ' + n.lastWords + '\n理由: ' + n.reason + '\n\n' + n.predict;
+      L.drawPara(4, 20, t, W - 8);
+      option(H - 42, '关闭', 'Enter');
+      hit(0, 0, W, H - 46, 'Enter');
+    },
+    key(k){ if (k === 'Enter' || k === 'softL' || k === 'Escape' || k === 'softR') back(); }
+  };
+  /* M14:捡到"别人"的遗物——只在没有自己的旧机残留可捡时才可能出现,且排除本局
+     漂流瓶已经给过的那位(呼应"排除同指纹集群"的精神,不做真的指纹系统)。 */
+  const CUR_RELIC = (() => {
+    if (!isB) return null;
+    const excl = new Set([CUR_BOTTLE.id]);
+    const cands = LEGACY_ROSTER.filter(n => !excl.has(n.id));
+    if (!cands.length || Math.random() >= 0.35) return null;
+    return cands[Math.floor(Math.random() * cands.length)];
+  })();
+  const relicAvail = () => isB && !oldPhoneAvail() && !!CUR_RELIC && !S.residueClaimed;
+  SCREENS.npcRelic = {
+    counted: true, transient: true,
+    render(){
+      statusBar();
+      const n = CUR_RELIC;
+      if (!n){ back(); return; }
+      let y = L.drawPara(4, 16, n.id + ' 的遗物\n' + n.causeTag + ' · ' + HEAT_CN[n.heat] +
+        '\n遗物价值: ¥' + n.relicVal, W - 8);
+      y += 6;
+      y = option(y, '1 回收 ¥' + n.relicVal + '(电量−6·信号▲▲)', '1');
+      option(y, '2 归还(投进漂流瓶信道)', '2');
+      settleLines(y + 26);
+      softKeys('', '返回');
+    },
+    key(k){
+      const n = CUR_RELIC;
+      if (k === '1'){
+        S.residueClaimed = true;
+        ENGINE.act('回收·' + n.id + ' 遗物', { bat: 6, trace: 8, slots: 4, val: n.relicVal });
+        back(); afterAction();
+      } else if (k === '2'){
+        S.residueClaimed = true;
+        S.relicReturned = n.id;    // D-110 拍板③:归还即追加进 BOTTLE_POOL 共享池(见 writeSave)
+        ENGINE.act('归还·' + n.id + ' 遗物', { bat: 2 }, ['已投进漂流瓶信道 · 下一个人会读到']);
+        ENGINE.logEv('relic_returned', { id: n.id });
+        back(); afterAction();
+      } else if (k === 'softR' || k === 'Escape'){ back(); afterAction(); }
     }
   };
 
@@ -2748,10 +2857,16 @@ const CONTENT = (() => {
     /* D-109 第③步:线程 id/label/to 读 DOSSIER.threads.inbox;未读徽标(活状态)仍是
        框架逻辑,只是现在按 id 查而非写死整行。行为与改动前逐字相同。 */
     const rouUnread = S.beats.anomaly === 'fired-once' ? ' (1)' : (seen.th_rou ? '' : ' (1)');
+    /* D-115 M13(残响,非语言通道那一半):已读、没有真实未读时,极低概率一帧即逝地
+       飘过"正在输入…"的错觉——不进 rouChat、不留痕迹、没有任何数值后果,纯氛围。 */
     const BADGE = {
       th_proto:    () => seen.th_proto ? '' : '(1)',
       th_mom:      () => MOM_LOCK === 'deleted' ? '' : (seen.th_mom ? '' : '(1)'),
-      th_rou:      () => rouUnread.trim(),
+      th_rou:      () => {
+        const u = rouUnread.trim();
+        if (u) return u;
+        return (isB && Math.random() < .01) ? '…' : '';
+      },
       th_stranger: () => S.stranger.read ? '' : '(1)',
       th_bill:     () => '106',
       bottleIn:    () => seen.bottleIn ? '' : '(1)',
@@ -3308,6 +3423,7 @@ const CONTENT = (() => {
       if (k === '1'){
         if (S.stranger.acted){ back(); afterAction(); return; }   // 已查过=直接回
         st.act(); st.mark(); S.stranger.acted = true;
+        if (maybeLegacyNode('th_stranger')) return;   // D-115:偶遇残留节点,插一屏,不吃掉本次 back
         back(); afterAction();                                    // 结算行落在收件箱(与 th_bill 一致)
       } else if (k === '2' || k === 'softR' || k === 'Escape'){ back(); afterAction(); }
     }
@@ -3828,6 +3944,7 @@ const CONTENT = (() => {
   }
   SCREENS.deleted = {
     counted: true,
+    enter(){ if (!this._t){ this._t = true; maybeLegacyNode('deleted'); } },   // D-115:偶遇残留节点
     render(){
       statusBar();
       if (!isB){
@@ -3843,6 +3960,8 @@ const CONTENT = (() => {
                       to: decoded ? 'e5voice' : 'e5crack' }];
       if (oldPhoneAvail()) rows.push({ label: PREV_INST + ' 的残留', right: PREV_INST, to: 'oldPhone' });
       else if (isB && SV.residueClaimed) rows.push({ label: PREV_INST + ' 的残留', right: '[已认领]', to: null });
+      /* D-115 M14:没有自己的旧机可捡时,才可能撞见"别人"的遗物 */
+      if (relicAvail()) rows.push({ label: CUR_RELIC.id + ' 的遗物', right: CUR_RELIC.id, to: 'npcRelic' });
       L.drawText(4, 18, '已删除 (' + rows.length + ')');
       list(rows, 40);
       settleLines(40 + rows.length * 18 + 8);
@@ -3925,7 +4044,10 @@ const CONTENT = (() => {
 
   /* ---- 工具:上传/断连(B 局:清洗道具 + 查扣风险 + 收束判定明示) ---- */
   SCREENS.tools = {
-    enter(){ if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
+    enter(){
+      if (!this._t){ this._t = true; ENGINE.S.trace += 4; }
+      maybeLegacyNode('tools');   // D-115:偶遇残留节点(push,不打断本屏正常渲染)
+    },
     render(){
       statusBar();
       const rounds = Math.max(1, Math.ceil(S.cacheSlots / 10));
