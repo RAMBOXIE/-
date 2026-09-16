@@ -1824,6 +1824,10 @@ const CONTENT = (() => {
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
   const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
+  /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
+     用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见
+     不认识的"妈"/AI 伴侣,却以为是同一批人。 */
+  const JUST_SWITCHED = !!(SV && SV.runCount == null && (SV.dossierCycle || 0) > 0);
   /* ==================== D-109 第⑥步:收口 —— loadDossier(CURRENT) ====================
      最小加载器。现在只有一份底本(phone-7741),`CURRENT` 就是它;这一步只是把"框架
      从哪里取底本"变成一个具名接口,为将来真的有多份底本(生成/挑选/切换)留一个不需要
@@ -2667,6 +2671,10 @@ const CONTENT = (() => {
         '',
         '遗言: 「留三成。我自己没做到。」'
       ];
+      /* D-114:刚切换到新机子的第一局,在#6404-C这份(不相关的)回收单之前先插一句框架级
+         独白——不点名新死者是谁,只交代"上一台结清了、这是另一台",避免玩家在毫无信号
+         的情况下突然看见陌生的"妈"/AI伴侣,却以为素材串场出了错。 */
+      if (JUST_SWITCHED) lines.unshift('上一台设备已回收 · 案卷归档', '');
       scrollView(lines, 16, H - 64, this);
       L.drawText(4, H - 60, '下一个接入者: 你');
       option(H - 42, '#' + DOSSIER_NUM + '-A 激活 · 接入', 'Enter');
@@ -2684,6 +2692,11 @@ const CONTENT = (() => {
       let y = 18;
       L.drawText(4, y, '采样员备忘 · #' + DOSSIER_NUM + '-A'); y += LH + 2;
       L.hline(y, 4, W - 5, 2); y += 6;
+      /* D-114:提前把死者代称(不是全名)露出来,而不是留到深翻妈线程/伴侣线程才第一次
+         看见——尤其是刚切换到新机子的那一局,这是玩家第一次能确认"这是另一个人"的
+         机会。措辞走采样官式的冷淡口吻,不额外解释,和其它协议文案语域一致。 */
+      y = L.drawPara(4, y, '接入对象: ' + DOSSIER.meta.deceased.alias + '(核验中)', W - 8);
+      y += 4;
       y = L.drawPara(4, y, '目标:翻找值钱数据 → 上传 → 活着断连。', W - 8);
       y += 4;
       y = L.drawPara(4, y, '电量=你的命,每步都扣,归零即失联。', W - 8);
