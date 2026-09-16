@@ -1324,6 +1324,26 @@ const CONTENT = (() => {
       },
     },
   };
+  /* ==================== D-109 第⑥步:收口 —— loadDossier(CURRENT) ====================
+     最小加载器。现在只有一份底本(phone-7741),`CURRENT` 就是它;这一步只是把"框架
+     从哪里取底本"变成一个具名接口,为将来真的有多份底本(生成/挑选/切换)留一个不需要
+     改调用方的口子——`loadDossier()` 不传 id 时返回当前底本,传了就校验 id 匹配。
+     **收口清点(范围校准终局)**:逐一确认 content.js 里仍写死的以下几块,均不是"结构
+     搬家"能干净接住的数据表,留在原处不动:
+       - `DIRECTIVE_LIB`/`TRAP_LIB`(采样官指令与陷阱库):`met()`/`detect()` 直接嵌
+         判定闭包,和 dilemma 池同一个"需要动作-效果 DSL"缺口(步⑤已记录),且是
+         canon 采样官机制本身的一部分,不是"这台机子"专属内容。
+       - `STRANGER_LIB`/`PREDS_A`/`PREDS_B`/`MOM_PAGES`/`MOM_TOLD_PAGES`/`ALBUM_SEQ`/
+         `ROU_PAGES`/`RECS`(陌生号码脚本、预测文案、妈/柔柔/相册/录音的整段叙事):
+         和 persona 暂缓同一条理由(拍板②)——现在只有一份底本,模板化零收益,却要
+         动大量对语法敏感的人物叙事散文,风险收益不对等,留到接第二台不同人物的
+         机子时再做。
+     以上均已在步①②③④⑤的范围校准里逐条记录过,这里只是最终确认没有遗漏。 */
+  const CURRENT = DOSSIER;
+  function loadDossier(id){
+    if (id && id !== CURRENT.meta.id) throw new Error('未知底本: ' + id);
+    return CURRENT;
+  }
   const RUN = (() => {
     const wg = DOSSIER.rules.windowGen;
     if (!SV || !SV.runCount) return { scen: 'A', wFrom: wg.A.wFrom, wTo: wg.A.wFrom + wg.A.wLen, clock0: wg.A.clock0 };
@@ -4427,6 +4447,7 @@ const CONTENT = (() => {
        (终局来电/中段遭遇/试炼等),不只是 finalCall 一处。 */
     freezeAdjust(hiddenMs){ if (timer && hiddenMs > 0) timer.deadline += hiddenMs; },
     instanceId: INSTANCE_ID,                              // 常驻锚点三件套(§1 宪法13)
+    dossier: loadDossier(),                               // D-109 收口:底本→渲染加载器
     go, back, SCREENS
   };
 })();
