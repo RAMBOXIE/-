@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-16T04:31:53.194Z",
+  "generatedAt": "2026-09-16T06:35:45.266Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -51,7 +51,7 @@
     {
       "id": "A",
       "name": "最短线·中止断连",
-      "readChars": 616,
+      "readChars": 615,
       "decisionCount": 4,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -67,7 +67,7 @@
       "topScreens": [
         {
           "screen": "th_proto",
-          "chars": 100
+          "chars": 99
         },
         {
           "screen": "brief",
@@ -111,7 +111,7 @@
           "read": 1.23,
           "decision": 0.2,
           "wait": 0.13,
-          "total": 1.57
+          "total": 1.56
         },
         "普通": {
           "read": 2.2,
@@ -120,7 +120,7 @@
           "total": 2.73
         },
         "沉浸": {
-          "read": 4.45,
+          "read": 4.44,
           "decision": 0.8,
           "wait": 0.13,
           "total": 5.38
@@ -130,7 +130,7 @@
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2060,
+      "readChars": 2050,
       "decisionCount": 13,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -177,16 +177,16 @@
           "chars": 137
         },
         {
-          "screen": "th_proto",
-          "chars": 109
-        },
-        {
           "screen": "memo2",
           "chars": 107
         },
         {
           "screen": "contacts",
           "chars": 101
+        },
+        {
+          "screen": "th_proto",
+          "chars": 99
         },
         {
           "screen": "finalCall",
@@ -199,29 +199,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.12,
+          "read": 4.1,
           "decision": 0.65,
           "wait": 0.74,
-          "total": 5.51
+          "total": 5.49
         },
         "普通": {
-          "read": 7.36,
+          "read": 7.32,
           "decision": 1.3,
           "wait": 0.74,
-          "total": 9.4
+          "total": 9.36
         },
         "沉浸": {
-          "read": 14.88,
+          "read": 14.81,
           "decision": 2.6,
           "wait": 0.74,
-          "total": 18.22
+          "total": 18.14
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2637,
+      "readChars": 2636,
       "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -290,12 +290,12 @@
           "chars": 107
         },
         {
-          "screen": "th_proto",
+          "screen": "finalCall",
           "chars": 100
         },
         {
-          "screen": "finalCall",
-          "chars": 100
+          "screen": "th_proto",
+          "chars": 99
         },
         {
           "screen": "th_bill",
@@ -307,19 +307,19 @@
           "read": 5.27,
           "decision": 1.2,
           "wait": 1.07,
-          "total": 7.55
+          "total": 7.54
         },
         "普通": {
-          "read": 9.42,
+          "read": 9.41,
           "decision": 2.4,
           "wait": 1.07,
           "total": 12.89
         },
         "沉浸": {
-          "read": 19.05,
+          "read": 19.04,
           "decision": 4.8,
           "wait": 1.07,
-          "total": 24.92
+          "total": 24.91
         }
       }
     },

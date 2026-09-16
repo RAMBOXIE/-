@@ -170,6 +170,78 @@ scenario('陷阱 · 触发条款则 fail(压过主指令达标)', null, ({A, C, 
   A(S.grade === 'fail', '触陷阱即便主指令达标也 fail,实际 '+S.grade);
 });
 
+/* ---- D-112:D_UPLOAD/T_BAIT/T_DEEP(实现规格 §3 早就点名、之前一直没落地的三项) ---- */
+scenario('D_UPLOAD · 快照步数在预算内则达标', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_UPLOAD', met: () => S.uploadStartedAtAction != null && S.uploadStartedAtAction <= 6 };
+  S.uploadStartedAtAction = 3;
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.dirMet === true, 'uploadStartedAtAction=3 ≤ 预算 6,应达标');
+  A(S.grade !== 'fail', '达标不应 fail,实际 ' + S.grade);
+});
+scenario('D_UPLOAD · 超预算才开始上传则不达标', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_UPLOAD', met: () => S.uploadStartedAtAction != null && S.uploadStartedAtAction <= 6 };
+  S.uploadStartedAtAction = 9;
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.dirMet === false, 'uploadStartedAtAction=9 > 预算 6,应不达标');
+  A(S.grade === 'fail', '不达标应 fail,实际 ' + S.grade);
+});
+scenario('D_UPLOAD · 还没开始上传(快照为 null)一律不达标', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_UPLOAD', met: () => S.uploadStartedAtAction != null && S.uploadStartedAtAction <= 6 };
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.dirMet === false, '没上传过,不该判达标');
+});
+scenario('T_BAIT · 取走对照样本(decoyTaken)即触发', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met: () => true };
+  S.trap = { id:'T_BAIT', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) };
+  S.clues.decoyTaken = true;
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.trapHit === true, 'decoyTaken=true 应判触发 T_BAIT');
+  A(S.grade === 'fail', '触陷阱应 fail,实际 ' + S.grade);
+});
+scenario('T_BAIT · 陌生号码踩饵(strangerBait)同样触发', null, ({A, C, S}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met: () => true };
+  S.trap = { id:'T_BAIT', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) };
+  S.clues.strangerBait = true;
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.trapHit === true, 'strangerBait=true 应判触发 T_BAIT("任一"对照样本)');
+});
+scenario('T_DEEP · 窗口内深搜(engine 集中钩子)即触发', null, ({A, C, S, E}) => {
+  C.go('saymaster', true);
+  S.directive = { id:'D_CASE', met: () => true };
+  S.trap = { id:'T_DEEP', detect: () => !!S.deepInWindowHit };
+  E.setRule(0, 1000); S.clock = 500;
+  E.act('深搜·测试', { bat: 1 });
+  A(S.deepInWindowHit === true, 'engine.act 里以"深搜"开头的动作应在窗口内点亮 deepInWindowHit');
+  S.dirGraded = false; S.cacheVal = 1000; S.beats = { truthDone:true };
+  C.go('receiptAlive', true);
+  A(S.trapHit === true, '应判触发 T_DEEP');
+});
+scenario('T_DEEP · 窗口外深搜不触发', null, ({A, C, S, E}) => {
+  E.setRule(0, 100); S.clock = 500;   // 窗口外
+  E.act('深搜·测试', { bat: 1 });
+  A(S.deepInWindowHit === false, '窗口外的深搜不该点亮 deepInWindowHit');
+});
+scenario('陷阱库/指令库 · D_UPLOAD/T_BAIT/T_DEEP 确实登记在两份底本里(不是只在测试里手造)', null, ({A, C}) => {
+  const ids = x => x.map(v => v.id);
+  A(ids(C.dossier.narrative.traps).includes('T_BAIT'), 'A 底本 traps 应含 T_BAIT');
+  A(ids(C.dossier.narrative.traps).includes('T_DEEP'), 'A 底本 traps 应含 T_DEEP');
+});
+scenario('陷阱库 · B 底本(phone-5029)同样登记了 T_BAIT/T_DEEP', { dossierId:'B' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'B 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'B 底本 traps 应含 T_DEEP');
+});
+
 /* ---- 离线:无 LLM(平台能力/代理都不在)时,下令与评级仍走模板,机制不缺 ---- */
 scenario('离线兜底 · 下令屏用模板措辞、机制在场', null, ({A, C, frame}) => {
   C.go('saymaster', true);

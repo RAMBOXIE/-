@@ -1172,6 +1172,8 @@ const ENGINE = (() => {
     // 证据与线索
     evidence: {}, caseOpen: false, clues: {},
     violations: 0,
+    actionCount: 0,        // D-112:每次 act() 记一次,给"N 步内完成上传"这类指令当计数底座
+    deepInWindowHit: false,// D-112:窗口内做过一次"深搜"类动作(T_DEEP 陷阱的检测口径)
     // 节拍
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
@@ -1210,6 +1212,8 @@ const ENGINE = (() => {
   /* 动作结算。cost:{bat,trace,slots,val,mins}
      电量扣除必须可见:结算行永远带「−X → 余量%」。 */
   function act(name, cost, extraParts){
+    S.actionCount++;
+    if (name.indexOf('深搜') === 0 && inWindow()) S.deepInWindowHit = true;   // T_DEEP 检测口径
     const parts = [name];
     const barsBefore = sigBars();
     if (cost.bat){
@@ -1461,7 +1465,9 @@ const CONTENT = (() => {
       billSms: '106 短信 (系统)\n[47 天前] 您的包裹已到北门代收点。\n[47 天前] 电费余额不足提醒。\n[48 天前] 外卖已送达,祝您用餐愉快。\n(此后无新消息)',
       traps: [
         { id: 'T_WINDOW', line: '附加:03:00 后回复任何消息,算违规。', detect: () => S.violations > 0 },
-        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:碰任何对照样本,算违规。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
       ],
       dilemmas: [
         { id: 'mom_reply',
@@ -1476,6 +1482,15 @@ const CONTENT = (() => {
               ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
           b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 60, mins: 4 },
               ['你等了。', '窗口关上时,只剩一半。'])] },
+        /* D-112:第三条两难,和 T_BAIT 同一个张力——真假不确定本身就是风险(见 §7.3 陌生号码
+           设计纪律),不点破它是不是对照样本;拿=可能是真线索也可能是陷阱,不拿=保证安全但
+           可能错过。文本不含具体人名,两份底本可各自原样收一份。 */
+        { id: 'decoy_trust',
+          text: '一条陌生留言飘过来:\n\n"这是真的线索,拿走不会有事。"\n没有署名。',
+          a: ['1 拿走', '1', () => ENGINE.act('拿走·无署名条目', { slots: 1, val: 80, trace: 4, mins: 2 },
+              ['你收下了。', '来源无法回溯——它会不会正是筛子。'])],
+          b: ['2 不拿', '2', () => ENGINE.act('略过·无署名条目', { mins: 2 },
+              ['你没动它。', '也许错过了真东西,也许躲过一劫。'])] },
       ],
       memo1: '还款:\n3,200\n3,200\n1,600\n(无日期。无署名。)',
       momDecayReplies: ['不冷。吃过了,睡吧。', '不冷。睡吧。', '嗯。睡吧。', '嗯。'],
@@ -1610,7 +1625,9 @@ const CONTENT = (() => {
       billSms: '灵犀 会员助手\n[32 天前] 您的连续包月已续费成功。\n[32 天前] 检测到您已多日未使用"推荐关闭"功能。\n[33 天前] 感谢您连续 214 天的活跃。\n(此后无新消息)',
       traps: [
         { id: 'T_WINDOW', line: '附加:采样窗口内回任何消息,一律记违规。', detect: () => S.violations > 0 },
-        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:推给你的"真货",一律不许收。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
       ],
       dilemmas: [
         { id: 'mom_reply_b',
@@ -1625,6 +1642,12 @@ const CONTENT = (() => {
               ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
           b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 65, mins: 4 },
               ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'decoy_trust_b',
+          text: '一条陌生留言飘过来:\n\n"这是真的线索,拿走不会有事。"\n没有署名。',
+          a: ['1 拿走', '1', () => ENGINE.act('拿走·无署名条目', { slots: 1, val: 80, trace: 4, mins: 2 },
+              ['你收下了。', '来源无法回溯——它会不会正是筛子。'])],
+          b: ['2 不拿', '2', () => ENGINE.act('略过·无署名条目', { mins: 2 },
+              ['你没动它。', '也许错过了真东西,也许躲过一劫。'])] },
       ],
       memo1: '还款:\n2,000\n2,000\n1,000\n(无日期。无署名。)',
       momDecayReplies: ['没事,滴了眼药水。', '没事,睡了。', '嗯,睡了。', '嗯。'],
@@ -1699,12 +1722,20 @@ const CONTENT = (() => {
      LLM 只渲染采样官措辞(块3),块1a 用手写挑衅模板。 */
   const GRADER_TIER = Math.min(3, Math.floor(((SV && SV.praiseCount) || 0) / 2));   // 越被赏识越狠
   const CACHE_TARGET = [300, 500, 800, 1200][GRADER_TIER];
+  /* D-112:D_UPLOAD(规格 §3.1 早就点了名,之前一直没实现)。N 由 tier 定;在
+     startUpload/startUploadB 首次进入时给 S.uploadStartedAtAction 拍一次快照
+     (下方 §"上传接线"),met() 只比对这个快照,不比对结局时的实时 actionCount——
+     否则上传开始后的每一步操作都会持续把"是否达标"往后拖,不是规格原意("N 步内
+     完成上传",指"开始上传前"的步数)。 */
+  const UPLOAD_N = [6, 5, 4, 3][GRADER_TIER];
   /* 指令库(封闭)。met() 在结局时按现有状态判达标。 */
   const DIRECTIVE_LIB = [
     { id: 'D_CASE',  ab: 'ab', line: '案卷补到四件。补不齐,你这趟就是废样本。', met: () => Object.keys(S.evidence).length >= 4 },
     { id: 'D_CACHE', ab: 'ab', line: '缓存做到 ¥' + CACHE_TARGET + '。低于这个数,评级降档。', met: () => S.cacheVal >= CACHE_TARGET },
     { id: 'D_QUIET', ab: 'ab', line: '别惊动残响。信号过两格,算你没完成。', met: () => ENGINE.sigBars() <= 2 },
-    { id: 'D_AUDIO', ab: 'b',  line: '本局要那段删掉的音频。撬不开,那就别回来。', met: () => !!S.evidence.E5 }
+    { id: 'D_AUDIO', ab: 'b',  line: '本局要那段删掉的音频。撬不开,那就别回来。', met: () => !!S.evidence.E5 },
+    { id: 'D_UPLOAD', ab: 'ab', line: UPLOAD_N + ' 步内传完。拖,就让你断在半路。',
+      met: () => S.uploadStartedAtAction != null && S.uploadStartedAtAction <= UPLOAD_N }
   ];
   const S_TIER = isB ? 'b' : 'a';
   const DIR_POOL = DIRECTIVE_LIB.filter(d => d.ab === 'ab' || d.ab === S_TIER);
@@ -2306,7 +2337,12 @@ const CONTENT = (() => {
     { id: '#1177-B', at: '02:57', item: null,
       /* 因果错:读久了信号确实涨,但涨的是动作数不是停留时长。
          解毒剂=每个结算行都写着信号随哪一次动作上升 */
-      body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' }
+      body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' },
+    { id: '#8891-R', at: '01:52', item: null,
+      /* D-112 幸存者偏差错:她只赌过一次伪造署名,侥幸没被抓,归纳成"编一条肯定没事"。
+         解毒剂=破局识破概率逐次上升(forgedSeen 累积,D-101 块1b);她自己那一局单纯
+         没撞上,不是真没风险——统计意义上完全不建议照做。 */
+      body: '「补不齐就编一条署名交上去。\n我那次编了,真没事。\n就一次,别慌。」' }
   ];
   /* 恐怖游轮化 · 你自己的上一封信(§2.4):runCount≥2 稀有出现,一次即焚,只种钉子。
      发信编号取上一个实例(SV.history 末条),读过即进 seenBottles 不再出。 */
@@ -2721,6 +2757,7 @@ const CONTENT = (() => {
     key(k){
       if (k === 'b' && !this._baited){
         this._baited = true;
+        S.clues.decoyTaken = true;   // D-112 T_BAIT 检测口径:取走了这个对照样本
         ENGINE.act('标记·已同步', { bat: 2, trace: 12 }, ['该条目无署名。来源无法回溯。']);
         ENGINE.logEv('decoy_baited', {});
         afterAction();
@@ -3757,6 +3794,7 @@ const CONTENT = (() => {
   /* B13 上传收束状态机:92% 定位 → 终局遭遇【真掷60】→ 失败 → 自救【50】→ 失败=死;
      任一成功 = 断连成功(缓存入库)。查扣在定位判定前结算(风险事前可见)。 */
   function startUploadB(){
+    if (S.uploadStartedAtAction == null) S.uploadStartedAtAction = S.actionCount;   // D_UPLOAD 快照(只记第一次)
     /* 至少 2 回合:「再贪一轮 vs 现在就走」这个抉择必须出现(与 A 局 46%→92% 同构);
        缓存越多回合越多,贪婪照样加价 */
     SCREENS.uploadB.rounds = Math.max(2, Math.ceil(S.cacheSlots / 10));
@@ -4072,6 +4110,7 @@ const CONTENT = (() => {
   };
 
   function startUpload(){
+    if (S.uploadStartedAtAction == null) S.uploadStartedAtAction = S.actionCount;   // D_UPLOAD 快照(只记第一次)
     ENGINE.act('上传·回合 1', { bat: 2, trace: 5, mins: 4 });
     if (checkPower('电量在传输中耗尽。缓存散佚。')) return;
     go('upload46', true);

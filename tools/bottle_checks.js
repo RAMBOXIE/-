@@ -1,6 +1,6 @@
 "use strict";
-/* 漂流瓶信道:三张 canon NPC 采样员的瓶。
-   验收:轮换(没读过的优先) / 三条 14③ 文案纪律 / 无附件瓶不给东西 / 查扣反事实 */
+/* 漂流瓶信道:四张 canon NPC 采样员的瓶(D-112 新增 #8891-R)。
+   验收:轮换(没读过的优先) / 四条 14③ 文案纪律 / 无附件瓶不给东西 / 查扣反事实 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
 const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
@@ -74,46 +74,52 @@ const BASE = {
 const save = extra => Object.assign({}, BASE, extra);
 
 /* ---- 1. 轮换:没读过的优先 ---- */
-scenario('轮换1: 只剩 #5502-D 没读过 -> 必给它', save({ seenBottles: ['#3120-K','#1177-B'] }), g => {
+scenario('轮换1: 只剩 #5502-D 没读过 -> 必给它', save({ seenBottles: ['#3120-K','#1177-B','#8891-R'] }), g => {
   const { A, CONTENT, frame } = g;
   CONTENT.go('bottleIn', true);
   const t = frame();
   A(t.includes('#5502-D'), '应给 #5502-D,实际帧: ' + t.slice(0, 90));
   A(g.S.bottleId === '#5502-D', 'bottleId 记录');
 });
-scenario('轮换2: 只剩 #3120-K 没读过 -> 必给它', save({ seenBottles: ['#5502-D','#1177-B'] }), g => {
+scenario('轮换2: 只剩 #3120-K 没读过 -> 必给它', save({ seenBottles: ['#5502-D','#1177-B','#8891-R'] }), g => {
   const { A, CONTENT, frame } = g;
   CONTENT.go('bottleIn', true);
   const t = frame();
   A(t.includes('#3120-K'), '应给 #3120-K,实际帧: ' + t.slice(0, 90));
   A(t.includes('先传,再贪'), '她的原话应在瓶面');
 });
-scenario('轮换3: 只剩 #1177-B 没读过 -> 必给它', save({ seenBottles: ['#5502-D','#3120-K'] }), g => {
+scenario('轮换3: 只剩 #1177-B 没读过 -> 必给它', save({ seenBottles: ['#5502-D','#3120-K','#8891-R'] }), g => {
   const { A, CONTENT, frame } = g;
   CONTENT.go('bottleIn', true);
   const t = frame();
   A(t.includes('#1177-B'), '应给 #1177-B,实际帧: ' + t.slice(0, 90));
   A(t.includes('#6404-C'), '他在替 #6404-C 传话——世界纵深');
 });
-scenario('轮换4: 三张都读过 -> 仍能给出一张(不空)', save({ seenBottles: ['#5502-D','#3120-K','#1177-B'] }), g => {
+scenario('轮换4: 只剩 #8891-R 没读过 -> 必给它', save({ seenBottles: ['#5502-D','#3120-K','#1177-B'] }), g => {
   const { A, CONTENT, frame } = g;
   CONTENT.go('bottleIn', true);
   const t = frame();
-  A(/#5502-D|#3120-K|#1177-B/.test(t), '读全后仍应随机给一张');
+  A(t.includes('#8891-R'), '应给 #8891-R,实际帧: ' + t.slice(0, 90));
+});
+scenario('轮换5: 四张都读过 -> 仍能给出一张(不空)', save({ seenBottles: ['#5502-D','#3120-K','#1177-B','#8891-R'] }), g => {
+  const { A, CONTENT, frame } = g;
+  CONTENT.go('bottleIn', true);
+  const t = frame();
+  A(/#5502-D|#3120-K|#1177-B|#8891-R/.test(t), '读全后仍应随机给一张');
 });
 
-/* ---- 2. 三条 14③ 文案纪律(逐张核对) ---- */
-scenario('文案纪律: 三张 NPC 瓶用「我那次」句式 + 都不是恶意', save({}), g => {
+/* ---- 2. 四条 14③ 文案纪律(逐张核对;D-112 新增 #8891-R 后 3→4) ---- */
+scenario('文案纪律: 四张 NPC 瓶用「我那次」句式 + 都不是恶意', save({}), g => {
   const { A } = g;
   const src = fs.readFileSync(ROOT + '/js/content.js', 'utf8');
   /* 精确框定 BOTTLE_POOL 数组本身(到它自己的 `];`),不吃后面的 OWN_BOTTLE */
   const start = src.indexOf('const BOTTLE_POOL = [');
   const block = src.slice(start, src.indexOf('\n  ];', start));
-  ['#5502-D','#3120-K','#1177-B'].forEach(id => {
+  ['#5502-D','#3120-K','#1177-B','#8891-R'].forEach(id => {
     A(block.includes(id), '瓶 ' + id + ' 应在表中');
   });
   const bodies = block.split('body:').slice(1);
-  A(bodies.length === 3, '三张 NPC 瓶应有 3 条 body,实际 ' + bodies.length);
+  A(bodies.length === 4, '四张 NPC 瓶应有 4 条 body,实际 ' + bodies.length);
   bodies.forEach((b, i) => {
     A(/我那次/.test(b), '第 ' + (i+1) + ' 张必须含「我那次」(归因载体),实际: ' + b.slice(0, 60));
   });
@@ -135,7 +141,7 @@ scenario('文案纪律: 你自己的信只两句、不解释机制、非恶意',
 });
 
 /* ---- 3. 无附件的瓶:取走键不给东西 ---- */
-scenario('无附件瓶: 取走无效,致谢仍可用', save({ seenBottles: ['#5502-D','#1177-B'] }), g => {
+scenario('无附件瓶: 取走无效,致谢仍可用', save({ seenBottles: ['#5502-D','#1177-B','#8891-R'] }), g => {
   const { A, K, CONTENT, frame, S } = g;
   CONTENT.go('bottleIn', true); frame();
   A(S.bottleId === '#3120-K', '应是无附件的 #3120-K');
@@ -153,7 +159,7 @@ scenario('存档: 读过的瓶写入 seenBottles', save({ seenBottles: ['#3120-K
   g.rnd(0.5);
   CONTENT.go('bottleIn', true); frame();
   const got = S.bottleId;
-  A(got === '#5502-D' || got === '#1177-B', '应给没读过的两张之一,实际 ' + got);
+  A(got === '#5502-D' || got === '#1177-B' || got === '#8891-R', '应给没读过的三张之一,实际 ' + got);
   /* 走到结局写档 */
   S.alive = true; S.uploadedOK = true;
   CONTENT.go('receiptFull', true); frame();
@@ -163,7 +169,7 @@ scenario('存档: 读过的瓶写入 seenBottles', save({ seenBottles: ['#3120-K
 });
 
 /* ---- 5. 查扣反事实:只在读过 #3120-K 时认领 ---- */
-scenario('查扣反事实: 读过 #3120-K 才点名她', save({ seenBottles: ['#5502-D','#1177-B'] }), g => {
+scenario('查扣反事实: 读过 #3120-K 才点名她', save({ seenBottles: ['#5502-D','#1177-B','#8891-R'] }), g => {
   const { A, K, CONTENT, frame, S, tick, ENGINE } = g;
   CONTENT.go('bottleIn', true); frame();
   A(S.bottleId === '#3120-K', '本局是她的瓶');

@@ -383,7 +383,7 @@ const PATHS = [
       lastCacheVal: 2270, lastReason: '我想看看那扇门后面有什么', lastReasonKept: false,
       lastWords: '别信秒回的', violationsA: 1,
       bottleRead: false, bottleTaken: false, bottleReply: null, bottleSealed: null,
-      seenBottles: ['#3120-K', '#1177-B'],         // 只剩 #5502-D 未读 → 本局读它,踩坑后归因卡成立
+      seenBottles: ['#3120-K', '#1177-B', '#8891-R'],   // 只剩 #5502-D 未读(D-112 新增 #8891-R 后需一并标记)→ 本局读它,踩坑后归因卡成立
       attribution: null, vault: null, residueClaimed: false, disposal: null,
       memGiven: false, predsA: [], predsB: []
     },

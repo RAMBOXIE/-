@@ -36,7 +36,7 @@ function boot(saveObj){
     frame:()=>{ ft=[]; L.frame(()=>env.C.render()); return ft.join('｜'); } };
 }
 /* B 局存档:读过其余两瓶,只剩 #5502-D 未读 → 本局必抽到它 */
-const B_SAVE_5502 = { runCount:1, history:[{cacheVal:100, inst:'#7741-A'}], seenBottles:['#3120-K','#1177-B'] };
+const B_SAVE_5502 = { runCount:1, history:[{cacheVal:100, inst:'#7741-A'}], seenBottles:['#3120-K','#1177-B','#8891-R'] };
 const B_SAVE_OTHER = { runCount:1, history:[{cacheVal:100, inst:'#7741-A'}], seenBottles:['#5502-D','#1177-B'] };
 
 function scenario(name, fn){

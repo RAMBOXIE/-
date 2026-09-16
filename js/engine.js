@@ -19,6 +19,8 @@ const ENGINE = (() => {
     // 证据与线索
     evidence: {}, caseOpen: false, clues: {},
     violations: 0,
+    actionCount: 0,        // D-112:每次 act() 记一次,给"N 步内完成上传"这类指令当计数底座
+    deepInWindowHit: false,// D-112:窗口内做过一次"深搜"类动作(T_DEEP 陷阱的检测口径)
     // 节拍
     beats: { anomaly:false, midEnc:false, trial:false, trial2:false, exposure:false, dilemma:false },
     predictions: [],          // {target, hit}
@@ -57,6 +59,8 @@ const ENGINE = (() => {
   /* 动作结算。cost:{bat,trace,slots,val,mins}
      电量扣除必须可见:结算行永远带「−X → 余量%」。 */
   function act(name, cost, extraParts){
+    S.actionCount++;
+    if (name.indexOf('深搜') === 0 && inWindow()) S.deepInWindowHit = true;   // T_DEEP 检测口径
     const parts = [name];
     const barsBefore = sigBars();
     if (cost.bat){
