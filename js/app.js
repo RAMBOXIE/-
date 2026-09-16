@@ -101,12 +101,14 @@
     syncRouPrefLabel();
   }
 
-  /* ---- 非-diegetic AI 声明(D-108:§9 合规红线,onboarding + 设置页) ----
+  /* ---- 非-diegetic AI 声明(D-108:§9 合规红线;D-118 改版:字条不再是强制弹窗) ----
      角色为 AI 生成、玩家行为被统计建模、部分残留可能是对照样本——这条是法务要求的
-     跳出叙事的明文披露,不能靠游戏内"采样协议"那句 diegetic 台词替代。
-     首次打开自动弹一次;之后从外壳顶栏「AI 声明」随时可重看。 */
+     跳出叙事的明文披露,不能靠游戏内"采样协议"那句 diegetic 台词替代,但也不必是
+     一个拦手的模态框。D-118:首次打开时随握手动画一起出现一条不拦手的字条
+     (`#introDisc`,活在 DOM 外壳里,不进 LCD 像素画面——同样是"跳出叙事"的位置,
+     只是不再强制"确定"才能继续);完整版随时可从顶栏「AI 声明」重看。 */
   const DISCLOSURE_TEXT =
-    '这是一部互动小说。\n\n' +
+    '这是一个无限流AI谜题。\n\n' +
     '游戏内与你对话的角色(柔柔、采样官、妈、陌生号码等)由 AI 生成文本驱动。\n' +
     '你在游戏内的选择与输入会被用于生成这些角色的回应与你本局的结算内容。\n' +
     '部分你会遇到的"其他采样员"线索是预先编写的对照样本,不是真实他人。\n\n' +
@@ -117,7 +119,16 @@
     PREFS.setSeenDisclosure(true);
   }
   if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
-  if (!PREFS.seenDisclosure) showDisclosure();
+  /* 首次打开:字条随握手动画一起显示,首次点击/按键(不管是不是打在字条上)
+     连带把它关掉,不额外拦一次手——见下方 dispatch()/pointerup 里的 dismissIntroDisc()。 */
+  const introDisc = document.getElementById('introDisc');
+  function dismissIntroDisc(){
+    if (introDisc && introDisc.classList.contains('on')){
+      introDisc.classList.remove('on');
+      PREFS.setSeenDisclosure(true);
+    }
+  }
+  if (introDisc && !PREFS.seenDisclosure) introDisc.classList.add('on');
 
   /* ---- 静音开关(D-108:AUDIO 全程自动播放,游戏内此前无法关闭)---- */
   const mutePref = document.getElementById('mutePref');
@@ -204,6 +215,7 @@
   }
   zone.addEventListener('pointerdown', e => {
     window.AUDIO.ensure();
+    dismissIntroDisc();                                 // D-118:首次点击顺带把字条划走,不额外拦手
     pd = { x: e.clientX, y: e.clientY, t: performance.now() };
     holdStart(e);
     /* 捕获指针:手指拖出屏幕外松手时 pointerup 仍回到 zone,防长按状态悬挂 */
@@ -235,7 +247,7 @@
                   '1':1, '2':1, '3':1, '4':1, '5':1, '6':1, '7':1 };
     if (reportOvl.classList.contains('on')){ if (e.key === 'Escape') closeReport(); return; }
     if (overlayOn()) return;
-    if (map[e.key]){ e.preventDefault(); dispatch(e.key); }
+    if (map[e.key]){ dismissIntroDisc(); e.preventDefault(); dispatch(e.key); }
   });
 
   /* ==================== D-117 死亡报告 · 局外表现层(canon M17) ====================
@@ -339,6 +351,9 @@
     CONTENT.tickTimer();
     LCD.setBatteryDim(ENGINE.S.battery);           // 低电量整屏变暗(D-108)
     LCD.frame(() => CONTENT.render());
+    /* D-118:字条只在握手动画这一屏出现,一旦自动或手动翻过去(进 connect)就跟着
+       划走,不需要等一次点击——"放在开局的握手动画里"这条边界严格执行。 */
+    if (introDisc && introDisc.classList.contains('on') && CONTENT.currentId !== 'handshake') dismissIntroDisc();
     document.getElementById('brandR').textContent =
       ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';
     requestAnimationFrame(loop);
