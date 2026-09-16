@@ -31,7 +31,12 @@ function mkEnv(saveObj){
     localStorage: storage, addEventListener(){}, navigator: {},
     location: { reload(){ LOG.push('RELOAD'); } },
     OVERLAY: { show(cfg,cb){ LOG.push('OVL'); cb({ text:'测试', kept:false }); }, text(){} },
-    APP: { exportFeedback(){} }, AUDIO: { ensure(){}, hiss(){}, blip(){} },
+    /* D-125:APP 桩此前只有 exportFeedback,D-117 死亡报告局外页上线后
+       receiptFull/receiptAlive 一直在报 "showDeathReport is not a func"——
+       不是游戏真的坏了,是这份工具的桩没跟上,遇事故都当真异常报出来,
+       噪音盖住了真信号。补齐 D-117 加的两个方法(空实现,这里只探路不看渲染)。 */
+    APP: { exportFeedback(){}, showDeathReport(){}, showTransparency(){} },
+    AUDIO: { ensure(){}, hiss(){}, blip(){} },
     HOLD: { active:false, x:0, y:0, t0:0 }, Math
   };
   env.window = env;
@@ -127,9 +132,17 @@ const SAVE_CAPTURED = {
   bottleSealed:null, vault:null, residueClaimed:false, disposal:null, memGiven:false,
   predsA:[], predsB:[], history:[{inst:'#7741-A',kind:'captured',cacheVal:2270,ev:4}]
 };
+/* D-125:这份夹具从建立起就没设过 dossierId——标着"B局"探路,实际渲染的一直是
+   DOSSIER_A(和 D-119 之前 layout_scan_checks.js 的 B_SAVE 撞的是同一个坑)。
+   底本 B(phone-5029)/C(phone-3319)从没被这个断头路/随机游走探测器真正照过。
+   补两份同形状、真设了 dossierId 的夹具,同一套探测逻辑复用。 */
+const SAVE_CAPTURED_B = Object.assign({}, SAVE_CAPTURED, { dossierId:'B', history:[{inst:'#5029-A',kind:'captured',cacheVal:2270,ev:4}] });
+const SAVE_CAPTURED_C = Object.assign({}, SAVE_CAPTURED, { dossierId:'C', history:[{inst:'#3319-A',kind:'captured',cacheVal:2270,ev:4}] });
 
-const rA = probeExits(null, 'A局');
-const rB = probeExits(SAVE_CAPTURED, 'B局');
+const rA = probeExits(null, 'A局(底本A首局)');
+const rB = probeExits(SAVE_CAPTURED, 'B局(底本A二周目,原有夹具,一直没设dossierId,本就该落DOSSIER_A)');
+const rBB = probeExits(SAVE_CAPTURED_B, 'B局(底本B/phone-5029二周目)');
+const rBC = probeExits(SAVE_CAPTURED_C, 'B局(底本C/phone-3319二周目)');
 const wA = { visited: new Map() };
 const wB = { visited: new Map() };
 const allA = Object.keys(mkEnv(null).CONTENT.SCREENS);
@@ -137,4 +150,5 @@ const allB = Object.keys(mkEnv(SAVE_CAPTURED).CONTENT.SCREENS);
 console.log('');
 
 console.log('');
-console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length) + ' 处 | 异常 ' + (rA.errs.length+rB.errs.length) + ' 处');
+console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length) +
+  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length) + ' 处');
