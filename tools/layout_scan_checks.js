@@ -133,6 +133,10 @@ const passes = [
   ['底本B(5029)·长结算行', B_SAVE_B, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   ['底本C(3319)·冷渲染', B_SAVE_C, null],
   ['底本C(3319)·长结算行', B_SAVE_C, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  /* D-122:破局新增两个条件性按钮行(th_rou「卡边缘发」/ tools「喂假数据」),
+     静态夹具默认不触发这两个条件(msgQuota/hunt 都是运行时状态),补一遍强制置位的
+     渲染,确保它们各自的按钮行不会把其余选项挤出屏或压住软键。 */
+  ['B局·回收进程倒计时中(喂假数据可见)', B_SAVE, g => { g.E.S.hunt = { steps: 2 }; g.E.S.cacheSlots = 3; g.E.S.cacheVal = 900; }],
 ];
 
 const all = {};

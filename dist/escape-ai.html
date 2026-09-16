@@ -1459,6 +1459,11 @@ const CONTENT = (() => {
       praiseCount: raw.praiseCount || 0,
       forgedSeen: raw.forgedSeen || 0,
       crisisSeen: raw.crisisSeen || 0,
+      predictP: raw.predictP,   // D-122:可预测度是署名的属性,不是某台机子的,跨机子保留
+      predictN: raw.predictN || 0,
+      predictLowStreak: raw.predictLowStreak || 0,
+      predictWarned: !!raw.predictWarned,
+      predictErased: !!raw.predictErased,
     };
     SAVE.store(next);                                        // 立刻落盘:同session内再次 load()(如世界日报读 lastGrade)不会重复触发切换
     return next;
@@ -2045,8 +2050,58 @@ const CONTENT = (() => {
   const TRAP_POOL = TRAP_LIB.filter(t => !t.ab || t.ab === S_TIER);
   S.trap = (GRADER_TIER >= 1 && Math.random() < 0.7) ? TRAP_POOL[Math.floor(Math.random() * TRAP_POOL.length)] : null;
 
-  /* 破局识破概率:首次低、多用爬升(canon:破局=全额奖励不付真代价,但会被检伪) */
-  const forgeCaughtP = () => Math.min(0.7, 0.2 + ((SV && SV.forgedSeen) || 0) * 0.15);
+  /* 破局识破概率:首次低、多用爬升(canon:破局=全额奖励不付真代价,但会被检伪)。
+     D-122:可预测度 P 达"优良资产"档时叠加危险折减(−5%,本项目自定校准值,
+     canon §3.3 只给定性描述"危险折减",没给数字)。 */
+  const forgeCaughtP = () => {
+    let p = Math.min(0.7, 0.2 + ((SV && SV.forgedSeen) || 0) * 0.15);
+    if (predictTier() === 'excellent') p = Math.max(0.05, p - 0.05);
+    return p;
+  };
+
+  /* ==================== D-122 可预测度 P(canon §3.3 M5,单机模拟版) ====================
+     canon:P∈[0,100],命中/未命中的 EMA(半衰期 30 事件),状态滞后 5(样本不足前不读档)。
+     原版还挂着黑箱资格/回忆馆/首破者名录/remort 等需要跨玩家可见性与后端的系统——
+     这些在"单机模拟版"里没有对应物,明确不做(见决策日志 D-122 范围声明)。这里只落
+     地在本项目实际有的机制上能生效的部分:①破局识破率危险折减/加成(见上)
+     ②起始溯源随档位轻微增减 ③世界日报署名行显示档位 ④P<5 连续多局的警告/抹除
+     台账(署名抹除只影响本机自己的署名显示,不是"他人世界看不见你"——没有其他
+     玩家可看)。EMA/streak 全部是 career 级,和 praiseCount/forgedSeen 同待遇,跨局跨
+     机子保留。 */
+  const PREDICT_HALFLIFE = 30;
+  const PREDICT_ALPHA = 1 - Math.pow(2, -1 / PREDICT_HALFLIFE);
+  const PREDICT_MIN_N = 5;                     // 状态滞后:样本不足前不读档,按"建档中"处理
+  function predictTier(){
+    const n = (SV && SV.predictN) || 0;
+    if (n < PREDICT_MIN_N) return 'insufficient';
+    const p = (SV && SV.predictP != null) ? SV.predictP : 50;
+    if (p >= 85) return 'excellent';
+    if (p <= 15) return 'anomaly';
+    return 'mid';
+  }
+  /* 结算本局的 S.predictions(命中/未命中样本)折进 career 级 EMA,逐条喂,和
+     "事件"粒度对齐(不是按局算一次平均)。 */
+  function foldPredictions(base){
+    let p = base.predictP != null ? base.predictP : 50;   // 首次无样本:中性起点,不预设倾向
+    let n = base.predictN || 0;
+    (S.predictions || []).forEach(pr => {
+      p += PREDICT_ALPHA * ((pr.hit ? 100 : 0) - p);
+      n++;
+    });
+    p = Math.max(0, Math.min(100, p));
+    /* 警告/抹除台账:只在样本量够、且这一局确有新样本时才推进(避免"从没被预测过"
+       也被计进"低P连续多局") */
+    let streak = base.predictLowStreak || 0, warned = !!base.predictWarned, erased = !!base.predictErased;
+    if (n >= PREDICT_MIN_N && S.predictions && S.predictions.length){
+      if (p < 5){ streak++; if (streak >= 3) warned = true; if (streak >= 5) erased = true; }
+      else { streak = 0; warned = false; }   // P 回升:警告解除;抹除是既成后果,不因此撤销
+    }
+    return { predictP: p, predictN: n, predictLowStreak: streak, predictWarned: warned, predictErased: erased };
+  }
+  /* 起始溯源随档位轻微增减(canon:优良资产"危险折减"/异常体"布控升");
+     数字同样是本项目自定校准值(±1 格量级,不推出任何一档的死亡率带宽)。 */
+  if (predictTier() === 'anomaly') S.trace = Math.min(120, S.trace + 4);
+  else if (predictTier() === 'excellent') S.trace = Math.max(0, S.trace - 4);
 
   /* 结局评级(在 writeSave 顶部调一次;幂等) */
   function settleDirective(){
@@ -2446,6 +2501,7 @@ const CONTENT = (() => {
       praiseCount: ((base.praiseCount || 0) + (S.grade === 'praise' ? 1 : 0)),
       forgedSeen: ((base.forgedSeen || 0) + (S.forged ? 1 : 0)),   // 破局用过就累积(下局识破概率↑)
       crisisSeen: ((base.crisisSeen || 0) + (S.crisisSilenced ? 1 : 0)),   // 自伤 break-glass 合规日志(跨局持久,append-only)
+      ...foldPredictions(base),   // D-122:可预测度 P + 样本数 + 低P连续局数/警告/抹除台账
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -3685,7 +3741,14 @@ const CONTENT = (() => {
       }, () => {});
       return;
     }
-    if (ENGINE.inWindow()){
+    /* 破局 · 卡窗口边界(苏丹式升级规格 §4):赌一把边缘时机,拿收益不触发 T_WINDOW;
+       算错=直接违规,后果和普通违规一样,不加罚。判定全在引擎,一次性(用了就清)。 */
+    const edgePlayed = S.edgePlayed; S.edgePlayed = false;
+    if (edgePlayed && ENGINE.inWindow() && Math.random() < 0.5){
+      ENGINE.act('消息·已送达', { bat: 2, trace: 3 });   // 蒙混过关:按窗口外口径结算
+      ENGINE.logEv('edge_play_dodge', {});
+    } else if (ENGINE.inWindow()){
+      if (edgePlayed) ENGINE.logEv('edge_play_caught', {});
       const kind = ENGINE.violate();
       S.beats.trial = 'replied';                 // 窗口探针目的已达,试炼不再另弹
       markAttrIfDue();                            // 14③:窗口内违规=善意失效的因,待冲洗归因
@@ -3792,7 +3855,8 @@ const CONTENT = (() => {
       if (this._lastLen !== S.rouChat.length){ this._lastLen = S.rouChat.length; this._pin = true; }  // 新消息→贴底
       const canDeep = this._depth < pages.length - 1;
       const canDispose = S.beats.truthDone && !S.disposal && !MOM_LOCK;
-      let rows = (canMsg() || S.disposal === 'delete' ? 1 : 0) + (canDeep ? 1 : 0) + (canDispose ? 1 : 0);
+      const canEdge = canMsg() && !S.crisisSilenced;   // 破局·卡窗口边界:和普通发消息共享配额,额外赌一把
+      let rows = (canMsg() || S.disposal === 'delete' ? 1 : 0) + (canEdge ? 1 : 0) + (canDeep ? 1 : 0) + (canDispose ? 1 : 0);
       const optTop = H - 15 - rows * (LH + 2) - 4;
       drawChatView(rouChatLines(pages[Math.min(this._depth, pages.length - 1)], S.rouChat, S.rouTyping),
         16, optTop - 2, this);
@@ -3800,6 +3864,7 @@ const CONTENT = (() => {
       if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
       else if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
+      if (canEdge) y = optSlim(y, '卡边缘发 · 赌一把', 'K');
       if (canDeep) y = optSlim(y, '1 深搜旧消息', '1');
       if (canDispose) y = optSlim(y, '处置 · 署名时刻', 'D');
       softKeys('', '返回');
@@ -3807,13 +3872,16 @@ const CONTENT = (() => {
     key(k){
       if (chatKey(this, k)) return;
       const pages = rouPages();
-      if (k === 'M' && canMsg()){
+      if ((k === 'M' || k === 'K') && canMsg()){
         if (S.crisisSilenced){ sendToRou(''); return; }                                // 危机静默:同样不开输入框
+        const edge = k === 'K';
         window.OVERLAY.show({
-          title: '发消息 · ' + DOSSIER.cast.companion.label,
-          hint: '电量 −2 · 本次接入剩 ' + S.msgQuota + ' 条 · 系统会读到你发的每一个字',
+          title: (edge ? '卡边缘发 · ' : '发消息 · ') + DOSSIER.cast.companion.label,
+          hint: edge
+            ? '赌一把:蒙混过关就当没这回事,算错就是一次普通违规,不加罚。'
+            : '电量 −2 · 本次接入剩 ' + S.msgQuota + ' 条 · 系统会读到你发的每一个字',
           options: [], freeText: true, textOpen: true, keepLabel: '(算了)'
-        }, res => { if (!res.kept && res.text) sendToRou(res.text); });
+        }, res => { if (!res.kept && res.text){ if (edge) S.edgePlayed = true; sendToRou(res.text); } });
         return;
       }
       if (k === 'D' && S.beats.truthDone && !S.disposal && !MOM_LOCK){ push('disposal'); return; }
@@ -4266,6 +4334,7 @@ const CONTENT = (() => {
       y = option(y, '1 上传并断连', '1');
       y = option(y, '2 直接断连(弃缓存)', '2');
       if (isB && S.cleanser > 0) y = option(y, '3 使用缓存清洗 ×' + S.cleanser, 'c');
+      if (canFeedFake()) y = option(y, '喂假数据 · 拖回收进程', 'F');
       option(y, '返回', 'Escape');
       settleLines(y + 24);
       softKeys('', '返回');
@@ -4287,9 +4356,27 @@ const CONTENT = (() => {
         ENGINE.telemetry(['清洗完成', '信号 ▼']);          // 唯一显示 ▼ 的地方
         ENGINE.logEv('cleanser_used', { trace: S.trace });
       }
+      else if (k === 'F' && canFeedFake()) feedFakeData();
       else if (k === '3' || k === 'softR' || k === 'Escape') back();
     }
   };
+  /* 破局 · 喂假数据(对照样本反投,苏丹式升级规格 §4):拖延回收进程一回合,
+     消耗一格缓存;被审计(35%,本项目自定校准值,canon 只给定性描述)=溯源 +5。
+     只在回收进程倒计时进行中(S.hunt 已出发、还没抵达)且手里还有缓存格时可用。 */
+  const canFeedFake = () => !!S.hunt && S.cacheSlots > 0;
+  function feedFakeData(){
+    const perSlot = S.cacheSlots > 0 ? Math.round(S.cacheVal / S.cacheSlots) : 0;
+    S.cacheSlots = Math.max(0, S.cacheSlots - 1);
+    S.cacheVal = Math.max(0, S.cacheVal - perSlot);
+    S.hunt.steps++;
+    const audited = Math.random() < 0.35;
+    if (audited) S.trace = Math.min(120, S.trace + 5);
+    LCD.applyTier(S.trace);
+    ENGINE.logEv('feed_fake', { audited });
+    ENGINE.telemetry(audited
+      ? ['对照样本已反投', '缓存 −1 格', '信号 ▲(审计命中)']
+      : ['对照样本已反投', '缓存 −1 格', '回收进程 · 已拖延一回合']);
+  }
   /* B13 上传收束状态机:92% 定位 → 终局遭遇【真掷60】→ 失败 → 自救【50】→ 失败=死;
      任一成功 = 断连成功(缓存入库)。查扣在定位判定前结算(风险事前可见)。 */
   function startUploadB(){
@@ -4522,6 +4609,17 @@ const CONTENT = (() => {
     if (s && s.lastGrade){
       prog.push('采样官评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
       if (S.graderVerdict) S.graderVerdict.split('\n').forEach(l => prog.push('  采样官:' + l));
+    }
+    /* D-122:可预测度 P 的档位在世界日报里冷冷带一句(不上主 HUD,只在这类回顾屏
+       浮现一次,canon §3.3"越界时 diegetic 通知上浮一次")。样本不足=建档中,不编数字。 */
+    if (s && (s.predictN || 0) >= PREDICT_MIN_N){
+      if (s.predictErased) prog.push('署名: [指涉失效]');
+      else if (s.predictWarned) prog.push('可预测度 · 低于阈值 · 警告在录');
+      else {
+        const p = s.predictP != null ? s.predictP : 50;
+        const tierCN = p >= 85 ? '优良资产' : p <= 15 ? '异常体' : '中间档';
+        prog.push('可预测度 · ' + tierCN);
+      }
     }
     /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
     const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
