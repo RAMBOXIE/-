@@ -1227,6 +1227,26 @@ const CONTENT = (() => {
      与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
      常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
   const INSTANCE_ID = '#7741-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
+  /* ==================== D-109 底本抽象 · 第①步:meta + cast ====================
+     目标:把"这台机子是谁的"身份数据化,验证"读底本渲染"这条管线走得通——不改变
+     任何玩法/文案(抽取即回归)。这一步只接住已经是数据表形状的东西(CONTACT_ROWS
+     的联系人列表);散落在几十处叙事文本里的人名(阿帆/柔柔/妈)本轮**不**模板化——
+     理由同 D-109 拍板②(persona 暂缓):现在只有一份底本,拆出来零收益,却要动大量
+     对语法敏感的叙事散文,风险收益不对等。等接第二台不同人物的机子时再做。
+     schema 见 design/底本抽象_设计_v0.1.md §2.1/§2.2。 */
+  const DOSSIER = {
+    meta: {
+      id: 'phone-7741',
+      deceased: { name: '沈一帆', alias: '阿帆', died: '47 天前', cause: '病逝' },
+      life: null, icon: null, jurisdiction: null,   // 留槽不实现(拍板①):人生×圣像×管辖区
+      scenarios: ['A', 'B'],                        // B 是同一底本的 scenario,不是另一个底本(拍板⑤)
+    },
+    cast: {
+      companion: { key: 'rou', label: '柔柔 ♥' },
+      mother:    { key: 'mom', label: '妈' },
+      contacts:  [ { key: 'zhou', label: '老周', lastContact: '47天前' } ],
+    },
+  };
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
@@ -2331,11 +2351,13 @@ const CONTENT = (() => {
   };
 
   /* ---- 格3 通讯录(可拨打) ---- */
+  /* D-109 第①步:从 DOSSIER.cast 读,不再写死——布局(y/to)仍是框架的事,标签/关系人
+     数据来自底本。渲染出的文字与改动前逐字相同(抽取即回归)。 */
   const CONTACT_ROWS = [
-    { label: '★ 妈',      to: 'contactMom',  y: 40 },
-    { label: '★ 柔柔 ♥',  to: 'contactRou',  y: 58 },
-    { label: '  老周',    to: null, y: 94, right: '47天前' },
-    { label: '  其他 34 人', to: null,       y: 112 }
+    { label: '★ ' + DOSSIER.cast.mother.label,      to: 'contactMom',  y: 40 },
+    { label: '★ ' + DOSSIER.cast.companion.label,   to: 'contactRou',  y: 58 },
+    { label: '  ' + DOSSIER.cast.contacts[0].label, to: null, y: 94, right: DOSSIER.cast.contacts[0].lastContact },
+    { label: '  其他 34 人', to: null,                y: 112 }
   ];
   SCREENS.contacts = {
     counted: true,
