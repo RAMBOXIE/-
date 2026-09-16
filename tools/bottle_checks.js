@@ -106,8 +106,8 @@ scenario('轮换4: 三张都读过 -> 仍能给出一张(不空)', save({ seenBo
 scenario('文案纪律: 三张 NPC 瓶用「我那次」句式 + 都不是恶意', save({}), g => {
   const { A } = g;
   const src = fs.readFileSync(ROOT + '/js/content.js', 'utf8');
-  /* 精确框定 BOTTLES 数组本身(到它自己的 `];`),不吃后面的 OWN_BOTTLE */
-  const start = src.indexOf('const BOTTLES = [');
+  /* 精确框定 BOTTLE_POOL 数组本身(到它自己的 `];`),不吃后面的 OWN_BOTTLE */
+  const start = src.indexOf('const BOTTLE_POOL = [');
   const block = src.slice(start, src.indexOf('\n  ];', start));
   ['#5502-D','#3120-K','#1177-B'].forEach(id => {
     A(block.includes(id), '瓶 ' + id + ' 应在表中');

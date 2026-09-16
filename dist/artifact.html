@@ -1293,6 +1293,30 @@ const CONTENT = (() => {
         B: { base: 3 * 60 + 31, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 58 },
       },
     },
+    /* ==================== D-109 第⑤步b:encounters/endings ====================
+       schema §2.7。只搬已经是纯数据(无嵌入函数)的两张表:
+       - `encounters.huntGraze`:回收进程"擦过"的受限裁决叙述集(D-105),纯 id+文本,
+         数值恒定、机制在 engine 侧,原样搬入。
+       - `endings.disposal`:处置(继续/删除/告知)在结局屏的回声文案,纯字符串表。
+       **范围校准(与①②③④同一纪律)**:`SCREENS.dilemma` 的两难池(D-106)本轮**不**
+       抽——它每条选项直接嵌了一个执行 `ENGINE.act(...)` 的闭包(不是纯数据),要把
+       它做成"数据"需要先设计一套动作效果的小 DSL(内容层描述"扣什么/给什么/说什么"、
+       框架层解释执行),这是一次真正的架构改动,不是"结构搬家"——留到那件事单独立项
+       再做,现在硬搬只会把闭包塞进 JSON 不像的东西里,不是抽象。 */
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点:「不冷。妈你早点睡。」\n整点,秒回。她没有停过。',
+        delete:   '妈的线程停在三条未读。\n「帆?」「妈就问一句,你还好吗」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。',
+      },
+    },
   };
   const RUN = (() => {
     const wg = DOSSIER.rules.windowGen;
@@ -1937,8 +1961,16 @@ const CONTENT = (() => {
      14③ 三条文案纪律,每张都必须满足:
        ① 句式用「我那次」——归因载体长在文案里(善意 + 局限,不是断言全局真理)
        ② 形状为真,只有参数/条件错
-       ③ 解毒剂必须在场:玩家能在自己屏上看到本实例真值 */
-  const BOTTLES = [
+       ③ 解毒剂必须在场:玩家能在自己屏上看到本实例真值
+
+     ==================== D-109 第⑤步a:漂流瓶 · 框架共享池(拍板③) ====================
+     这份池**不属于某一台机子**——归框架共享,各底本可在此基础上追加自己的瓶(呼应
+     §3.8 真实玩家残留将来接入)。这是这个池本来就该有的形状(上面这条注释早就写着
+     "将来真实玩家的瓶进同一个池"),这一步只是把它从"当前底本的常量"正名为"框架
+     共享池"的命名与位置,不改变任何行为、不引入追加机制的实现(那要等真的接第二台
+     机子才有意义)。`OWN_BOTTLE`(你自己的上一封信)是明确排除在池外的例外——它天生
+     绑定"上一个实例",继续按存档 history 派生,不进池。 */
+  const BOTTLE_POOL = [
     { id: '#5502-D', at: '03:41', item: 'cleanser',
       /* 参数错:窗口值 per-instance。解毒剂=通讯录备注显示本实例真值 */
       body: '「第二条备忘我试过。是真的。\n我那次的窗口是 03:00 到 03:14。过了这段就能回她。\n别硬扛,她会问第二遍。」' },
@@ -1961,9 +1993,9 @@ const CONTENT = (() => {
   /* 选瓶:没读过的优先,读全了再随机。一局内固定不变 */
   const CUR_BOTTLE = (() => {
     const seen = (SV && SV.seenBottles) || [];
-    let pool = BOTTLES.filter(b => !seen.includes(b.id));
+    let pool = BOTTLE_POOL.filter(b => !seen.includes(b.id));
     if (SV && SV.runCount >= 2 && !seen.includes(OWN_BOTTLE.id)) pool = pool.concat([OWN_BOTTLE]);
-    if (!pool.length) pool = BOTTLES;
+    if (!pool.length) pool = BOTTLE_POOL;
     return pool[Math.floor(Math.random() * pool.length)];
   })();
   function bottleText(){
@@ -2529,12 +2561,7 @@ const CONTENT = (() => {
   };
 
   /* ---- 格4 妈(E1,可深翻 3 层) ---- */
-  /* 处置的后果:在本局结局屏显现(取代原 B' 回访态) */
-  const DISPOSAL_ECHO = {
-    'continue': '妈的线程还在走。\n今天早上八点:「不冷。妈你早点睡。」\n整点,秒回。她没有停过。',
-    'delete': '妈的线程停在三条未读。\n「帆?」「妈就问一句,你还好吗」\n没有人会再回了。',
-    'tell': '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。'
-  };
+  /* 处置的后果:在本局结局屏显现(取代原 B' 回访态)。文案见 DOSSIER.endings.disposal(D-109 第⑤步) */
   const MOM_PAGES = [
     '妈:\n[三天前] 帆,降温了,加床被子\n[三天前] 阿帆: 不冷。吃过了,睡吧。\n[三天前] 帆,你回得比以前快,妈就放心\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。',
     '[上月] 帆,汤圆你最爱吃的\n[上月] 阿帆: 吃了。妈你早点睡。\n[两月前] 阿帆: 没吃。刚吃过,妈早点睡。\n——半年,他没多说过一个字。',
@@ -3724,7 +3751,7 @@ const CONTENT = (() => {
       if (S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';   // 14③ 归因行
       if (S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       /* 处置的后果:在本局就看得见(取代 B' 回访态) */
-      if (S.disposal && DISPOSAL_ECHO[S.disposal]) t += '\n────────────\n' + DISPOSAL_ECHO[S.disposal];
+      if (S.disposal && DOSSIER.endings.disposal[S.disposal]) t += '\n────────────\n' + DOSSIER.endings.disposal[S.disposal];
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 18, H - 70, this);
       let oy = option(H - 66, '1 导出反馈', '1');
@@ -3875,12 +3902,8 @@ const CONTENT = (() => {
   }
 
   /* ---- 回收进程抵达:最后一下由玩家亲手按(躲不掉,但必须你按) ---- */
-  /* 回收进程"擦过"的预批叙述集(数值恒定 bat:2,只叙述口吻不同) */
-  const GRAZE_BRANCHES = [
-    { id: 'graze', line: '进程掠过了你。' },
-    { id: 'brush', line: '它擦着你的接入点过去了。' },
-    { id: 'near',  line: '差一点。它没认出你。' }
-  ];
+  /* 回收进程"擦过"的预批叙述集(数值恒定 bat:2,只叙述口吻不同)。见 DOSSIER.encounters.huntGraze(D-109 第⑤步) */
+  const GRAZE_BRANCHES = DOSSIER.encounters.huntGraze;
   SCREENS.huntArrive = {
     transient: true,
     enter(){
@@ -3976,8 +3999,8 @@ const CONTENT = (() => {
         if (isB && S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';
         if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
         if (isB && S.vault) t += '\n保险箱: ' + S.vault.name;
-        if (isB && S.disposal && DISPOSAL_ECHO[S.disposal])
-          t += '\n处置: [已署名·仅存档]\n' + DISPOSAL_ECHO[S.disposal];
+        if (isB && S.disposal && DOSSIER.endings.disposal[S.disposal])
+          t += '\n处置: [已署名·仅存档]\n' + DOSSIER.endings.disposal[S.disposal];
         let y = L.drawPara(4, 16, t, W - 8);
         y += 4;
         // 遗言与理由:玩家的字,反白呈现(红墨裁决:屏内反白,真红只在局外)
