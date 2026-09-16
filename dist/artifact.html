@@ -1263,6 +1263,30 @@ const CONTENT = (() => {
         '平台没有把他登记为死亡——按平台的数据,这台手机的主人每天都在说话。账单停了,人不动了,话没停:「持有人失联」,是系统给这种状态留的类目。\n\n记忆可以被复制。思念可以吗?\n——你现在知道答案由谁执行了。',
       ],
     },
+    /* ==================== D-109 第③步:threads(收件箱/菜单线程清单) ====================
+       schema §2.3。只搬"哪些线程 + 叫什么名字 + 点了去哪"这类静态表;未读徽标(哪条读过/
+       删除态覆盖标签/窗口收件人)是活状态驱动的框架逻辑,原样留在 `inboxItems()` 里,只是
+       现在从这张表读 id/label/to,不再写死整个 rows 数组。`bottleIn` 标 `scenario:'B'`——
+       B 局专属收件人条目,呼应 `meta.scenarios`(拍板⑤,B 是同一底本的场景分支)。 */
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '柔柔 ♥',       to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },   // D-104
+        { id: 'th_bill',     label: '尾号8873',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
   };
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
@@ -2137,16 +2161,23 @@ const CONTENT = (() => {
 
   /* ---- 收件箱 ---- */
   function inboxItems(){
+    /* D-109 第③步:线程 id/label/to 读 DOSSIER.threads.inbox;未读徽标(活状态)仍是
+       框架逻辑,只是现在按 id 查而非写死整行。行为与改动前逐字相同。 */
     const rouUnread = S.beats.anomaly === 'fired-once' ? ' (1)' : (seen.th_rou ? '' : ' (1)');
-    const rows = [
-      { label: '采样协议', right: seen.th_proto ? '' : '(1)', to: 'th_proto' },
-      { label: MOM_LOCK === 'deleted' ? '妈 · [已停摆]' : '妈',
-        right: MOM_LOCK === 'deleted' ? '' : (seen.th_mom ? '' : '(1)'), to: 'th_mom' },
-      { label: '柔柔 ♥',   right: rouUnread.trim(),           to: 'th_rou' },
-      { label: '陌生号码', right: S.stranger.read ? '' : '(1)', to: 'th_stranger' },   // D-104
-      { label: '尾号8873', right: '106',                      to: 'th_bill' }
-    ];
-    if (isB) rows.unshift({ label: '未指定收件人', right: seen.bottleIn ? '' : '(1)', to: 'bottleIn' });
+    const BADGE = {
+      th_proto:    () => seen.th_proto ? '' : '(1)',
+      th_mom:      () => MOM_LOCK === 'deleted' ? '' : (seen.th_mom ? '' : '(1)'),
+      th_rou:      () => rouUnread.trim(),
+      th_stranger: () => S.stranger.read ? '' : '(1)',
+      th_bill:     () => '106',
+      bottleIn:    () => seen.bottleIn ? '' : '(1)',
+    };
+    const mapRow = t => ({
+      label: (t.id === 'th_mom' && MOM_LOCK === 'deleted') ? '妈 · [已停摆]' : t.label,
+      right: BADGE[t.id](), to: t.to,
+    });
+    const rows = DOSSIER.threads.inbox.filter(t => t.id !== 'bottleIn').map(mapRow);
+    if (isB) rows.unshift(mapRow(DOSSIER.threads.inbox.find(t => t.id === 'bottleIn')));
     return rows;
   }
   SCREENS.inbox = {
@@ -2179,16 +2210,8 @@ const CONTENT = (() => {
     }
   };
 
-  /* ---- 主菜单(7 项,含录音) ---- */
-  const MENU = [
-    { label: '1 消息',        to: 'inbox' },
-    { label: '2 通讯录',      to: 'contacts' },
-    { label: '3 相册',        to: 'album' },
-    { label: '4 备忘录',      to: 'memoList' },
-    { label: '5 录音',        to: 'recorder' },
-    { label: '6 工具 > 备份', to: 'tools' },
-    { label: '7 已删除 (?)',  to: 'deleted' }
-  ];
+  /* ---- 主菜单(7 项,含录音)—— 读 DOSSIER.threads.menu(D-109 第③步) ---- */
+  const MENU = DOSSIER.threads.menu;
   SCREENS.menu = {
     render(){
       statusBar();
