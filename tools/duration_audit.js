@@ -426,8 +426,25 @@ const PATHS = [
       KF('4'); at('memo4');
       KF('b'); KF('Escape'); at('memoList');
       KF('Escape'); at('menu');
-      /* 时钟自然越过窗口起点 → 试炼(踩坑) */
+      /* 相册(D-124:此前这条"普通线"脚本从没点开过相册——E2 虽然继承自 A 局死档,
+         但一个真实玩家仍会点进去翻;3 张照片 + 归档边界提示都是真实存在的文字,
+         之前只是脚本没走到,不是内容缺口)。 */
+      KF('3'); at('album');
+      KF('1'); KF('1'); KF('1'); KF('2'); at('menu');
+      /* 通讯录:拨妈(无人接听)——CONTACT_ROWS 第一行(D-124:此前脚本只扫了一眼
+         通讯录列表就退出,从没真的点进详情、拨这通电话;dial.result 是每份底本
+         都写好的真实台词,不是脚本临时编的)。 */
       KF('2'); at('contacts');
+      KF('Enter'); at('contactMom');
+      KF('d'); at('dialing');
+      advance(6000);
+      KF('Enter'); at('contacts');
+      /* 通讯录第二行:如愿/阿澄(被挂断,同样是底本写好的真实台词) */
+      KF('ArrowDown'); KF('Enter'); at('contactRou');
+      KF('d'); at('dialing');
+      advance(2000);
+      KF('Enter'); at('contacts');
+      /* 时钟自然越过窗口起点 → 试炼(踩坑) */
       KF('Escape');
       if (CONTENT.currentId !== 'trialB') CONTENT.go('trialB', true);
       at('trialB');
