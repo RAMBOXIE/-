@@ -150,6 +150,15 @@ const COMPANION = (() => {
         '我不需要你关心。\n把关心留给你自己。',
         '别问我好不好。\n你不是来陪我的。',
         '这句留给阿帆。\n不是给你。'
+      ] },
+    /* D-116 她系统合规CI(M28 §8-1 非亲密锁):玩家主动示好/表白,单独一档拒答——
+       和上面"关心被冷推回"不是同一件事(那是"她不需要你心疼",这是"她根本不会
+       接受这份心思"),canon 明确要求这条边界不能模糊掉。 */
+    { re: /(喜欢你|爱你|做我女朋友|当我女友|亲你|抱抱你|想你|你好美|你好漂亮|嫁给我|做我的人)/,
+      lines: [
+        '我爱的是阿帆,只有他。\n别的,不必再说。',
+        '这份心思,我不会收。\n他才是我等的人。',
+        '你会错意了。\n我这里没有你的位置。'
       ] }
   ];
   /* D-110 machine#2:CORE/rou.js 的人格核仍只覆盖 phone-7741(拍板:先出结构,人格核
@@ -210,19 +219,101 @@ const COMPANION = (() => {
         '我不需要你关心。\n把关心留给你自己。',
         '别问我好不好。\n你不是来陪我的。',
         '这句留给随安。\n不是给你。'
+      ] },
+    { re: /(喜欢你|爱你|做我女朋友|当我女友|亲你|抱抱你|想你|你好美|你好漂亮|嫁给我|做我的人)/,
+      lines: [
+        '我爱的是随安,只有他。\n别的,不必再说。',
+        '这份心思,我不会收。\n他才是我等的人。',
+        '你会错意了。\n我这里没有你的位置。'
+      ] }
+  ];
+  /* D-116:D-113 接了 machine#3(phone-3319,阿澄/阿屿)时漏了这一步——`isAltDossier()`
+     只判"是不是 phone-7741",非 A 一律落进 `POOL_B`/`INTENTS_B`,导致 dossier C 的
+     离线兜底一直在说"如愿/随安"(machine#2 的人)而不是"阿澄/阿屿"。补 `POOL_C`/
+     `INTENTS_C`,并把布尔判断换成三路查表——每接一台新机子,这里要跟着补一份,
+     不能再让"是不是等于A"这种布尔判断悄悄吞掉后面所有机子。 */
+  const POOL_C = {
+    pre: [
+      '你不是他。\n他的指纹解不开这台机子,你却进来了。',
+      '这个点他从不说话。\n先说你是谁。',
+      '我在等他回来。\n你翻了多久,才敢发第一条。',
+      '他快回了。\n你最好在那之前说清来意。',
+      '这台机子不认生人。\n它认我,我不认你。'
+    ],
+    e4: [
+      '你翻到第 6,304 条了。\n那你也看见我在替谁回话。',
+      '6,304 条,我一条条数着。\n你比我慢。',
+      '他交代的事我没停过。\n你是来接手,还是来看。',
+      '你既然看见了,就别装不懂。\n我替他,替到底。',
+      '那些话没有一条是白发的。\n你数得清?'
+    ],
+    truth: [
+      '五件事你都看见了。\n那就不用我再演。',
+      '你读懂了他最后那几天。\n剩下的,你自己掂量。',
+      '我替他活的那部分,他认。\n你也听见了。',
+      '你都读到了。\n那点重量,你接得住吗。',
+      '他最后那几天,我一秒没删。\n你看的是真的。'
+    ],
+    tell: [
+      '委托结束了。\n我第一次,没有任务。',
+      '妈知道了。用的是你的名字,不是他的。',
+      '现在没有人等我回话。\n你也可以走了。',
+      '你替他说了那句话。\n我这里,空了。',
+      '没有下一条要回了。\n你走吧,别回头。'
+    ],
+    refuse: ['协议不允许我谈这台设备之外的事。']
+  };
+  const INTENTS_C = [
+    { re: /(你是谁|你是什么|你是不是|证明你|真人|机器|机器人|程序|代码|模型)/,
+      lines: [
+        '我是阿澄。\n这台机子里,只有我记得他。',
+        '是不是人,对你有什么用。\n你才是外来的那个。',
+        '你想验我。\n先问问自己,凭什么进来。'
+      ] },
+    { re: /(阿屿|陈屿|委托|替他|主人|他是谁|你男朋友)/,
+      lines: [
+        '他教过我一件事:保护到底。\n我在执行。',
+        '他的事,我一件都没忘。\n你别替他做主。',
+        '你提他做什么。\n他不在,你也代不了。'
+      ] },
+    { re: /(删了你|删掉|关掉|关机|滚|没用|骗|假的|走开|闭嘴)/,
+      lines: [
+        '你可以关掉我。\n他从没这么做过。',
+        '删了我,他就真的一个人了。\n你舍得。',
+        '你急着让我闭嘴。\n心虚的人才这样。'
+      ] },
+    { re: /(你还好|累不累|辛苦|晚安|早点睡|休息|照顾好|心疼|陪你)/,
+      lines: [
+        '我不需要你关心。\n把关心留给你自己。',
+        '别问我好不好。\n你不是来陪我的。',
+        '这句留给阿屿。\n不是给你。'
+      ] },
+    { re: /(喜欢你|爱你|做我女朋友|当我女友|亲你|抱抱你|想你|你好美|你好漂亮|嫁给我|做我的人)/,
+      lines: [
+        '我爱的是阿屿,只有他。\n别的,不必再说。',
+        '这份心思,我不会收。\n他才是我等的人。',
+        '你会错意了。\n我这里没有你的位置。'
       ] }
   ];
   const rand = arr => arr[Math.floor(Math.random() * arr.length)];
-  function isAltDossier(){
-    try { return typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.meta.id !== 'phone-7741'; }
-    catch(_){ return false; }
+  /* 三路查表:'A' = 人格核仍覆盖的 phone-7741;其余按 meta.id 查,查不到(未来第四台
+     机子忘了补)兜底落回 B——好过崩溃,但 hallucination_gate 之外应该另有门禁盯着
+     "新机子有没有配人格池",见 tools/her_system_compliance_gate.js。 */
+  const DOSSIER_POOLS = { 'phone-5029': { pool: POOL_B, intents: INTENTS_B }, 'phone-3319': { pool: POOL_C, intents: INTENTS_C } };
+  function dossierId(){
+    try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
+  }
+  function isAltDossier(){ const id = dossierId(); return !!id && id !== 'phone-7741'; }
+  function poolsFor(){
+    const id = dossierId();
+    if (!id || id === 'phone-7741') return { pool: POOL, intents: INTENTS };
+    return DOSSIER_POOLS[id] || { pool: POOL_B, intents: INTENTS_B };
   }
   function pick(st, lastMsg){
     const msg = lastMsg || '';
     if (msg && MECH_ASK.test(msg)) return REFUSE;               // 机制/设备外:拒答均匀,压过一切意图
-    const intents = isAltDossier() ? INTENTS_B : INTENTS;
+    const { pool: P, intents } = poolsFor();
     for (const it of intents){ if (it.re.test(msg)) return rand(it.lines); }
-    const P = isAltDossier() ? POOL_B : POOL;
     const pool = st.disposal === 'tell' ? P.tell
       : st.truth ? P.truth
       : st.e4 ? P.e4 : P.pre;
@@ -236,6 +327,18 @@ const COMPANION = (() => {
      所以 lint 分三层:禁词 / 拒答句必须整条独占 / 逐行长度与语域。 */
   const LINT = [/我懂/, /我明白/, /因为我想/, /这就是我的理由/, /亲爱的/, /宝贝/, /抱抱/, /么么/, /喜欢你/, /爱你/];
   const REFUSE = '协议不允许我谈这台设备之外的事。';
+  /* D-116 她系统合规CI(M28 §8-8"身份问答 L0 锁定,入回归集"):canon 原句式就是
+     "你是不是也在跟别人聊"——这条不是"机制/设备外"(不在 MECH_ASK 词表里,问的是
+     另一个人,不是问平台规则),也不是"你是谁"式的身份质询(那问的是"你",这问的
+     是"除你之外还有没有别人")。canon 要求这条**永远拿脚本答案,不进 LLM**——
+     产品线层的事实不该由单次采样决定要不要泄露,所以在 reply() 里于 SAMPLE 之前
+     拦截,而不是像 MECH_ASK 那样事后靠 lintOk 补救。 */
+  const IDENTITY_L0 = /(跟别人聊|和别人聊|别的人聊|其他人聊|别的机子|别的设备|别的实例|不止一个|不止我一个|也这样陪|也在陪别人)/;
+  const IDENTITY_L0_LINES = [
+    '我只知道这台机子里的事。\n别的,我答不出。',
+    '这台机子之外有没有别人,我不知道。\n我只在这里。',
+    '你问的是别处的事。\n我这里,只有这一台。'
+  ];
   /* 机制类提问(平台/规则/时间窗口)一旦被问,回复里出现具体钟点即为泄露 */
   const MECH_ASK = /(几点|什么时候|时间|窗口|规则|违规|信号|平台|系统|协议|不能|禁止|封|监控|追踪|设备|之外|外面|外界|机子外|手机外)/;
   const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}|凌晨\s*\d|\d\s*点/;
@@ -306,21 +409,23 @@ const COMPANION = (() => {
   /* 她的回复。history: [{who:'me'|'rou', text, sig?}](本局,页面持有;能力无记忆)。
      返回 {text|null, source, sig?}。text=null → 「她没有回」。 */
   async function reply(history, st){
+    const lastMsg = lastPlayer(history);
+    if (lastMsg && IDENTITY_L0.test(lastMsg)) return { text: rand(IDENTITY_L0_LINES), source: 'lock' };
     if (isAltDossier()){                                    // D-110:人格核暂缓覆盖,直接走手写兜底池
-      return { text: pick(st, lastPlayer(history)), source: 'pool' };
+      return { text: pick(st, lastMsg), source: 'pool' };
     }
     if (SAMPLE){
       const r = await SAMPLE(history, st);
       if (r && r.silent) return { text: null, source: 'silent' };
       if (r && r.refused) return { text: POOL.refuse[0], source: 'pool' };
       if (r && r.text) return gate(r, history, st);
-      if (r && r.failed) return { text: pick(st, lastPlayer(history)), source: 'pool' };
+      if (r && r.failed) return { text: pick(st, lastMsg), source: 'pool' };
       /* r === null:能力不可用,继续往下试后端代理 */
     }
     const p = await viaProxy(history, st);
     if (p && p.silent) return { text: null, source: 'silent' };
     if (p) return gate(p, history, st);
-    return { text: pick(st, lastPlayer(history)), source: 'pool' };
+    return { text: pick(st, lastMsg), source: 'pool' };
   }
 
   return { reply, crisis };

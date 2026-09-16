@@ -80,12 +80,27 @@ const MOMLLM = (() => {
     '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
     '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
   ];
+  /* D-116:D-113 接 machine#3(phone-3319,阿屿)时漏了这一步——`isAltDossier()` 只判
+     "是不是 phone-7741",dossier C 之前一直落进 TOLD_B(说"安子"),不是"阿屿"。
+     补 TOLD_C,三路查表(每接一台新机子都要在这里补一份,同 companion.js 的教训)。 */
+  const TOLD_C = [
+    '妈: 这个号码,是屿屿的旧机吗。\n妈: 谁在用它。',
+    '妈: 屿屿最后,\n妈: 是不是有人陪着他。',
+    '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
+    '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
+  ];
   const rand = a => a[Math.floor(Math.random() * a.length)];
-  function isAltDossier(){
-    try { return typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.meta.id !== 'phone-7741'; }
-    catch(_){ return false; }
+  function dossierId(){
+    try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
   }
-  function fallback(){ return rand(isAltDossier() ? TOLD_B : TOLD); }
+  function isAltDossier(){ const id = dossierId(); return !!id && id !== 'phone-7741'; }
+  function fallbackPool(){
+    const id = dossierId();
+    if (!id || id === 'phone-7741') return TOLD;
+    if (id === 'phone-3319') return TOLD_C;
+    return TOLD_B;   // phone-5029,以及未来未及配置的新机子兜底落回 B
+  }
+  function fallback(){ return rand(fallbackPool()); }
 
   /* 护栏 lint。crisis/beg 命中 = 立刻回退安全脚本,绝不上屏。 */
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|跟(他|你)走|下去陪|一了百了|想死|了结)/;
