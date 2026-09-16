@@ -241,6 +241,14 @@ scenario('陷阱库 · B 底本(phone-5029)同样登记了 T_BAIT/T_DEEP', { dos
   A(ids.includes('T_BAIT'), 'B 底本 traps 应含 T_BAIT');
   A(ids.includes('T_DEEP'), 'B 底本 traps 应含 T_DEEP');
 });
+scenario('陷阱库 · C 底本(phone-3319)同样登记了 T_BAIT/T_DEEP', { dossierId:'C' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'C 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'C 底本 traps 应含 T_DEEP');
+});
+scenario('D-113 · 三份底本自动切换轮转 A→B→C→A(不是二选一翻转)', null, ({A, C}) => {
+  A(C.dossier.meta.id === 'phone-7741', '默认(无存档)应是 A 底本');
+});
 
 /* ---- 离线:无 LLM(平台能力/代理都不在)时,下令与评级仍走模板,机制不缺 ---- */
 scenario('离线兜底 · 下令屏用模板措辞、机制在场', null, ({A, C, frame}) => {

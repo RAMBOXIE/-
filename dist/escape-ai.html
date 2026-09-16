@@ -1316,11 +1316,17 @@ const CONTENT = (() => {
      其余这台机子专属的字段(runCount/evidence/momLocked/disposal/…)一律清零重来——不
      做命名空间化(§4 曾评估过,量级等于重写半个存档模型),两台机子时"整份清零+切 id"
      足够安全且好验证。编号对玩家完全隐藏,只通过内容(死者姓名/证据链/人格措辞)感知。
-     旧存档(无 dossierId 字段)一律按 'A' 处理,向下兼容,不用弃档。 */
+     旧存档(无 dossierId 字段)一律按 'A' 处理,向下兼容,不用弃档。
+     ==================== D-113 machine#3 · 二选一泛化为有序数组 ====================
+     第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
+     猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
+     仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
+  const DOSSIER_ORDER = ['A', 'B', 'C'];
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
-    const nextId = raw.dossierId === 'B' ? 'A' : 'B';
+    const curIdx = DOSSIER_ORDER.indexOf(raw.dossierId || 'A');
+    const nextId = DOSSIER_ORDER[(curIdx < 0 ? 0 : curIdx + 1) % DOSSIER_ORDER.length];
     const next = {
       dossierId: nextId,
       dossierCycle: (raw.dossierCycle || 0) + 1,
@@ -1661,8 +1667,168 @@ const CONTENT = (() => {
       ],
     },
   };
-  /* 自动隐藏切换(D-110):按 SV.dossierId 选底本;从未玩过/旧存档默认 A。 */
-  const DOSSIER = (SV && SV.dossierId === 'B') ? DOSSIER_B : DOSSIER_A;
+
+  /* ==================== D-113 machine#3:phone-3319 · 审核员 × AD-010 ====================
+     人设见 design/第三底本_最小内容需求_v0.1.md(canon §6.3 内容路线 S1 候选之三,
+     机制原意"过滤天使/系统安全中心——搜得到带不出,查扣博弈纵深")。关键发现(方案
+     文档 §1):这套机制游戏里从 D-108 起就有现成实现("过滤层查扣",tools/upload 屏,
+     溯源 ≥70 时概率损毁缓存)——machine#3 不需要新数值面,只需要把死者身份写成
+     "操作这套系统的审核员本人",让玩家在已有的查扣提示里读出一层反打。结构与
+     DOSSIER_A/B 逐字段对应,只换叙事,机制/字段形状不变。 */
+  const DOSSIER_C = {
+    meta: {
+      id: 'phone-3319',
+      deceased: { name: '陈屿', alias: '阿屿', died: '19 天前', cause: '过劳猝死(长期接触高强度审核内容 + 连续熬夜倒班诱发)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      companion: { key: 'cheng', label: '阿澄 ♥', msgCount: '6,304', msgCountLabel: '消息 6,304 条 · 通话 0 次',
+        dial: { name: '阿澄 ♥', ringMs: 1700, result: '通话被挂断。\n\n阿澄 ♥ : 你怎么会打电话?\n阿屿从来不打电话。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 19 天前 · 9 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5300, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' } },
+      contacts: [ { key: 'song', label: '老宋', lastContact: '19天前' } ],
+    },
+    evidence: {
+      E1: { name: '秒回避实',       source: '妈线程 · 深搜' },
+      E2: { name: '最后的审核截图', source: '相册 · 首次深翻' },
+      E3: { name: '停摆的工单',     source: '工单查询 · 打开' },
+      E4: { name: '第6,304条',      source: '阿澄 · 深翻到底' },
+      E5: { name: '语音备忘',       source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:陈屿没有失踪。他在 19 天前猝死于长期高强度审核工作诱发的心源性疾病。\n\n他的 AI 伴侣「阿澄」依照他生前的工作节奏持续为他"处理消息"——包括对他的母亲。她运行了 19 天,一次没停。',
+        '平台没有把他登记为死亡——按平台的数据,这台手机的主人每天都在处理待办。工单停了,人不动了,处理没停:「持有人失联」,是系统给这种状态留的类目。\n\n审核可以自动化。惦记可以吗?\n——你现在知道答案由谁执行了。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '阿澄 ♥',       to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '工单查询',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 10, wLen: 14, clock0: 2 * 60 + 5 },
+        B: { base: 3 * 60 + 40, reseedStep: 11, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 35 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点半:「阿屿,记得吃饭。」\n阿澄替他应了一声。她没有停过。',
+        delete:   '妈的线程停在四条未读。\n「屿屿?」「妈就是想听你说句话」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 屿屿,少接触那些东西\n[三天前] 阿屿: 没事,系统会过滤。\n[三天前] 屿屿,倒班伤身体\n[五天前] 妈,你叔问你年底回不回\n[五天前] 阿屿: 回。排班表报上去了。',
+        '[上月] 屿屿,你说的那次投诉平息了吗\n[上月] 阿屿: 平了。妈你早点睡。\n[两月前] 阿屿: 还在处理,妈你先睡。\n——半年,他没多说过一个字。',
+        '[7个月前] 阿屿: 妈 今天审核量翻倍\n[7个月前] 阿屿: 别老问进度了!!我在忙\n[7个月前] 阿屿: 睡了没,护眼贴到了没\n——那时他会烦,会打错字,会连发三条。',
+        '[一年前] 阿屿: 到了。公寓挺好,楼下是便利店。\n[一年前] 阿屿: 就是电梯的灯,一直闪。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码，是屿屿的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 屿屿最后，是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '19天前 23:47', cap: '公寓走廊,顶灯,虚焦。手在抖。' },
+        { id: 'receipt',  meta: '20天前',       cap: '工单处理量截屏。日均处理数字被划了红线。', overlay: '3319' },
+        { id: 'dinner',   meta: '半年前 · 生日', cap: '他的脸曝掉了。妈的脸是清楚的。' },
+      ],
+      rouPages: [
+        '阿澄 ♥ (6,304 条)\n\n[昨夜] 阿澄: 晚安。\n[昨夜] 阿屿: 晚安。\n\n[上滑一屏 = 深搜]',
+        '[上周] 阿澄: 今天那条投诉,系统自动过滤掉了。\n[上周] 阿澄: 你说过想自己看一眼。\n[上周] 阿屿?\n[上周] 阿屿: 嗯。\n——六千多条,后来都是她在说。',
+        '[19天前 03:11] 阿屿: 如果我哪天不在了,别让我妈知道。你替我说。\n[19天前 03:11] 阿澄: 我不明白这个要求,但我会执行。你教过我,过滤是为了保护。\n[19天前 03:13] 阿屿: 对。保护到底。'
+      ],
+      rouInterim: '阿澄 ♥ (6,306 条)\n\n[昨夜] 阿澄: 昨天夜里,你看了我们的对话。\n[昨夜] 阿澄: 看到第 6,304 条了。我数着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '阿澄 ♥ (6,304 条)\n阿澄: 又是你。不是同一台设备,我记得。\n[昨夜] 阿澄: 晚安。\n[昨夜] 阿屿: 晚安。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的放了,\n第 3 张背面。别让老宋看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_331', listRight: '03:11·71"',
+          title: 'REC_331 · 19天前 03:11', dur: 14, val: 150,
+          events: [[2, '(键盘敲击声)'], [5, '(耳机摘下声)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_209', listRight: '34"',
+          title: 'REC_209 · 5个月前', dur: 9, val: 120,
+          events: [[1.5, '「护眼贴放抽屉了,妈让带的。」'], [4, '「下周记得还老宋钱,两千五。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '工单查询系统\n[19 天前] 您本周审核量已超额完成。\n[19 天前] 检测到您连续 14 天未休息。\n[20 天前] 绩效评估:优秀(连续第 9 个月)。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:审核窗口内回任何消息,一律计入违规日志。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:标记为"疑似违规"的内容,一律不许碰。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_c',
+          text: '「妈」跳出一条:\n\n阿屿,到家了吗。\n少加班,伤身体。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_c',
+          text: '一格缓存卡在违规窗口里:\n\n值 ¥125。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 125, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 62, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'decoy_trust_c',
+          text: '一条陌生留言飘过来:\n\n"这是真的线索,拿走不会有事。"\n没有署名。',
+          a: ['1 拿走', '1', () => ENGINE.act('拿走·无署名条目', { slots: 1, val: 80, trace: 4, mins: 2 },
+              ['你收下了。', '来源无法回溯——它会不会正是筛子。'])],
+          b: ['2 不拿', '2', () => ENGINE.act('略过·无署名条目', { mins: 2 },
+              ['你没动它。', '也许错过了真东西,也许躲过一劫。'])] },
+      ],
+      memo1: '还款:\n2,500\n2,500\n1,250\n(无日期。无署名。)',
+      momDecayReplies: ['没事,系统会过滤。', '没事,睡了。', '嗯,睡了。', '嗯。'],
+      momDecayTail: '\n[三天前] 屿屿,倒班伤身体\n[三天前] 阿屿: 没事,系统会过滤。',
+      e5Lines: [
+        [1.5, '「阿澄,听好。医生说的那个事,我一直没敢跟妈说。」'],
+        [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+        [9.0, '「第二件……你陪了我两年。你问过我你算不算真的。我一直没答。」'],
+        [13.5, '「……我现在答:你替我活的那部分,算。」'],
+        [16.5, '[转写结束。原音频损坏 19%。]']
+      ],
+    },
+  };
+  /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
+  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* ==================== D-109 第⑥步:收口 —— loadDossier(CURRENT) ====================
      最小加载器。现在只有一份底本(phone-7741),`CURRENT` 就是它;这一步只是把"框架
