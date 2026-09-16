@@ -2300,7 +2300,16 @@ const CONTENT = (() => {
       L.drawText(96, 0, '回收·' + S.hunt.steps, { corrupt: .06 });
     else
       L.drawText(96, 0, clk, { corrupt: L.R.corrupt * .5 });
-    const pct = S.battery + '%';
+    let pct = S.battery + '%';
+    /* D-127:电量数字的"错值→真值"故障效果——D-108 Low 清单里点名"只有时钟/日期
+       数字被换,电量没做"。同一套 tsScramble 机制(逐帧重掷,不持久,下一帧大概率
+       换回真值,看起来像信号跳了一下,不是真的偷走电量),换到数字位上而不是
+       百分号,免得玩家把它误读成"电量突然多了个符号"。 */
+    if (L.R.tsScramble && Math.random() < .04){
+      const d = pct.split(''); const i = Math.floor(Math.random() * (pct.length - 1));
+      d[i] = String(Math.floor(Math.random() * 10));
+      pct = d.join('');
+    }
     L.drawBattery(W - 22, 1, ENGINE.batSegs(), L.R.batJitter);
     L.drawText(W - 25 - L.textWidth(pct), 0, pct);
     /* 颜色告警(只染状态栏,保持哑机质感):电量 ≤20% 琥珀、≤10% 转红;
