@@ -961,6 +961,28 @@ const CONTENT = (() => {
     ENGINE.logEv('death', { cause });
     askLastWords(() => go('report', true));
   }
+  /* ==================== D-117 死亡报告 · 局外表现层数据装配 ====================
+     只重排既有字段,不重算任何数值(避免局外页和局内报告口径漂移,方案见决策日志
+     D-117)。三个结局屏(report/receiptFull/receiptAlive)各自的"致死因子/反事实"
+     措辞不同,通过 opts 传入;其余字段三屏共用同一套读法。 */
+  function buildDeathReportData(opts){
+    opts = opts || {};
+    const data = {
+      inst: INSTANCE_ID,
+      cacheVal: S.cacheVal,
+      uploaded: !!opts.uploaded,
+      predHit: S.predictions.filter(p => p.hit).length,
+      predTotal: S.predictions.length,
+      grade: opts.grade || (isB ? (S.beats.truthDone ? 'S' : 'B') : 'C·教学基线'),
+      evCount: Object.keys(S.evidence).length,
+      cause: opts.cause || S.causeOfDeath || '——',
+      counterfactual: opts.counterfactual || null,
+      lastWords: S.lastWords || null,
+      reason: S.reasons.length ? S.reasons[S.reasons.length - 1] : (S.reasonKept ? '[无法访问]' : null),
+    };
+    if (isB && S.disposal && DOSSIER.endings.disposal[S.disposal]) data.disposalEcho = DOSSIER.endings.disposal[S.disposal];
+    return data;
+  }
   /* 结局落地时写存档(死亡不清零认知) */
   function writeSave(ending){
     if (S._saved) return; S._saved = true;
@@ -3148,14 +3170,16 @@ const CONTENT = (() => {
       if (S.disposal && DOSSIER.endings.disposal[S.disposal]) t += '\n────────────\n' + DOSSIER.endings.disposal[S.disposal];
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 18, H - 70, this);
-      let oy = option(H - 66, '1 导出反馈', '1');
-      option(oy, '2 回访', '2');
+      let oy = optSlim(H - 66, '1 导出反馈', '1');
+      oy = optSlim(oy, '2 回访', '2');
+      optSlim(oy, '3 局外报告', '3');
       softKeys('', '');
     },
     key(k){
       if (scrollKey(this, k)) return;
       if (k === '1') window.APP.exportFeedback();
       else if (k === '2') go('worldReport');
+      else if (k === '3') window.APP.showDeathReport(buildDeathReportData({ uploaded: true }));
     }
   };
   SCREENS.bailConfirm = {
@@ -3424,8 +3448,9 @@ const CONTENT = (() => {
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
-        yy = option(yy, '1 导出反馈', '1');
-        option(yy, isB ? '2 回访' : '2 重新接入', '2');
+        yy = optSlim(yy, '1 导出反馈', '1');
+        yy = optSlim(yy, (isB ? '2 回访' : '2 重新接入'), '2');
+        optSlim(yy, '3 局外报告', '3');
         softKeys('', '');
       }
     },
@@ -3434,6 +3459,15 @@ const CONTENT = (() => {
       else if (this.page === 2){
         if (k === '1') window.APP.exportFeedback();
         else if (k === '2') go('worldReport');
+        else if (k === '3'){
+          let cf;
+          if (S.exhausted) cf = '反事实: 电量剩三成时,上传已经足够。你把它翻完了。';
+          else if (!isB) cf = '反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
+          else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
+          else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
+          else cf = '反事实: 上传之前,清洗和断连都还在。';
+          window.APP.showDeathReport(buildDeathReportData({ uploaded: false, counterfactual: cf }));
+        }
         else if (k === 'Escape') wipeTap();
       }
     }
@@ -3477,14 +3511,16 @@ const CONTENT = (() => {
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 20, H - 70, this);
-      let oy = option(H - 66, '1 导出反馈', '1');
-      option(oy, isB ? '2 回访' : '2 重新接入', '2');
+      let oy = optSlim(H - 66, '1 导出反馈', '1');
+      oy = optSlim(oy, isB ? '2 回访' : '2 重新接入', '2');
+      optSlim(oy, '3 局外报告', '3');
       softKeys('', '');
     },
     key(k){
       if (scrollKey(this, k)) return;
       if (k === '1') window.APP.exportFeedback();
         else if (k === '2') go('worldReport');
+      else if (k === '3') window.APP.showDeathReport(buildDeathReportData({ uploaded: false, cause: '主动断连(裸退)' }));
       else if (k === 'Escape') wipeTap();
     }
   };

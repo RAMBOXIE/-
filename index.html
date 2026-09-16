@@ -56,6 +56,44 @@
   .sheet .row button{appearance:none;border:1px solid #2c312f;background:#1c201f;color:#9fada8;
     font:inherit;font-size:12px;padding:8px 16px;border-radius:4px;cursor:pointer}
   .sheet .row button.primary{background:#20302b;border-color:#33463f;color:#a8e8d3}
+
+  /* D-117 死亡报告 · 局外表现层(canon M17 短链页 + 红墨裁决"真红只在局外")。
+     和上面 .overlay/.sheet(游戏内覆盖层,LCD 逻辑的延伸)刻意分开一套样式——这是
+     整个项目里唯一允许出现真实红色的地方,叙事解:降级渲染夺走了颜色,只有在
+     你自己的档案里,它才是红的。没有后端,这不是真的可分享短链,是本局结算后
+     的本地导出预览(§0 范围声明,见决策日志 D-117)。 */
+  .report-overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
+    padding:6vh 12px;background:#000;z-index:10;overflow-y:auto}
+  .report-overlay.on{display:flex}
+  .report-page{width:min(480px,94vw);background:#fafaf7;color:#1a1a1a;border-radius:2px;
+    padding:28px 24px 24px;font:14px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei",monospace;
+    position:relative;box-shadow:0 30px 80px -30px rgba(0,0,0,.8)}
+  .report-page::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.05;
+    background:repeating-linear-gradient(0deg,#000 0 1px,transparent 1px 3px)}
+  .report-water{position:absolute;top:18px;right:20px;font-size:10px;letter-spacing:.18em;
+    color:#00000030;text-transform:uppercase;text-align:right}
+  .report-h{font-size:12px;letter-spacing:.28em;color:#00000066;text-transform:uppercase;margin:0 0 2px}
+  .report-inst{font-size:20px;letter-spacing:.04em;margin:0 0 18px;font-weight:600}
+  .report-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+    border-bottom:1px solid #00000014;font-size:13px}
+  .report-row b{font-weight:600}
+  .report-block{margin:16px 0;padding:14px 14px 12px;background:#00000006;border-radius:2px}
+  .report-block h4{margin:0 0 6px;font-size:11px;letter-spacing:.16em;color:#00000066;
+    text-transform:uppercase;font-weight:400}
+  /* 红墨:只出现在这两处(理由/遗言) */
+  .report-ink{color:#a3121f;font-weight:600;white-space:pre-wrap}
+  .report-cf{color:#5a5a52;font-style:italic;font-size:12.5px;margin-top:6px}
+  .report-cta{display:block;width:100%;margin-top:20px;padding:13px;text-align:center;
+    background:#141414;color:#fafaf7;border:0;border-radius:3px;cursor:pointer;
+    font:inherit;font-size:13px;letter-spacing:.08em}
+  .report-link{display:block;text-align:center;margin-top:10px;font-size:11px;color:#00000066;
+    cursor:pointer;text-decoration:underline}
+  .report-foot{margin-top:16px;font-size:10.5px;color:#00000055;text-align:center;letter-spacing:.04em}
+  .report-close{position:absolute;top:14px;left:16px;font-size:16px;color:#00000055;cursor:pointer}
+  .transp-list{margin:0;padding:0;list-style:none}
+  .transp-list li{padding:8px 0;border-bottom:1px solid #00000014;font-size:12.5px;
+    display:flex;justify-content:space-between;gap:10px}
+  .transp-ok{color:#2f6b3f}
 </style>
 </head>
 <body>
@@ -83,6 +121,12 @@
       <button class="primary" id="ovlOk">确定</button>
     </div>
   </div>
+</div>
+
+<!-- D-117 死亡报告 · 局外表现层(canon M17)。两页:回收单(报告本体)+ 付费透明度
+     (canon:"该页可进死亡报告短链页",做成同一个覆盖层里的第二页,不另开导航)。 -->
+<div class="report-overlay" id="reportOvl">
+  <div class="report-page" id="reportPage"></div>
 </div>
 
 <script src="js/lcd.js?v=8"></script>
