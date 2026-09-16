@@ -5,7 +5,7 @@
    ============================================================================ */
 const LCD = (() => {
   const W = 196, H = 224, SCALE = 3;
-  const CELL_H = 14, CW_ASC = 7, LINE_H = 16, SS = 4;
+  const CELL_H = 13, CW_ASC = 6, LINE_H = 15, SS = 4;
   const CJK_FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif';
   const ASC_FONT = 'ui-monospace,"SF Mono",Menlo,Consolas,monospace';
 
@@ -50,7 +50,7 @@ const LCD = (() => {
   const gctx = gcan.getContext('2d', { willReadFrequently: true });
   const glyphCache = new Map();
   const isHalf = ch => ch.charCodeAt(0) < 0x2000 && !/[，。、：；「」『』（）？！—·…♥]/.test(ch);
-  const cellW = ch => isHalf(ch) ? CW_ASC : 14;
+  const cellW = ch => isHalf(ch) ? CW_ASC : CELL_H;
 
   function glyph(ch){
     const hit = glyphCache.get(ch); if (hit) return hit;

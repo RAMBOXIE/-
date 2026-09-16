@@ -88,8 +88,9 @@ scenario('回收单 · 仅作答后打印归因行(断连成功页)', ({A}) => {
   g.C.key('2');                                // 冲洗(默认 answer 非 kept → attrAnswered)
   g.C.go('receiptFull', true);
   const t = g.frame();
+  const flat = t.replace(/｜/g, '');   // 拼接时按帧连接符分行,换行点会随字号/宽度变,判断前去掉分隔符不受影响
   A(t.includes('参考线索: #5502-D'), '作答后回收单应打归因行,实际 ' + t.slice(0, 240));
-  A(t.includes('对本实例参数不成立'), '归因行应点名"机制对本实例不成立",不点名发信人善意');
+  A(flat.includes('对本实例参数不成立'), '归因行应点名"机制对本实例不成立",不点名发信人善意');
 });
 
 scenario('回收单 · 未作答(保留)不打印归因行', ({A}) => {
