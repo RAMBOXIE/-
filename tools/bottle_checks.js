@@ -177,6 +177,12 @@ scenario('查扣反事实: 读过 #3120-K 才点名她', save({ seenBottles: ['#
   /* 布置:高信号 + 上传到 92% + 强制查扣 */
   S.trace = 80; S.cacheVal = 1000; S.cacheSlots = 10;
   ENGINE.setClock(3, 50); S.beats.trial = 'replied';
+  /* 已知 flaky 根因(和 D-122 countermeasures_checks.js 撞上的是同一个坑):
+     SCREENS.tools.enter() 里挂着 D-115 的 maybeLegacyNode('tools')(20% 真随机、
+     跑到这里时还没被下面 g.rnd() 摁死),小概率把这一屏悄悄换成 legacyNode,
+     后面两次 K('1') 就打空了,断言看起来像"没查扣"。提前摁死这个开关,不让
+     它跟这条用例本身要测的"查扣反事实"扯上关系。 */
+  S.legacyNodeShown = true;
   CONTENT.go('tools', true); frame();
   g.rnd(0.1);                       // <0.25 -> 查扣发生;同时 d11 <= 60 断连成功
   K('1'); frame(); K('1');          // 两回合 -> 92%
