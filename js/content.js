@@ -10,24 +10,15 @@ const CONTENT = (() => {
 
   /* ---------- 场景层:A 教学局 / B 二次进入 / B' 回访(规格 v0.2) ---------- */
   const SV = SAVE.load();
-  const RUN = (() => {
-    if (!SV || !SV.runCount) return { scen: 'A', wFrom: 3 * 60, wTo: 3 * 60 + 14, clock0: 2 * 60 + 12 };
-    const k = Math.max(0, (SV.runCount | 0) - 1);       // B'起窗口播种重摇,长度恒 14 分
-    const from = 3 * 60 + 31 + (k % 4) * 7;
-    return { scen: 'B', wFrom: from, wTo: from + 14, clock0: 2 * 60 + 58 };
-  })();
-  const isB = RUN.scen === 'B';
-  /* 本局实例编号(§1 宪法13 常驻锚点三件套之一:虚构运营商+实例编号+接入中)。
-     与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
-     常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
-  const INSTANCE_ID = '#7741-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
   /* ==================== D-109 底本抽象 · 第①步:meta + cast ====================
      目标:把"这台机子是谁的"身份数据化,验证"读底本渲染"这条管线走得通——不改变
      任何玩法/文案(抽取即回归)。这一步只接住已经是数据表形状的东西(CONTACT_ROWS
      的联系人列表);散落在几十处叙事文本里的人名(阿帆/柔柔/妈)本轮**不**模板化——
      理由同 D-109 拍板②(persona 暂缓):现在只有一份底本,拆出来零收益,却要动大量
      对语法敏感的叙事散文,风险收益不对等。等接第二台不同人物的机子时再做。
-     schema 见 design/底本抽象_设计_v0.1.md §2.1/§2.2。 */
+     schema 见 design/底本抽象_设计_v0.1.md §2.1/§2.2。
+     **DOSSIER 提到 RUN 前面定义**:第④步 rules.windowGen 要被 RUN 读,顺序必须先有
+     底本、后有 RUN。 */
   const DOSSIER = {
     meta: {
       id: 'phone-7741',
@@ -81,7 +72,34 @@ const CONTENT = (() => {
         { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
       ],
     },
+    /* ==================== D-109 第④步:rules(活规则窗口生成参数) ====================
+       schema §2.5。只搬"这台机子的活规则窗口怎么定"这一件干净参数——A 局固定窗口
+       (起点/长度/开局钟点),B 局重摇公式(基点+步长×(局数%周期)/长度/开局钟点)。
+       **范围校准(与①②③同一纪律)**:掉落表(`dropTable`,各屏 `ENGINE.act` 里的
+       `slots/val`)与判定成功率(`checkOverrides`)本轮**不**抽——前者散落在近百处
+       `ENGINE.act` 调用里,和叙事动作紧耦合,搬了没有即时收益;后者(`engine.js` 的
+       `CHECK` 表)是 canon 蒙特卡洛校准过的**框架共享**平衡数值,不是"这台机子"的
+       内容,本就不该进底本。留到真的接第二台机子、且这两块出现"要按底本变"的
+       具体需求时再做。 */
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60, wLen: 14, clock0: 2 * 60 + 12 },
+        B: { base: 3 * 60 + 31, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 58 },
+      },
+    },
   };
+  const RUN = (() => {
+    const wg = DOSSIER.rules.windowGen;
+    if (!SV || !SV.runCount) return { scen: 'A', wFrom: wg.A.wFrom, wTo: wg.A.wFrom + wg.A.wLen, clock0: wg.A.clock0 };
+    const k = Math.max(0, (SV.runCount | 0) - 1);       // B'起窗口播种重摇,长度恒 14 分
+    const from = wg.B.base + (k % wg.B.reseedMod) * wg.B.reseedStep;
+    return { scen: 'B', wFrom: from, wTo: from + wg.B.wLen, clock0: wg.B.clock0 };
+  })();
+  const isB = RUN.scen === 'B';
+  /* 本局实例编号(§1 宪法13 常驻锚点三件套之一:虚构运营商+实例编号+接入中)。
+     与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
+     常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
+  const INSTANCE_ID = '#7741-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
