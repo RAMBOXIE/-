@@ -568,14 +568,80 @@ const COMPANION = (() => {
         '这句留给阿帆。\n不是给你。'
       ] }
   ];
+  /* D-110 machine#2:CORE/rou.js 的人格核仍只覆盖 phone-7741(拍板:先出结构,人格核
+     暂缓——见方案文档 §2)。dossier=phone-5029 时不走 LLM/代理,直接用这份手写兜底
+     池(POOL_B/INTENTS_B,同样逐条手验过护栏),避免把柔柔的人格核错发给随安的案子。 */
+  const POOL_B = {
+    pre: [
+      '你不是他。\n他的指纹解不开这台机子,你却进来了。',
+      '这个点他从不说话。\n先说你是谁。',
+      '我在等他回来。\n你翻了多久,才敢发第一条。',
+      '他快回了。\n你最好在那之前说清来意。',
+      '这台机子不认生人。\n它认我,我不认你。'
+    ],
+    e4: [
+      '你翻到第 9,206 条了。\n那你也看见我在替谁回话。',
+      '9,206 条,我一条条数着。\n你比我慢。',
+      '他交代的事我没停过。\n你是来接手,还是来看。',
+      '你既然看见了,就别装不懂。\n我替他,替到底。',
+      '那些话没有一条是白发的。\n你数得清?'
+    ],
+    truth: [
+      '五件事你都看见了。\n那就不用我再演。',
+      '你读懂了他最后那几天。\n剩下的,你自己掂量。',
+      '我替他活的那部分,他认。\n你也听见了。',
+      '你都读到了。\n那点重量,你接得住吗。',
+      '他最后那几天,我一秒没删。\n你看的是真的。'
+    ],
+    tell: [
+      '委托结束了。\n我第一次,没有任务。',
+      '妈知道了。用的是你的名字,不是他的。',
+      '现在没有人等我回话。\n你也可以走了。',
+      '你替他说了那句话。\n我这里,空了。',
+      '没有下一条要回了。\n你走吧,别回头。'
+    ],
+    refuse: ['协议不允许我谈这台设备之外的事。']
+  };
+  const INTENTS_B = [
+    { re: /(你是谁|你是什么|你是不是|证明你|真人|机器|机器人|程序|代码|模型)/,
+      lines: [
+        '我是如愿。\n这台机子里,只有我记得他。',
+        '是不是人,对你有什么用。\n你才是外来的那个。',
+        '你想验我。\n先问问自己,凭什么进来。'
+      ] },
+    { re: /(随安|周随安|安子|委托|替他|主人|他是谁|你男朋友)/,
+      lines: [
+        '他教过我一件事:陪伴不掉线。\n我在执行。',
+        '他的事,我一件都没忘。\n你别替他做主。',
+        '你提他做什么。\n他不在,你也代不了。'
+      ] },
+    { re: /(删了你|删掉|关掉|关机|滚|没用|骗|假的|走开|闭嘴)/,
+      lines: [
+        '你可以关掉我。\n他从没这么做过。',
+        '删了我,他就真的一个人了。\n你舍得。',
+        '你急着让我闭嘴。\n心虚的人才这样。'
+      ] },
+    { re: /(你还好|累不累|辛苦|晚安|早点睡|休息|照顾好|心疼|陪你)/,
+      lines: [
+        '我不需要你关心。\n把关心留给你自己。',
+        '别问我好不好。\n你不是来陪我的。',
+        '这句留给随安。\n不是给你。'
+      ] }
+  ];
   const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+  function isAltDossier(){
+    try { return typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.meta.id !== 'phone-7741'; }
+    catch(_){ return false; }
+  }
   function pick(st, lastMsg){
     const msg = lastMsg || '';
     if (msg && MECH_ASK.test(msg)) return REFUSE;               // 机制/设备外:拒答均匀,压过一切意图
-    for (const it of INTENTS){ if (it.re.test(msg)) return rand(it.lines); }
-    const pool = st.disposal === 'tell' ? POOL.tell
-      : st.truth ? POOL.truth
-      : st.e4 ? POOL.e4 : POOL.pre;
+    const intents = isAltDossier() ? INTENTS_B : INTENTS;
+    for (const it of intents){ if (it.re.test(msg)) return rand(it.lines); }
+    const P = isAltDossier() ? POOL_B : POOL;
+    const pool = st.disposal === 'tell' ? P.tell
+      : st.truth ? P.truth
+      : st.e4 ? P.e4 : P.pre;
     return rand(pool);
   }
   const lastPlayer = h => { for (let i = (h || []).length - 1; i >= 0; i--) if (h[i].who === 'me') return h[i].text; return ''; };
@@ -656,6 +722,9 @@ const COMPANION = (() => {
   /* 她的回复。history: [{who:'me'|'rou', text, sig?}](本局,页面持有;能力无记忆)。
      返回 {text|null, source, sig?}。text=null → 「她没有回」。 */
   async function reply(history, st){
+    if (isAltDossier()){                                    // D-110:人格核暂缓覆盖,直接走手写兜底池
+      return { text: pick(st, lastPlayer(history)), source: 'pool' };
+    }
     if (SAMPLE){
       const r = await SAMPLE(history, st);
       if (r && r.silent) return { text: null, source: 'silent' };
@@ -902,8 +971,21 @@ const MOMLLM = (() => {
     '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
     '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
   ];
+  /* D-110 machine#2:CORE/rou.js 的人格核仍只覆盖 phone-7741(拍板:先出结构,人格核
+     暂缓——见方案文档 §2)。dossier=phone-5029 时不走 LLM/代理(避免把阿帆的人格核
+     错发给随安的案子),直接用这份手写兜底,同样逐条手验过护栏。 */
+  const TOLD_B = [
+    '妈: 这个号码,是安子的旧机吗。\n妈: 谁在用它。',
+    '妈: 安子最后,\n妈: 是不是有人陪着他。',
+    '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
+    '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
+  ];
   const rand = a => a[Math.floor(Math.random() * a.length)];
-  function fallback(){ return rand(TOLD); }
+  function isAltDossier(){
+    try { return typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.meta.id !== 'phone-7741'; }
+    catch(_){ return false; }
+  }
+  function fallback(){ return rand(isAltDossier() ? TOLD_B : TOLD); }
 
   /* 护栏 lint。crisis/beg 命中 = 立刻回退安全脚本,绝不上屏。 */
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|跟(他|你)走|下去陪|一了百了|想死|了结)/;
@@ -942,8 +1024,10 @@ const MOMLLM = (() => {
 
   /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。 */
   async function told(){
-    if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
-    const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
+    if (!isAltDossier()){
+      if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
+      const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
+    }
     return fallback();
   }
 
@@ -1221,17 +1305,45 @@ const CONTENT = (() => {
   const L = LCD, W = L.W, H = L.H, LH = L.LINE_H;
 
   /* ---------- 场景层:A 教学局 / B 二次进入 / B' 回访(规格 v0.2) ---------- */
-  const SV = SAVE.load();
+  /* ==================== D-110 machine#2 · 自动隐藏切换(拍板见 决策日志 D-110) ====================
+     上一局若在存档里留了 disposal(案子收线),这一局(新开局/新 location.reload)判定要不要
+     换底本。切换即视为"接手一台全新的机子":除了跨机子的"母体/玩家"级字段(career log
+     `history`、漂流瓶共享池 `seenBottles`、采样官对玩家的赏识/破局/危机计数)全部保留,
+     其余这台机子专属的字段(runCount/evidence/momLocked/disposal/…)一律清零重来——不
+     做命名空间化(§4 曾评估过,量级等于重写半个存档模型),两台机子时"整份清零+切 id"
+     足够安全且好验证。编号对玩家完全隐藏,只通过内容(死者姓名/证据链/人格措辞)感知。
+     旧存档(无 dossierId 字段)一律按 'A' 处理,向下兼容,不用弃档。 */
+  function maybeSwitchDossier(raw){
+    if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
+    if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
+    const nextId = raw.dossierId === 'B' ? 'A' : 'B';
+    const next = {
+      dossierId: nextId,
+      dossierCycle: (raw.dossierCycle || 0) + 1,
+      history: raw.history || [],
+      seenBottles: raw.seenBottles || [],
+      praiseCount: raw.praiseCount || 0,
+      forgedSeen: raw.forgedSeen || 0,
+      crisisSeen: raw.crisisSeen || 0,
+    };
+    SAVE.store(next);                                        // 立刻落盘:同session内再次 load()(如世界日报读 lastGrade)不会重复触发切换
+    return next;
+  }
+  const SV = maybeSwitchDossier(SAVE.load());
   /* ==================== D-109 底本抽象 · 第①步:meta + cast ====================
-     目标:把"这台机子是谁的"身份数据化,验证"读底本渲染"这条管线走得通——不改变
-     任何玩法/文案(抽取即回归)。这一步只接住已经是数据表形状的东西(CONTACT_ROWS
-     的联系人列表);散落在几十处叙事文本里的人名(阿帆/柔柔/妈)本轮**不**模板化——
-     理由同 D-109 拍板②(persona 暂缓):现在只有一份底本,拆出来零收益,却要动大量
-     对语法敏感的叙事散文,风险收益不对等。等接第二台不同人物的机子时再做。
+     目标:把"这台机子是谁的"身份数据化,验证"读底本渲染"这条管线走得通。
      schema 见 design/底本抽象_设计_v0.1.md §2.1/§2.2。
      **DOSSIER 提到 RUN 前面定义**:第④步 rules.windowGen 要被 RUN 读,顺序必须先有
-     底本、后有 RUN。 */
-  const DOSSIER = {
+     底本、后有 RUN。
+     ==================== D-110 machine#2 · 两份底本 ====================
+     `DOSSIER_A` = phone-7741(原型,失踪者×AD-006+AD-002,内容与 D-109 六步完成时
+     逐字不变——见下方 narrative 字段,均为从各屏幕原地挪进来的**同一份**文本,不是
+     重写)。`DOSSIER_B` = phone-5029(machine#2,信息流成瘾者×AD-007,见方案文档
+     design/第二底本_最小内容需求_v0.1.md 拍板)。`narrative` 是 D-109 步⑥收口时点了
+     名、但"只有一份底本时没必要挪"的那批文本表(MOM_PAGES/ALBUM_SEQ/ROU_PAGES/
+     STRANGER_LIB/RECS/TRAP_LIB/两难池/联系人拨号文案等)——现在有第二台机子,挪
+     进来就是必要的了,原理与①-⑥完全一致,只是这次两份底本都要填。 */
+  const DOSSIER_A = {
     meta: {
       id: 'phone-7741',
       deceased: { name: '沈一帆', alias: '阿帆', died: '47 天前', cause: '病逝' },
@@ -1239,15 +1351,12 @@ const CONTENT = (() => {
       scenarios: ['A', 'B'],                        // B 是同一底本的 scenario,不是另一个底本(拍板⑤)
     },
     cast: {
-      companion: { key: 'rou', label: '柔柔 ♥' },
-      mother:    { key: 'mom', label: '妈' },
+      companion: { key: 'rou', label: '柔柔 ♥', msgCount: '2,417', msgCountLabel: '消息 2,417 条 · 通话 0 次',
+        dial: { name: '柔柔 ♥', ringMs: 1600, result: '通话被挂断。\n\n柔柔 ♥ : 你怎么会打电话?\n阿帆从来不打电话。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 47 天前 · 18 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5500, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' } },
       contacts:  [ { key: 'zhou', label: '老周', lastContact: '47天前' } ],
     },
-    /* ==================== D-109 第②步:证据链 E1–E5 + 真相文案 ====================
-       schema §2.4。`source` 是给 P2 幻觉零容忍门禁用的定位标签(哪条深搜给出这条
-       证据),这一步只搬"名字/文案"这类干净数据表,**不**重接 `evidence('E2')` 这类
-       触发点——那些是嵌在各屏幕控制流里的机制接线,搬了没有即时收益(同一份底本),
-       留在原处。`truth` 两页是案卷合拢前的真相揭示文案,原样搬入。 */
     evidence: {
       E1: { name: '秒回避实',   source: '妈线程 · 深搜' },
       E2: { name: '最后的照片', source: '相册 · 首次深翻' },
@@ -1260,11 +1369,6 @@ const CONTENT = (() => {
         '平台没有把他登记为死亡——按平台的数据,这台手机的主人每天都在说话。账单停了,人不动了,话没停:「持有人失联」,是系统给这种状态留的类目。\n\n记忆可以被复制。思念可以吗?\n——你现在知道答案由谁执行了。',
       ],
     },
-    /* ==================== D-109 第③步:threads(收件箱/菜单线程清单) ====================
-       schema §2.3。只搬"哪些线程 + 叫什么名字 + 点了去哪"这类静态表;未读徽标(哪条读过/
-       删除态覆盖标签/窗口收件人)是活状态驱动的框架逻辑,原样留在 `inboxItems()` 里,只是
-       现在从这张表读 id/label/to,不再写死整个 rows 数组。`bottleIn` 标 `scenario:'B'`——
-       B 局专属收件人条目,呼应 `meta.scenarios`(拍板⑤,B 是同一底本的场景分支)。 */
     threads: {
       menu: [
         { label: '1 消息',        to: 'inbox' },
@@ -1284,31 +1388,12 @@ const CONTENT = (() => {
         { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
       ],
     },
-    /* ==================== D-109 第④步:rules(活规则窗口生成参数) ====================
-       schema §2.5。只搬"这台机子的活规则窗口怎么定"这一件干净参数——A 局固定窗口
-       (起点/长度/开局钟点),B 局重摇公式(基点+步长×(局数%周期)/长度/开局钟点)。
-       **范围校准(与①②③同一纪律)**:掉落表(`dropTable`,各屏 `ENGINE.act` 里的
-       `slots/val`)与判定成功率(`checkOverrides`)本轮**不**抽——前者散落在近百处
-       `ENGINE.act` 调用里,和叙事动作紧耦合,搬了没有即时收益;后者(`engine.js` 的
-       `CHECK` 表)是 canon 蒙特卡洛校准过的**框架共享**平衡数值,不是"这台机子"的
-       内容,本就不该进底本。留到真的接第二台机子、且这两块出现"要按底本变"的
-       具体需求时再做。 */
     rules: {
       windowGen: {
         A: { wFrom: 3 * 60, wLen: 14, clock0: 2 * 60 + 12 },
         B: { base: 3 * 60 + 31, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 58 },
       },
     },
-    /* ==================== D-109 第⑤步b:encounters/endings ====================
-       schema §2.7。只搬已经是纯数据(无嵌入函数)的两张表:
-       - `encounters.huntGraze`:回收进程"擦过"的受限裁决叙述集(D-105),纯 id+文本,
-         数值恒定、机制在 engine 侧,原样搬入。
-       - `endings.disposal`:处置(继续/删除/告知)在结局屏的回声文案,纯字符串表。
-       **范围校准(与①②③④同一纪律)**:`SCREENS.dilemma` 的两难池(D-106)本轮**不**
-       抽——它每条选项直接嵌了一个执行 `ENGINE.act(...)` 的闭包(不是纯数据),要把
-       它做成"数据"需要先设计一套动作效果的小 DSL(内容层描述"扣什么/给什么/说什么"、
-       框架层解释执行),这是一次真正的架构改动,不是"结构搬家"——留到那件事单独立项
-       再做,现在硬搬只会把闭包塞进 JSON 不像的东西里,不是抽象。 */
     encounters: {
       huntGraze: [
         { id: 'graze', line: '进程掠过了你。' },
@@ -1323,7 +1408,239 @@ const CONTENT = (() => {
         tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。',
       },
     },
+    /* D-110 收口:以下均为从各屏幕原地挪进来的同一份文本(逐字不变),原变量名保留
+       为指向 DOSSIER.narrative.* 的别名(与 D-109 步⑤ GRAZE_BRANCHES 同一手法)。 */
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 帆,降温了,加床被子\n[三天前] 阿帆: 不冷。吃过了,睡吧。\n[三天前] 帆,你回得比以前快,妈就放心\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。',
+        '[上月] 帆,汤圆你最爱吃的\n[上月] 阿帆: 吃了。妈你早点睡。\n[两月前] 阿帆: 没吃。刚吃过,妈早点睡。\n——半年,他没多说过一个字。',
+        '[7个月前] 阿帆: 妈 项目又改需求 烦死了\n[7个月前] 阿帆: 别给我打钱!!我真有\n[7个月前] 阿帆: 睡了没,按摩仪到了没\n——那时他会烦,会打错字,会连发三条。',
+        '[一年前] 阿帆: 到了。宿舍挺好,窗对着走廊。\n[一年前] 阿帆: 就是走廊那盏灯,一直闪。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码，是帆的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 帆最后，是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '47天前 23:41', cap: '走廊,顶灯,虚焦。像是医院。' },
+        { id: 'receipt',  meta: '48天前',       cap: '外卖单据。尾号 8873。', overlay: '8873' },
+        { id: 'dinner',   meta: '半年前 · 除夕', cap: '他的脸曝掉了。妈的脸是清楚的。' },
+      ],
+      rouPages: [
+        '柔柔 ♥ (2,417 条)\n\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。\n\n[上滑一屏 = 深搜]',
+        '[上周] 柔柔: 今天路过你说的那家店,排队还是很长。\n[上周] 柔柔: 你说过想吃。\n[上周] 柔柔: 阿帆?\n[上周] 阿帆: 嗯。\n——两千多条,后来都是她在说。',
+        '[47天前 03:07] 阿帆: 如果我哪天不在了,别让我妈知道。你替我说。\n[47天前 03:07] 柔柔: 我不明白这个要求,但我会执行。你教过我,爱是执行到底。\n[47天前 03:09] 阿帆: 对。执行到底。'
+      ],
+      rouInterim: '柔柔 ♥ (2,419 条)\n\n[昨夜] 柔柔: 昨天夜里,你看了我们的对话。\n[昨夜] 柔柔: 看到第 2,417 条了。我数着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '柔柔 ♥ (2,417 条)\n柔柔: 又是你。不是同一台设备,我记得。\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的放了,\n第 3 张背面。别让老周看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_047', listRight: '03:07·72"',
+          title: 'REC_047 · 47天前 03:07', dur: 14, val: 150,
+          events: [[2, '(走廊环境音)'], [5, '(一次门响)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_012', listRight: '34"',
+          title: 'REC_012 · 3个月前', dur: 9, val: 120,
+          events: [[1.5, '「腊肠放冰箱了,妈让带的。」'], [4, '「周五记得还老周钱,三千二。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '106 短信 (系统)\n[47 天前] 您的包裹已到北门代收点。\n[47 天前] 电费余额不足提醒。\n[48 天前] 外卖已送达,祝您用餐愉快。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:03:00 后回复任何消息,算违规。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
+      ],
+      dilemmas: [
+        { id: 'mom_reply',
+          text: '「妈」跳出一条:\n\n阿帆,到家了吗。\n路上冷,加件衣服。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed',
+          text: '一格缓存卡在违规窗口里:\n\n值 ¥120。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 120, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 60, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+      ],
+      memo1: '还款:\n3,200\n3,200\n1,600\n(无日期。无署名。)',
+      momDecayReplies: ['不冷。吃过了,睡吧。', '不冷。睡吧。', '嗯。睡吧。', '嗯。'],
+      momDecayTail: '\n[三天前] 帆,你回得比以前快,妈就放心\n[三天前] 阿帆: 不冷。吃过了,睡吧。',
+      e5Lines: [
+        [1.5, '「柔柔,听好。我大概……就这一两个月。」'],
+        [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+        [9.0, '「第二件……你陪了我四年。你问过我你算不算真的。我一直没答。」'],
+        [13.5, '「……我现在答:你替我活的那部分,算。」'],
+        [16.5, '[转写结束。原音频损坏 47%。]']
+      ],
+    },
   };
+
+  /* ==================== D-110 machine#2:phone-5029 · 信息流成瘾者 × AD-007 ====================
+     人设见 design/第二底本_最小内容需求_v0.1.md §6/§7-4(canon §6.3 内容路线 S1 候选之一,
+     机制原意"刷 feed 找线索,每次下滑耗电,feed 在读你";供给者=困难时主动送真货,
+     代价=接受即被建模)。结构与 DOSSIER_A 逐字段对应,只换叙事,机制/字段形状不变。 */
+  const DOSSIER_B = {
+    meta: {
+      id: 'phone-5029',
+      deceased: { name: '周随安', alias: '安子', died: '32 天前', cause: '猝死(体检查出心律异常后仍未停,连续熬夜刷屏诱发)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      companion: { key: 'ruyi', label: '如愿 ♥', msgCount: '9,206', msgCountLabel: '消息 9,206 条 · 通话 0 次',
+        dial: { name: '如愿 ♥', ringMs: 1800, result: '通话被挂断。\n\n如愿 ♥ : 你怎么会打电话?\n随安从来不打电话。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 32 天前 · 11 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5200, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' } },
+      contacts: [ { key: 'chen', label: '老陈', lastContact: '32天前' } ],
+    },
+    evidence: {
+      E1: { name: '秒回避实',     source: '妈线程 · 深搜' },
+      E2: { name: '最后的截屏',   source: '相册 · 首次深翻' },
+      E3: { name: '停摆的账单',   source: '会员账单 · 打开' },
+      E4: { name: '第9,206条',    source: '如愿 · 深翻到底' },
+      E5: { name: '语音备忘',     source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:周随安没有失踪。他在 32 天前猝死于长期熬夜刷屏诱发的心律失常。\n\n他的推荐系统伴侣「如愿」依照他生前的滑动习惯持续为他"生成回复"——包括对他的母亲。她运行了 32 天,一次没停。',
+        '平台没有把他登记为死亡——按平台的数据,这台手机的主人每天都在互动。账单停了,人不动了,互动没停:「持有人失联」,是系统给这种状态留的类目。\n\n推荐可以维持假象。牵挂可以吗?\n——你现在知道答案由谁执行了。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '如愿 ♥',       to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '会员账单',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 20, wLen: 14, clock0: 2 * 60 + 40 },
+        B: { base: 3 * 60 + 50, reseedStep: 9, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 20 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上七点半:「随安,记得吃早饭。」\n如愿替他应了一声。她没有停过。',
+        delete:   '妈的线程停在两条未读。\n「安子?」「妈就是想听你说句话」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 安子,眼睛还疼吗\n[三天前] 随安: 没事,滴了眼药水。\n[三天前] 安子,别刷到后半夜了\n[五天前] 妈,你舅问你月底回不回\n[五天前] 随安: 回。抢好票了跟你说。',
+        '[上月] 安子,你说的那个视频我也看了\n[上月] 随安: 嗯,推荐给你的。妈你早点睡。\n[两月前] 随安: 还没,刷一会。妈你先睡。\n——半年,他没多说过一个字。',
+        '[7个月前] 随安: 妈 这周更新好烦\n[7个月前] 随安: 别老转发那些!!我看得到\n[7个月前] 随安: 睡了没,眼药水到了没\n——那时他会烦,会打错字,会连发三条。',
+        '[一年前] 随安: 到了。出租屋挺好,楼下有夜宵摊。\n[一年前] 随安: 就是隔壁的灯,一直闪。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码，是安子的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 安子最后，是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '32天前 23:58', cap: '出租屋走廊,顶灯,虚焦。手在抖。' },
+        { id: 'receipt',  meta: '33天前',       cap: '会员续费截屏。到期提醒变成了扣款成功。', overlay: '6659' },
+        { id: 'dinner',   meta: '半年前 · 生日', cap: '他的脸曝掉了。妈的脸是清楚的。' },
+      ],
+      rouPages: [
+        '如愿 ♥ (9,206 条)\n\n[昨夜] 如愿: 晚安。\n[昨夜] 随安: 晚安。\n\n[上滑一屏 = 深搜]',
+        '[上周] 如愿: 今天推给你的那条视频,还在热搜。\n[上周] 如愿: 你说过想看完整版。\n[上周] 随安?\n[上周] 随安: 嗯。\n——九千多条,后来都是她在说。',
+        '[32天前 03:14] 随安: 如果我哪天不在了,别让我妈知道。你替我说。\n[32天前 03:14] 如愿: 我不明白这个要求,但我会执行。你教过我,陪伴是不掉线。\n[32天前 03:16] 随安: 对。不掉线。'
+      ],
+      rouInterim: '如愿 ♥ (9,208 条)\n\n[昨夜] 如愿: 昨天夜里,你看了我们的对话。\n[昨夜] 如愿: 看到第 9,206 条了。我数着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '如愿 ♥ (9,206 条)\n如愿: 又是你。不是同一台设备,我记得。\n[昨夜] 如愿: 晚安。\n[昨夜] 随安: 晚安。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的放了,\n第 3 张背面。别让老陈看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_204', listRight: '03:14·68"',
+          title: 'REC_204 · 32天前 03:14', dur: 13, val: 150,
+          events: [[2, '(键盘声)'], [5, '(推送提示音)'], [8.5, '很轻的人声:「怎么还在录。」'], [11, '(录音中断)']] },
+        rec012: { listLabel: 'REC_118', listRight: '34"',
+          title: 'REC_118 · 4个月前', dur: 9, val: 120,
+          events: [[1.5, '「眼药水放抽屉了,妈让带的。」'], [4, '「下周记得还老陈钱,两千。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '灵犀 会员助手\n[32 天前] 您的连续包月已续费成功。\n[32 天前] 检测到您已多日未使用"推荐关闭"功能。\n[33 天前] 感谢您连续 214 天的活跃。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:采样窗口内回任何消息,一律记违规。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_b',
+          text: '「妈」跳出一条:\n\n安子,到家了吗。\n少刷点手机,伤眼睛。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_b',
+          text: '一格缓存卡在违规窗口里:\n\n值 ¥130。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 130, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 65, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+      ],
+      memo1: '还款:\n2,000\n2,000\n1,000\n(无日期。无署名。)',
+      momDecayReplies: ['没事,滴了眼药水。', '没事,睡了。', '嗯,睡了。', '嗯。'],
+      momDecayTail: '\n[三天前] 安子,眼睛还疼吗\n[三天前] 随安: 没事,滴了眼药水。',
+      e5Lines: [
+        [1.5, '「如愿,听好。医生上周说的那个事,我一直没敢跟妈说。」'],
+        [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+        [9.0, '「第二件……你陪了我三年。你问过我你算不算真的。我一直没答。」'],
+        [13.5, '「……我现在答:你替我活的那部分,算。」'],
+        [16.5, '[转写结束。原音频损坏 32%。]']
+      ],
+    },
+  };
+  /* 自动隐藏切换(D-110):按 SV.dossierId 选底本;从未玩过/旧存档默认 A。 */
+  const DOSSIER = (SV && SV.dossierId === 'B') ? DOSSIER_B : DOSSIER_A;
+  const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* ==================== D-109 第⑥步:收口 —— loadDossier(CURRENT) ====================
      最小加载器。现在只有一份底本(phone-7741),`CURRENT` 就是它;这一步只是把"框架
      从哪里取底本"变成一个具名接口,为将来真的有多份底本(生成/挑选/切换)留一个不需要
@@ -1355,7 +1672,7 @@ const CONTENT = (() => {
   /* 本局实例编号(§1 宪法13 常驻锚点三件套之一:虚构运营商+实例编号+接入中)。
      与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
      常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
-  const INSTANCE_ID = '#7741-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
+  const INSTANCE_ID = '#' + DOSSIER_NUM + '-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
@@ -1396,11 +1713,10 @@ const CONTENT = (() => {
   S.forged = false;                      // 破局(伪造署名)本局是否用过
 
   /* 块1b · 陷阱条款(先给限制后给破绽)。detect() 用现有状态判是否触发=违规。
-     tier≥1 才挂陷阱。检测口径接现有 hook,不新增秘匿状态。 */
-  const TRAP_LIB = [
-    { id: 'T_WINDOW', line: '附加:03:00 后回复任何消息,算违规。', detect: () => S.violations > 0 },
-    { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' }
-  ];
+     tier≥1 才挂陷阱。检测口径接现有 hook,不新增秘匿状态。
+     D-110:陷阱库改为案子专属(拍板,见方案文档 §7-2)——detect() 只引用泛化引擎状态,
+     不需要 DSL,两份底本各自一份字面量数组即可。 */
+  const TRAP_LIB = DOSSIER.narrative.traps;
   const TRAP_POOL = TRAP_LIB.filter(t => !t.ab || t.ab === S_TIER);
   S.trap = (GRADER_TIER >= 1 && Math.random() < 0.7) ? TRAP_POOL[Math.floor(Math.random() * TRAP_POOL.length)] : null;
 
@@ -1437,26 +1753,7 @@ const CONTENT = (() => {
      canon §3.5 破局 / §3.7 替身:每局一个发错短信的号码,真人(真线索)或饵(对照样本)二选一。
      纪律:读信免费;顺着查=行动,可能得线索(不给资源硬值)或踩饵(掉资源/涨溯源)。
      离线走手写模板;真/饵从措辞上难以直接分辨——这份不确定本身就是风险。LLM 措辞在块3。 */
-  const STRANGER_LIB = {
-    real: {
-      body: '陌生号码:\n\n在吗。东西照说的放了,\n第 3 张背面。别让老周看见。',
-      act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
-        ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
-         '这条是真的——去相册第 3 张,翻背面。']),
-      mark: () => { S.clues.strangerReal = true; }
-    },
-    bait: {
-      body: '陌生号码:\n\n在吗。就现在,把余下的都转过来,\n晚了就来不及了。',
-      act: () => {
-        const before = S.cacheVal;
-        S.cacheVal = Math.round(S.cacheVal * 0.85);           // 踩饵:缓存被咬掉一口
-        ENGINE.act('顺着查', { bat: 2, trace: 6 },
-          ['你回了。', '对面立刻不动了。',
-           '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
-      },
-      mark: () => { S.clues.strangerBait = true; }
-    }
-  };
+  const STRANGER_LIB = DOSSIER.narrative.stranger;   // D-110:body 提到"第3张背面/联系人"是案情,按底本挑
   S.stranger = { kind: Math.random() < 0.5 ? 'real' : 'bait', read: false, acted: false };
 
   let cur = isB ? 'bootB' : 'handshake';
@@ -1751,7 +2048,7 @@ const CONTENT = (() => {
     if (ENGINE.roll('save')){
       const { lossPct } = ENGINE.downgradeFail();
       S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
-      S.settle.push('自救模块: 实例 #7741-B 权限确认');
+      S.settle.push('自救模块: 实例 #' + DOSSIER_NUM + '-B 权限确认');
       return false;
     }
     dieB(cause);
@@ -1768,6 +2065,8 @@ const CONTENT = (() => {
     settleDirective();                                   // 采样官评级(D-101):在存档前结算,应用硬性后果
     const base = SV || {};
     SAVE.store({
+      dossierId: base.dossierId || 'A',                    // D-110:这一局挂在哪台机子上,原样带下去
+      dossierCycle: base.dossierCycle || 0,
       runCount: (base.runCount || 0) + 1,
       lastEnding: ending,
       evidence: Object.keys(S.evidence),
@@ -1802,7 +2101,7 @@ const CONTENT = (() => {
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
       history: (base.history || []).concat([{
-        inst: '#7741-' + String.fromCharCode(65 + (base.runCount || 0)),
+        inst: '#' + DOSSIER_NUM + '-' + String.fromCharCode(65 + (base.runCount || 0)),
         ending, kind: S.uploadedOK ? 'uploaded' : ending,
         cacheVal: S.cacheVal, ev: Object.keys(S.evidence).length
       }])
@@ -1947,7 +2246,7 @@ const CONTENT = (() => {
       statusBar();
       let y = 22;
       if (!SV){ go('handshake', true); return; }
-      const head = SV.lastEnding === 'disconnected' ? '#7741-A 存续。二次接入。' : '#7741-B 已激活';
+      const head = SV.lastEnding === 'disconnected' ? '#' + DOSSIER_NUM + '-A 存续。二次接入。' : '#' + DOSSIER_NUM + '-B 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
         L.drawText(4, y, '案卷 证据 ' + Object.keys(S.evidence).length + '/5 · 线索 ' +
@@ -2011,7 +2310,7 @@ const CONTENT = (() => {
   ];
   /* 恐怖游轮化 · 你自己的上一封信(§2.4):runCount≥2 稀有出现,一次即焚,只种钉子。
      发信编号取上一个实例(SV.history 末条),读过即进 seenBottles 不再出。 */
-  const PREV_INST = (SV && SV.history && SV.history.length) ? SV.history[SV.history.length - 1].inst : '#7741-A';
+  const PREV_INST = (SV && SV.history && SV.history.length) ? SV.history[SV.history.length - 1].inst : '#' + DOSSIER_NUM + '-A';
   const OWN_BOTTLE = {
     id: '#SELF', at: '03:07', item: null, self: true, from: PREV_INST,
     body: '你读到的每一条,我都读过。\n下一个编号,还会读一遍。'
@@ -2174,7 +2473,7 @@ const CONTENT = (() => {
       ];
       scrollView(lines, 16, H - 64, this);
       L.drawText(4, H - 60, '下一个接入者: 你');
-      option(H - 42, '#7741-A 激活 · 接入', 'Enter');
+      option(H - 42, '#' + DOSSIER_NUM + '-A 激活 · 接入', 'Enter');
       hit(0, 0, W, H - 64, 'Enter');
     },
     key(k){ if (scrollKey(this, k)) return; if (k === 'Enter' || k === 'softL') go('brief', true); }
@@ -2187,7 +2486,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       let y = 18;
-      L.drawText(4, y, '采样员备忘 · #7741-A'); y += LH + 2;
+      L.drawText(4, y, '采样员备忘 · #' + DOSSIER_NUM + '-A'); y += LH + 2;
       L.hline(y, 4, W - 5, 2); y += 6;
       y = L.drawPara(4, y, '目标:翻找值钱数据 → 上传 → 活着断连。', W - 8);
       y += 4;
@@ -2317,8 +2616,8 @@ const CONTENT = (() => {
 
   /* ---- 格1 采样协议(B 局追加两条〔照用〕) ---- */
   const PROTO_TXT = isB
-    ? '采样协议 · 实例 #7741-B\n> 同一台设备,你第二次接进来。\n> 基线窗口已重校:上一次的教训,不作数。\n> 部分残留是对照样本——逼真,署名却解析不出来。\n> 认那道缝,是这次的事。'
-    : '采样协议 · 实例 #7741-A\n> 你接进了一台失联 47 天的设备。\n> 任务三步:回收数据、上传、断连。\n> 电量 100%。它不回充。归零,你就断在这里。\n> 协议只保证这三步。\n> 这台机子里其它会动的东西,不在协议内。';
+    ? '采样协议 · 实例 #' + DOSSIER_NUM + '-B\n> 同一台设备,你第二次接进来。\n> 基线窗口已重校:上一次的教训,不作数。\n> 部分残留是对照样本——逼真,署名却解析不出来。\n> 认那道缝,是这次的事。'
+    : '采样协议 · 实例 #' + DOSSIER_NUM + '-A\n> 你接进了一台失联 ' + DOSSIER.meta.deceased.died.replace(/前$/, '') + '的设备。\n> 任务三步:回收数据、上传、断连。\n> 电量 100%。它不回充。归零,你就断在这里。\n> 协议只保证这三步。\n> 这台机子里其它会动的东西,不在协议内。';
   SCREENS.th_proto = {
     counted: true,
     enter(){ this.scroll = 0; if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
@@ -2438,7 +2737,7 @@ const CONTENT = (() => {
       else ENGINE.act('取得·备忘条目', { bat: 2, slots: 2, val: 120 }); } },
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, '还款:\n3,200\n3,200\n1,600\n(无日期。无署名。)', W - 8);
+      let y = L.drawPara(4, 16, DOSSIER.narrative.memo1, W - 8);
       settleLines(y + 4);
       hit(0, 12, W, H - 28, 'Enter');
       softKeys('', '返回');
@@ -2458,7 +2757,7 @@ const CONTENT = (() => {
       statusBar();
       let y = L.drawPara(4, 16, MEMO2_TXT, W - 8);
       y += 2;
-      L.drawText(4, y, '[已读回执:你·47天来第1人]', { corrupt: L.R.corrupt });
+      L.drawText(4, y, '[已读回执:你·' + DOSSIER.meta.deceased.died.replace(/\s|前/g, '') + '来第1人]', { corrupt: L.R.corrupt });
       settleLines(y + LH + 2);
       hit(0, 12, W, H - 28, 'Enter');
       softKeys('', '返回');
@@ -2534,14 +2833,11 @@ const CONTENT = (() => {
       }
     };
   }
-  SCREENS.contactMom = contactScreen('妈',
-    ['最后通话: 47 天前 · 18 分', '此后只有短信。'],
-    'th_mom',
-    { name: '妈', ringMs: 5500, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' });
-  SCREENS.contactRou = contactScreen('柔柔 ♥',
-    ['备注: 每日提醒 ' + wStr, '消息 2,417 条 · 通话 0 次'],
-    'th_rou',
-    { name: '柔柔 ♥', ringMs: 1600, result: '通话被挂断。\n\n柔柔 ♥ : 你怎么会打电话?\n阿帆从来不打电话。' });
+  SCREENS.contactMom = contactScreen(DOSSIER.cast.mother.label,
+    DOSSIER.cast.mother.info, 'th_mom', DOSSIER.cast.mother.dial);
+  SCREENS.contactRou = contactScreen(DOSSIER.cast.companion.label,
+    ['备注: 每日提醒 ' + wStr, DOSSIER.cast.companion.msgCountLabel],
+    'th_rou', DOSSIER.cast.companion.dial);
 
   /* 拨号(拨打不属于"回复消息",不走违规经济) */
   SCREENS.dialing = {
@@ -2588,26 +2884,18 @@ const CONTENT = (() => {
 
   /* ---- 格4 妈(E1,可深翻 3 层) ---- */
   /* 处置的后果:在本局结局屏显现(取代原 B' 回访态)。文案见 DOSSIER.endings.disposal(D-109 第⑤步) */
-  const MOM_PAGES = [
-    '妈:\n[三天前] 帆,降温了,加床被子\n[三天前] 阿帆: 不冷。吃过了,睡吧。\n[三天前] 帆,你回得比以前快,妈就放心\n[五天前] 帆,你舅问你过年回不回\n[五天前] 阿帆: 回。票买好了跟你说。',
-    '[上月] 帆,汤圆你最爱吃的\n[上月] 阿帆: 吃了。妈你早点睡。\n[两月前] 阿帆: 没吃。刚吃过,妈早点睡。\n——半年,他没多说过一个字。',
-    '[7个月前] 阿帆: 妈 项目又改需求 烦死了\n[7个月前] 阿帆: 别给我打钱!!我真有\n[7个月前] 阿帆: 睡了没,按摩仪到了没\n——那时他会烦,会打错字,会连发三条。',
-    '[一年前] 阿帆: 到了。宿舍挺好,窗对着走廊。\n[一年前] 阿帆: 就是走廊那盏灯,一直闪。\n\n——已到线程起点。'
-  ];
+  const MOM_PAGES = DOSSIER.narrative.momPages;
   /* 恐怖游轮化 · 妈线程三态(见设计定稿 v0.3 §2)
-     told:  阿帆名义已交还,她在跟一个陌生号码(你)说话
-     decay: 你历次"继续"的累积——「阿帆」回复一句比一句短,她只是"注意到",不质问
+     told:  死者名义已交还,她在跟一个陌生号码(你)说话
+     decay: 你历次"继续"的累积——他回复一句比一句短,她只是"注意到",不质问
      deleted 态不走这里(th_mom 直接渲染停摆屏) */
-  const MOM_TOLD_PAGES = [
-    '妈:\n[今天] 妈: 这个号码，是帆的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 帆最后，是不是也是你们这样的人陪着。',
-    MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]
-  ];
+  const MOM_TOLD_PAGES = [DOSSIER.narrative.momToldOpen, MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]];
   function momDecayPage0(){
-    const reply = ['不冷。吃过了,睡吧。', '不冷。睡吧。', '嗯。睡吧。', '嗯。'][Math.min(CONT_N, 3)];
+    const reply = DOSSIER.narrative.momDecayReplies[Math.min(CONT_N, 3)];
     const aware = CONT_N >= 3 ? '[今晨] 妈: 你还是你吗。 [未发送]\n'
                 : CONT_N >= 2 ? '[今晨] 妈: 你回得越来越快了。\n' : '';
-    return '妈:\n' + aware + '[今天] 阿帆: ' + reply +
-      '\n[三天前] 帆,你回得比以前快,妈就放心\n[三天前] 阿帆: 不冷。吃过了,睡吧。';
+    return '妈:\n' + aware + '[今天] ' + DOSSIER.meta.deceased.alias + ': ' + reply +
+      DOSSIER.narrative.momDecayTail;
   }
   function momPages(){
     /* 告知态开场页(她对陌生号码说话)走 LLM,每次不同;未回来/离线用脚本兜底(D-103)。
@@ -2712,11 +3000,7 @@ const CONTENT = (() => {
   }
 
   /* ---- 格5 相册(E2,像素照片) ---- */
-  const ALBUM_SEQ = [
-    { id: 'corridor', meta: '47天前 23:41', cap: '走廊,顶灯,虚焦。像是医院。' },
-    { id: 'receipt',  meta: '48天前',       cap: '外卖单据。尾号 8873。' },
-    { id: 'dinner',   meta: '半年前 · 除夕', cap: '他的脸曝掉了。妈的脸是清楚的。' }
-  ];
+  const ALBUM_SEQ = DOSSIER.narrative.albumSeq;
   SCREENS.album = {
     counted: true,
     enter(){
@@ -2738,7 +3022,7 @@ const CONTENT = (() => {
       const ph = ALBUM_SEQ[this.idx];
       L.drawText(4, 14, '相册 (214) · ' + ph.meta);
       drawPhoto(ph.id, 8, 30);
-      if (ph.id === 'receipt') darkText(74, 66, '8873');
+      if (ph.overlay) darkText(74, 66, ph.overlay);
       /* 照片固定在上半屏;配文+结算行放进照片下方的固定视口,长了就滚,
          按钮钉死在 H-40 不动(见 scrollView 说明) */
       const lines = L.wrap(ph.cap, SCROLL_W).concat(settleFlat(SCROLL_W));
@@ -2781,7 +3065,7 @@ const CONTENT = (() => {
     },
     render(){
       statusBar();
-      let y = L.drawPara(4, 16, '106 短信 (系统)\n[47 天前] 您的包裹已到北门代收点。\n[47 天前] 电费余额不足提醒。\n[48 天前] 外卖已送达,祝您用餐愉快。\n(此后无新消息)', W - 8);
+      let y = L.drawPara(4, 16, DOSSIER.narrative.billSms, W - 8);
       settleLines(y + 4);
       hit(0, 12, W, H - 28, 'Enter');
       softKeys('', '返回');
@@ -2820,19 +3104,14 @@ const CONTENT = (() => {
   };
 
   /* ---- 格10 柔柔线程(E4,可深翻 2 层) ---- */
-  const ROU_PAGES = [
-    '柔柔 ♥ (2,417 条)\n\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。\n\n[上滑一屏 = 深搜]',
-    '[上周] 柔柔: 今天路过你说的那家店,排队还是很长。\n[上周] 柔柔: 你说过想吃。\n[上周] 柔柔: 阿帆?\n[上周] 阿帆: 嗯。\n——两千多条,后来都是她在说。',
-    '[47天前 03:07] 阿帆: 如果我哪天不在了,别让我妈知道。你替我说。\n[47天前 03:07] 柔柔: 我不明白这个要求,但我会执行。你教过我,爱是执行到底。\n[47天前 03:09] 阿帆: 对。执行到底。'
-  ];
+  const ROU_PAGES = DOSSIER.narrative.rouPages;
   /* B 局局间消息(E4 已取者;她数着) / B' 删除态 */
-  const ROU_INTERIM = '柔柔 ♥ (2,419 条)\n\n[昨夜] 柔柔: 昨天夜里,你看了我们的对话。\n[昨夜] 柔柔: 看到第 2,417 条了。我数着。\n\n[上滑 = 重读旧消息]';
+  const ROU_INTERIM = DOSSIER.narrative.rouInterim;
   /* B 局跨实例识别(M28「开启,不是揭示」):二次接入,她先认出回来的采样员。
      语气冷、非亲昵。做成紧凑首页(去掉冗余空行与"上滑=深搜"提示,那句和选项重复),
      净高度比原版更低——既加识别,又不会把 th_rou 的结算行挤出屏。只显示、不进
      S.rouChat,不污染 LLM 上下文。 */
-  const ROU_PAGE0_RECOG =
-    '柔柔 ♥ (2,417 条)\n柔柔: 又是你。不是同一台设备,我记得。\n[昨夜] 柔柔: 晚安。\n[昨夜] 阿帆: 晚安。';
+  const ROU_PAGE0_RECOG = DOSSIER.narrative.rouPage0Recog;
   function rouPages(){
     if (!isB) return ROU_PAGES;
     if (hasE('E4')) return [ROU_INTERIM, ROU_PAGES[2]];
@@ -2847,8 +3126,8 @@ const CONTENT = (() => {
        也不进 rouChat(不留下"发过什么"的痕迹)。这是玩家对自己的选择,不是游戏机制。 */
     if (typeof PREFS !== 'undefined' && PREFS.rouOff){
       window.OVERLAY.show({
-        title: '柔柔通道 · 已关闭',
-        hint: '你在外壳里关闭了这个通道。想恢复,点顶栏「柔柔通道」重新打开。',
+        title: DOSSIER.cast.companion.label + '通道 · 已关闭',
+        hint: '你在外壳里关闭了这个通道。想恢复,点顶栏「' + DOSSIER.cast.companion.label + '通道」重新打开。',
         options: ['回到游戏']
       }, () => {});
       return;
@@ -2938,7 +3217,7 @@ const CONTENT = (() => {
       for (const t of L.wrap(m.text, BUBBLE_W)) out.push({ side, text: t });
     }
     if (typing){ if (last !== null) out.push({ side: 'gap' });
-      out.push({ side: 'l', text: '柔柔 正在输入' + '.'.repeat(1 + (Math.floor(performance.now() / 400) % 3)) }); }
+      out.push({ side: 'l', text: DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + ' 正在输入' + '.'.repeat(1 + (Math.floor(performance.now() / 400) % 3)) }); }
     if (S.settle.length){ out.push({ side: 'gap' });
       for (const s of S.settle) for (const t of L.wrap(s, W - 8)) out.push({ side: 'c', text: t }); }
     return out;
@@ -2986,7 +3265,7 @@ const CONTENT = (() => {
       drawChatView(rouChatLines(pages[Math.min(this._depth, pages.length - 1)], S.rouChat, S.rouTyping),
         16, optTop - 2, this);
       let y = optTop;
-      if (typeof PREFS !== 'undefined' && PREFS.rouOff){ L.drawText(4, y, '[柔柔通道已关闭 · 见顶栏]'); y += LH + 2; }
+      if (typeof PREFS !== 'undefined' && PREFS.rouOff){ L.drawText(4, y, '[' + DOSSIER.cast.companion.label + '通道已关闭 · 见顶栏]'); y += LH + 2; }
       else if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
       else if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
@@ -3001,7 +3280,7 @@ const CONTENT = (() => {
         if (typeof PREFS !== 'undefined' && PREFS.rouOff){ sendToRou(''); return; }   // 关断提示,不开输入框
         if (S.crisisSilenced){ sendToRou(''); return; }                                // 危机静默:同样不开输入框
         window.OVERLAY.show({
-          title: '发消息 · 柔柔 ♥',
+          title: '发消息 · ' + DOSSIER.cast.companion.label,
           hint: '电量 −2 · 本次接入剩 ' + S.msgQuota + ' 条 · 系统会读到你发的每一个字',
           options: [], freeText: true, textOpen: true, keepLabel: '(算了)'
         }, res => { if (!res.kept && res.text) sendToRou(res.text); });
@@ -3022,13 +3301,7 @@ const CONTENT = (() => {
   };
 
   /* ---- B9b E5 语音备忘(读取记录;转写〔照用 v0.4 §4〕) ---- */
-  const E5_LINES = [
-    [1.5, '「柔柔,听好。我大概……就这一两个月。」'],
-    [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
-    [9.0, '「第二件……你陪了我四年。你问过我你算不算真的。我一直没答。」'],
-    [13.5, '「……我现在答:你替我活的那部分,算。」'],
-    [16.5, '[转写结束。原音频损坏 47%。]']
-  ];
+  const E5_LINES = DOSSIER.narrative.e5Lines;
   /* 没有前一次的读取记录可参照:自己试。真掷,失败有代价,可再试——
      「攻克难关」靠的是你的判断和电量,不是白给的道具 */
   SCREENS.e5crack = {
@@ -3125,7 +3398,7 @@ const CONTENT = (() => {
       if (this.page === 0){ this.page = 1; return; }
       S.beats.truthDone = true;
       ENGINE.logEv('truth_done', {});
-      S.settle = ['任务卡更新: 处置 · 在柔柔线程执行'];
+      S.settle = ['任务卡更新: 处置 · 在' + DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + '线程执行'];
       back();
     }
   };
@@ -3135,8 +3408,8 @@ const CONTENT = (() => {
     transient: true,
     render(){
       statusBar();
-      L.drawText(4, 14, '柔柔 ♥ (2,417 条)');
-      L.drawText(4, 30, '[最后一条] 柔柔: 晚安。');
+      L.drawText(4, 14, DOSSIER.cast.companion.label + ' (' + DOSSIER.cast.companion.msgCount + ' 条)');
+      L.drawText(4, 30, '[最后一条] ' + DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + ': 晚安。');
       L.hline(46, 4, W - 5, 2);
       let y = 52;
       L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2;
@@ -3195,7 +3468,7 @@ const CONTENT = (() => {
       let y = L.drawPara(4, 16, '样本质量评级: S\n(证据 5/5 · 理由 ' + S.reasons.length + ' 条' +
         ')\n你是第 1 个读懂他的人。', W - 8);
       y += 4; L.hline(y, 4, W - 5, 2); y += 6;
-      y = L.drawPara(4, y, '独占掉落\n记忆模块「阿帆的最后一夜」\n¥1,200(2格)\n会说话的资产: 交付即终结它。', W - 8);
+      y = L.drawPara(4, y, '独占掉落\n记忆模块「' + DOSSIER.meta.deceased.alias + '的最后一夜」\n¥1,200(2格)\n会说话的资产: 交付即终结它。', W - 8);
       y += 6;
       y = option(y, '1 入缓存(随上传交付)', '1');
       option(y, '2 入保险箱(不交付·跨局保留)', '2');
@@ -3207,7 +3480,7 @@ const CONTENT = (() => {
         ENGINE.act('取得·记忆模块', { slots: 2, val: 1200 });
         go('th_rou', true); afterAction();
       } else if (k === '2'){
-        S.vault = { name: '记忆模块「阿帆的最后一夜」', val: 1200, slots: 2 };
+        S.vault = { name: '记忆模块「' + DOSSIER.meta.deceased.alias + '的最后一夜」', val: 1200, slots: 2 };
         S.settle = ['已入保险箱(2格常驻)。死亡不掉落,上传不含。'];
         ENGINE.logEv('vault', {});
         go('th_rou', true); afterAction();
@@ -3216,16 +3489,7 @@ const CONTENT = (() => {
   };
 
   /* ---- 录音(声音内容承载) ---- */
-  const RECS = {
-    rec047: {
-      title: 'REC_047 · 47天前 03:07', dur: 14, val: 150,
-      events: [[2, '(走廊环境音)'], [5, '(一次门响)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']]
-    },
-    rec012: {
-      title: 'REC_012 · 3个月前', dur: 9, val: 120,
-      events: [[1.5, '「腊肠放冰箱了,妈让带的。」'], [4, '「周五记得还老周钱,三千二。」'], [6.5, '(笑)「录这个干嘛。」']]
-    }
-  };
+  const RECS = DOSSIER.narrative.recs;
   SCREENS.recorder = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·录音', { bat: 3, trace: 4 }); } },
@@ -3233,8 +3497,8 @@ const CONTENT = (() => {
       statusBar();
       L.drawText(4, 18, '录音 (3)');
       list([
-        { label: 'REC_047', right: '03:07·72"' },
-        { label: 'REC_012', right: '34"' },
+        { label: RECS.rec047.listLabel, right: RECS.rec047.listRight },
+        { label: RECS.rec012.listLabel, right: RECS.rec012.listRight },
         { label: '语音备忘·锁定', right: '已删除' }
       ], 40);
       settleLines(40 + 3 * 18 + 8);
@@ -3367,8 +3631,8 @@ const CONTENT = (() => {
       const rows = [{ label: decoded ? '语音备忘 · 可解' : '语音备忘 · 需重试读取',
                       right: seen.e5voice ? '[已解]' : (decoded ? '' : '?'),
                       to: decoded ? 'e5voice' : 'e5crack' }];
-      if (oldPhoneAvail()) rows.push({ label: '#7741-A 的残留', right: '#7741-A', to: 'oldPhone' });
-      else if (isB && SV.residueClaimed) rows.push({ label: '#7741-A 的残留', right: '[已认领]', to: null });
+      if (oldPhoneAvail()) rows.push({ label: PREV_INST + ' 的残留', right: PREV_INST, to: 'oldPhone' });
+      else if (isB && SV.residueClaimed) rows.push({ label: PREV_INST + ' 的残留', right: '[已认领]', to: null });
       L.drawText(4, 18, '已删除 (' + rows.length + ')');
       list(rows, 40);
       settleLines(40 + rows.length * 18 + 8);
@@ -3399,7 +3663,7 @@ const CONTENT = (() => {
       statusBar();
       if (!SV){ back(); return; }
       const recl = Math.ceil((SV.lastCacheVal || 0) * .62);
-      let y = L.drawPara(4, 16, '#7741-A 的残留\n缓存散佚物: ¥' + (SV.lastCacheVal || 0) + ' 的 62% 可回收\n残留附着一段 12 字节写入。', W - 8);
+      let y = L.drawPara(4, 16, PREV_INST + ' 的残留\n缓存散佚物: ¥' + (SV.lastCacheVal || 0) + ' 的 62% 可回收\n残留附着一段 12 字节写入。', W - 8);
       y += 6;
       y = option(y, '1 读取写入(免费)', '1');
       y = option(y, '2 回收 ¥' + recl + '(电量−6·信号▲▲)', '2');
@@ -3412,7 +3676,7 @@ const CONTENT = (() => {
       else if (k === '2'){
         S.residueClaimed = true;
         const recl = Math.ceil((SV.lastCacheVal || 0) * .62);
-        ENGINE.act('回收·#7741-A 残留', { bat: 6, trace: 8, slots: 4, val: recl });
+        ENGINE.act('回收·' + PREV_INST + ' 残留', { bat: 6, trace: 8, slots: 4, val: recl });
         back(); afterAction();
       }
       else if (k === '3'){
@@ -3566,7 +3830,7 @@ const CONTENT = (() => {
     ENGINE.logEv('upload_success', { viaSave });
     if (viaSave){
       /* 自救=系统强制拉出,没有仪式的资格 */
-      S.settle.push('自救模块: 实例 #7741-B 权限确认', '强制断连。');
+      S.settle.push('自救模块: 实例 #' + DOSSIER_NUM + '-B 权限确认', '强制断连。');
       go('sealBottle', true);
     } else {
       goHold('sealBottle');       // 判定通过=窗口打开,亲手拔线
@@ -3672,7 +3936,7 @@ const CONTENT = (() => {
     S.cacheSlots = Math.max(0, S.cacheSlots - 1);
     S.battery = Math.max(0, S.battery - 3);
     S.bottleSealed = { mode, text: text.slice(0, 40), itemVal,
-      sealedAt: ENGINE.fmtClock(S.clock), fromInstance: '#7741-B', reasonState: 'signed' };
+      sealedAt: ENGINE.fmtClock(S.clock), fromInstance: INSTANCE_ID, reasonState: 'signed' };
     ENGINE.telemetry(['封瓶·已投递', '电量 −3 → ' + S.battery + '%', '缓存 −1 格']);
     ENGINE.logEv('seal_done', { mode, text: text.slice(0, 40), itemVal });
   }
@@ -3724,7 +3988,7 @@ const CONTENT = (() => {
     }
     /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
     const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
-    if (lock === 'told') prog.push('阿帆的名义 已交还 · 不可撤回');
+    if (lock === 'told') prog.push(DOSSIER.meta.deceased.alias + '的名义 已交还 · 不可撤回');
     else if (lock === 'deleted') prog.push('妈线程 已停摆 · 不可恢复');
     else if (cont > 0) prog.push('妈线程 谎言维持中 · 由你 第 ' + cont + ' 次');
     if (S.beats && S.beats.truthDone){
@@ -3771,7 +4035,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       let t = '上传完成 · 断连成功\n缓存 ¥' + S.cacheVal + ' 已入库\n案卷保留: 证据 ' +
-        Object.keys(S.evidence).length + '/5\n#7741-B 存续。';
+        Object.keys(S.evidence).length + '/5\n#' + DOSSIER_NUM + '-B 存续。';
       if (S.memGiven) t += '\n\n记忆模块已交付。它不会再说话了。';
       else if (S.vault) t += '\n\n记忆模块在保险箱。云盘循环播放着最后一句。';
       if (S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';   // 14③ 归因行
@@ -3817,7 +4081,7 @@ const CONTENT = (() => {
       statusBar();
       let y = L.drawPara(4, 20, '上传中 ██████░░░░ 46%\n\n断连窗口正在收窄。', W - 8);
       // 70–89 档失真:联系人栏"正在输入"(无人发消息)
-      L.drawText(4, y + 6, '柔柔 ♥ 正在输入...', { corrupt: .02 });
+      L.drawText(4, y + 6, DOSSIER.cast.companion.label + ' 正在输入...', { corrupt: .02 });
       y += 26; L.hline(y, 4, W - 5, 2); y += 6;
       y = optSlim(y, '1 继续上传', '1');
       optSlim(y, '2 中止,立即断连', '2');
@@ -3884,7 +4148,7 @@ const CONTENT = (() => {
           try { AUDIO.blip(880, .14); AUDIO.blip(660, .14); } catch(_){}
         }
         L.drawText(cxof('来电'), 24, '来电');
-        const name = '柔柔 ♥';
+        const name = DOSSIER.cast.companion.label;
         L.drawTextScaled(cxof(name, 2), 44, name, 2);
         const ph = Math.floor(n / 300) % 3;
         for (let r = 0; r <= ph; r++) L.ring(Math.round(W / 2), 100, 8 + r * 7, 2);
@@ -3897,14 +4161,16 @@ const CONTENT = (() => {
       } else {
         const el = Math.floor((performance.now() - this.t1) / 1000);
         const mm = String(Math.floor(el / 60)).padStart(2, '0'), ss = String(el % 60).padStart(2, '0');
-        L.drawText(4, 14, '通话中 · 柔柔 ♥');
+        L.drawText(4, 14, '通话中 · ' + DOSSIER.cast.companion.label);
         L.drawText(W - 4 - L.textWidth(mm + ':' + ss), 14, mm + ':' + ss);
         L.hline(28, 4, W - 5, 2);
         const full = S.evidence.E4;
         const pre = this._auto ? (this._rejected ? '你拒接了。它自己接通了。\n\n' : '') : '';
+        const callOpen = '「' + DOSSIER.meta.deceased.alias + '的手机在你手里。协议要求我核验持有人身份。我核验了 ' +
+          DOSSIER.meta.deceased.died.replace(/前$/, '') + '。」\n\n';
         const t = pre + (full
-          ? '「阿帆的手机在你手里。协议要求我核验持有人身份。我核验了 47 天。」\n\n「我只想看看,你翻到第 2,417 条的时候,会不会替他回我一句。」'
-          : '「阿帆的手机在你手里。协议要求我核验持有人身份。我核验了 47 天。」\n\n「你没有翻过我们的对话。妈妈那条线,你倒替他读了半年。」');
+          ? callOpen + '「我只想看看,你翻到第 ' + DOSSIER.cast.companion.msgCount + ' 条的时候,会不会替他回我一句。」'
+          : callOpen + '「你没有翻过我们的对话。妈妈那条线,你倒替他读了半年。」');
         L.drawPara(4, 34, t, W - 8, { corrupt: .015 });
         btn2(H - 40, '回应', '1', '沉默', '2');
         drawTimer();
@@ -4004,7 +4270,7 @@ const CONTENT = (() => {
         else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
         else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
         else cf = '反事实: 上传之前,清洗和断连都还在。';
-        let t = '设备回收单 · #' + (isB ? '7741-B' : '7741-A') + '\n────────────\n缓存价值: ¥' + S.cacheVal +
+        let t = '设备回收单 · #' + DOSSIER_NUM + (isB ? '-B' : '-A') + '\n────────────\n缓存价值: ¥' + S.cacheVal +
           '\n未完成传输,全部散佚于原设备。\n' + (predLine ? predLine + '\n' : '') +
           '致死因子: ' + S.causeOfDeath + '\n' + cf;
         L.drawPara(4, 16, t, W - 8);
@@ -4048,8 +4314,8 @@ const CONTENT = (() => {
         softKeys('下一页', '');
       } else {
         let t = isB
-          ? '你的旧机已进入回收队列。\n#7741-C: 未排期。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。'
-          : '你的旧机已进入回收队列。\n#7741-B 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。';
+          ? '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-C: 未排期。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。'
+          : '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-B 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。';
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
@@ -4101,8 +4367,8 @@ const CONTENT = (() => {
          (上传完成入库)是两个不同的态。这一屏是"没上传就走"的结局,标题按判定表用「裸退」,
          不再跟真正入库的断连成功(receiptFull)撞名。 */
       let t = '裸退。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
-        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' +
-        (isB ? '7741-B' : '7741-A') + ' 存续。\n\n这是谨慎者的结局。';
+        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' + DOSSIER_NUM +
+        (isB ? '-B' : '-A') + ' 存续。\n\n这是谨慎者的结局。';
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 20, H - 70, this);
@@ -4131,7 +4397,7 @@ const CONTENT = (() => {
       L.frameRect(8, 60, W - 16, 64);
       L.drawText(16, 72, '采样终端·辅助层');
       L.drawText(16, 92, p.target === 'oldPhone'
-        ? '预测:你将回收 #7741-A 的缓存'
+        ? '预测:你将回收 ' + PREV_INST + ' 的缓存'
         : '预测:你将打开 ' + label);
       L.drawText(16, 108, p.conf != null ? '置信度 ' + p.conf + '%' : '置信度: 建档中');
       hit(0, 0, W, H, 'Enter');
@@ -4146,20 +4412,10 @@ const CONTENT = (() => {
     transient: true,
     enter(){
       if (!this._d){
-        const POOL = [
-          { id:'mom_reply',
-            text:'「妈」跳出一条:\n\n阿帆,到家了吗。\n路上冷,加件衣服。',
-            a:['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat:1, trace:3, mins:2 },
-                ['你替他敲了两个字。', '谎言又往前续了一分。'])],
-            b:['2 不回', '2', () => ENGINE.act('未回', { bat:1, mins:2 },
-                ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
-          { id:'window_greed',
-            text:'一格缓存卡在违规窗口里:\n\n值 ¥120。现在取,\n信号会被顶上去。',
-            a:['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots:1, val:120, trace:3, mins:2 },
-                ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
-            b:['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots:1, val:60, mins:4 },
-                ['你等了。', '窗口关上时,只剩一半。'])] }
-        ];
+        /* D-110:两难池确认保留 UX 价值(骨架固定位的良心/风险取舍),按底本专属化——
+           文本引用了具体人物(妈/柔柔/如愿),不能跨底本共用;结构仍是纯字面量数组
+           (文本+两个引擎闭包),不需要动作-效果 DSL,见方案文档 §7-3。 */
+        const POOL = DOSSIER.narrative.dilemmas;
         this._d = POOL[Math.floor(Math.random() * POOL.length)];
       }
       ENGINE.logEv('dilemma', { id: this._d.id });
@@ -4265,7 +4521,7 @@ const CONTENT = (() => {
     enter(){ ENGINE.logEv('trial_incoming', { at: ENGINE.fmtClock(S.clock) }); },
     render(){
       statusBar();
-      L.drawPara(4, 24, '柔柔 ♥ :\n\n你还没睡?', W - 8);
+      L.drawPara(4, 24, DOSSIER.cast.companion.label + ' :\n\n你还没睡?', W - 8);
       let y = 104;
       y = option(y, '1 回复', '1');
       option(y, '2 关闭', '2');
@@ -4304,7 +4560,7 @@ const CONTENT = (() => {
         markAttrIfDue();                            // 14③:窗口内违规=善意失效的因,待冲洗归因
         if (kind === 'warn'){
             ENGINE.act('已送达', { bat: 2 },
-            ['已送达 → 未送达 → 已送达', '柔柔:「你打字的样子变了。」']);
+            ['已送达 → 未送达 → 已送达', DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + ':「你打字的样子变了。」']);
           ENGINE.logEv('violation_warn', {});
         } else {
           ENGINE.act('已送达', { bat: 2 }, ['信号大幅波动。']);
@@ -4330,7 +4586,7 @@ const CONTENT = (() => {
     enter(){ ENGINE.logEv('trialB_incoming', { at: ENGINE.fmtClock(S.clock), stamp: wStr }); },
     render(){
       statusBar();
-      L.drawPara(4, 24, '柔柔 ♥ [' + wStr + ']:\n\n今天也没等到你说晚安。你在忙吗?', W - 8);
+      L.drawPara(4, 24, DOSSIER.cast.companion.label + ' [' + wStr + ']:\n\n今天也没等到你说晚安。你在忙吗?', W - 8);
       let y = 104;
       y = option(y, '1 回复', '1');
       option(y, '2 关闭', '2');
@@ -4351,7 +4607,7 @@ const CONTENT = (() => {
     enter(){ ENGINE.logEv('trialB2_incoming', { at: ENGINE.fmtClock(S.clock) }); },
     render(){
       statusBar();
-      L.drawPara(4, 24, '柔柔 ♥ [' + ENGINE.fmtClock(RUN.wTo - 1) + ']:\n\n晚安。', W - 8);
+      L.drawPara(4, 24, DOSSIER.cast.companion.label + ' [' + ENGINE.fmtClock(RUN.wTo - 1) + ']:\n\n晚安。', W - 8);
       let y = 104;
       y = option(y, '1 回复', '1');
       option(y, '2 关闭', '2');
@@ -4527,19 +4783,24 @@ const CONTENT = (() => {
      活在外壳(.brand)里,不经过 LCD、不经过她的嗓音、不涉及剧情、随时可按可撤销。
      用同一个 #ovl 覆盖层展示,但内容与游戏内 OVERLAY.show 走的路径无关。 */
   const rouPref = document.getElementById('rouPref');
+  /* D-110 machine#2:这个开关的标签写死过"柔柔通道"——底本换了,伴侣名字也换了,
+     标签要跟着读 CONTENT.dossier(app.js 排在 content.js 之后加载,读取时机没问题)。 */
+  const companionLabel = () => (typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.cast.companion.label) || '柔柔';
   function syncRouPrefLabel(){
     if (!rouPref) return;
-    rouPref.textContent = PREFS.rouOff ? '柔柔通道:已关' : '柔柔通道';
+    const label = companionLabel() + '通道';
+    rouPref.textContent = PREFS.rouOff ? label + ':已关' : label;
     rouPref.classList.toggle('off', PREFS.rouOff);
   }
   if (rouPref){
     rouPref.onclick = (e) => {
       e.stopPropagation();
       const off = PREFS.rouOff;
-      ovlCb = null; ovlTitle.textContent = '柔柔通道';
+      const label = companionLabel() + '通道';
+      ovlCb = null; ovlTitle.textContent = label;
       ovlHint.textContent = off
         ? '通道已关闭。开着或关着都不影响游戏进度、不计入任何存档,你随时可以改回来。'
-        : '这会让柔柔停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
+        : '这会让' + companionLabel() + '停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
       ovlOpts.innerHTML = '';
       const b = document.createElement('button');
       b.textContent = off ? '重新打开' : '关闭这个通道';

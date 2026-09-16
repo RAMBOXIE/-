@@ -71,8 +71,21 @@ const MOMLLM = (() => {
     '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
     '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
   ];
+  /* D-110 machine#2:CORE/rou.js 的人格核仍只覆盖 phone-7741(拍板:先出结构,人格核
+     暂缓——见方案文档 §2)。dossier=phone-5029 时不走 LLM/代理(避免把阿帆的人格核
+     错发给随安的案子),直接用这份手写兜底,同样逐条手验过护栏。 */
+  const TOLD_B = [
+    '妈: 这个号码,是安子的旧机吗。\n妈: 谁在用它。',
+    '妈: 安子最后,\n妈: 是不是有人陪着他。',
+    '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
+    '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
+  ];
   const rand = a => a[Math.floor(Math.random() * a.length)];
-  function fallback(){ return rand(TOLD); }
+  function isAltDossier(){
+    try { return typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.meta.id !== 'phone-7741'; }
+    catch(_){ return false; }
+  }
+  function fallback(){ return rand(isAltDossier() ? TOLD_B : TOLD); }
 
   /* 护栏 lint。crisis/beg 命中 = 立刻回退安全脚本,绝不上屏。 */
   const CRISIS = /(自杀|自残|轻生|不想活|活不下去|跟(他|你)走|下去陪|一了百了|想死|了结)/;
@@ -111,8 +124,10 @@ const MOMLLM = (() => {
 
   /* 告知态开场白。永远给一段(LLM 不成/越界就安全脚本),不抛错。 */
   async function told(){
-    if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
-    const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
+    if (!isAltDossier()){
+      if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
+      const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
+    }
     return fallback();
   }
 

@@ -71,19 +71,24 @@
      活在外壳(.brand)里,不经过 LCD、不经过她的嗓音、不涉及剧情、随时可按可撤销。
      用同一个 #ovl 覆盖层展示,但内容与游戏内 OVERLAY.show 走的路径无关。 */
   const rouPref = document.getElementById('rouPref');
+  /* D-110 machine#2:这个开关的标签写死过"柔柔通道"——底本换了,伴侣名字也换了,
+     标签要跟着读 CONTENT.dossier(app.js 排在 content.js 之后加载,读取时机没问题)。 */
+  const companionLabel = () => (typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.cast.companion.label) || '柔柔';
   function syncRouPrefLabel(){
     if (!rouPref) return;
-    rouPref.textContent = PREFS.rouOff ? '柔柔通道:已关' : '柔柔通道';
+    const label = companionLabel() + '通道';
+    rouPref.textContent = PREFS.rouOff ? label + ':已关' : label;
     rouPref.classList.toggle('off', PREFS.rouOff);
   }
   if (rouPref){
     rouPref.onclick = (e) => {
       e.stopPropagation();
       const off = PREFS.rouOff;
-      ovlCb = null; ovlTitle.textContent = '柔柔通道';
+      const label = companionLabel() + '通道';
+      ovlCb = null; ovlTitle.textContent = label;
       ovlHint.textContent = off
         ? '通道已关闭。开着或关着都不影响游戏进度、不计入任何存档,你随时可以改回来。'
-        : '这会让柔柔停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
+        : '这会让' + companionLabel() + '停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
       ovlOpts.innerHTML = '';
       const b = document.createElement('button');
       b.textContent = off ? '重新打开' : '关闭这个通道';
