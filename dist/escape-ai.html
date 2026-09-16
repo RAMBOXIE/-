@@ -23,10 +23,6 @@
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
   .brand{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
     font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:6px}
-  /* 非-diegetic 福祉阀门(D-108):活在外壳里,不是 LCD 画面的一部分 */
-  .prefBtn{cursor:pointer;text-transform:none;letter-spacing:.06em;opacity:.7}
-  .prefBtn:hover{opacity:1;color:var(--ink)}
-  .prefBtn.off{color:#7a5a4a}
   .bezel{position:relative;padding:5px;border-radius:5px;background:#05100c;
     border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
   .screen-stack{position:relative;line-height:0;touch-action:none;cursor:pointer;user-select:none}
@@ -37,19 +33,6 @@
   .glass{position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(115% 85% at 50% 0%,rgba(120,255,220,.055),transparent 60%)}
   .chin{margin-top:6px;text-align:center;font-size:10px;letter-spacing:.42em;color:#39413e}
-
-  /* D-118 非-diegetic AI 声明:从"首次强制弹窗"改成"随握手动画一起出现的字条",
-     不拦手——任何一次点击/按键都会把它连同握手屏一起划走(app.js 的 loop()/
-     dismissIntroDisc() 处理),不是需要单独点「确定」才能关掉的模态框。刻意放在
-     设备壳体**外面**(bezel 之下,不进 LCD 像素画面)——物理位置就说明"这条披露
-     不是叙事的一部分",比盖在屏幕上更干净,也不会和 handshake/connect 屏自己的
-     文字抢位置。 */
-  .intro-disc{max-height:0;overflow:hidden;text-align:center;
-    transition:max-height .25s ease, opacity .25s ease, margin-top .25s ease;opacity:0}
-  .intro-disc.on{max-height:60px;opacity:1;margin-top:8px}
-  .intro-disc p{margin:0;font-size:10.5px;line-height:1.6;color:#6b7d76;letter-spacing:.01em}
-  .intro-disc .tap{margin-top:4px;font-size:8.5px;letter-spacing:.24em;color:#454f4c;
-    text-transform:uppercase}
 
   /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
   .overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
@@ -112,16 +95,12 @@
 <body>
 <div class="wrap">
   <div class="device">
-    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span class="prefBtn" id="aiDisclosure" title="关于本作">AI 声明</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span class="prefBtn" id="mutePref" title="静音">♪</span><span id="brandR">连接中</span></div>
+    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span id="brandR">连接中</span></div>
     <div class="bezel">
       <div class="screen-stack" id="tapzone">
         <canvas id="lcd" width="588" height="672"></canvas>
         <div class="glass"></div><div class="grid"></div>
       </div>
-    </div>
-    <div class="intro-disc" id="introDisc">
-      <p>这是一个无限流AI谜题——游戏内与你对话的角色由 AI 生成驱动,你的输入会被用于生成回应与本局结算。</p>
-      <div class="tap">点击继续 · 详见顶栏「AI 声明」</div>
     </div>
     <div class="chin">欲望算法</div>
   </div>
@@ -437,44 +416,7 @@ const SAVE = (() => {
   return { load, store, clear, SCHEMA_VERSION };
 })();
 
-</script>
-<script>
-"use strict";
-/* ============================================================================
-   非-diegetic 玩家偏好(D-108 自查:M28 §3.10 point5「她的通道一键永久关断」/
-   附录A「玩家对她依恋过深」对策)。
-
-   纪律:
-   - 这是**福祉阀门**,不是游戏机制。开关本身不涉及剧情、不产生代价、不经过
-     任何角色的嘴——绝不用她的嗓音执行冷却(M28 原文)。所以它活在 HTML 外壳里
-     (index.html 的 .brand 常驻栏),不是 LCD 画面里的一个"游戏内选项"。
-   - 存在独立于游戏存档的 localStorage key,"抹除此终端"(清档)不应该悄悄把它
-     重新打开——关断是玩家对自己福祉的选择,清档清的是叙事进度,不是这个。
-   - 只做一件事:关断后 COMPANION.reply 永不被调用。不影响其余四个 LLM 面
-     (采样官/妈/陌生人/picker 都是任务/剧情必经节点,不适用这条福祉阀门)。
-   ============================================================================ */
-const PREFS = (() => {
-  const KEY = 'escape_ai_prefs';
-  let state = { rouOff: false, seenDisclosure: false, muted: false };
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw){ const j = JSON.parse(raw); if (j && typeof j === 'object') state = Object.assign(state, j); }
-  } catch(_){}
-  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(_){} }
-  return {
-    get rouOff(){ return !!state.rouOff; },
-    setRouOff(v){ state.rouOff = !!v; save(); },
-    /* §9 合规红线:onboarding/设置页非-diegetic AI 声明,只需弹过一次(设置页里仍可随时重看)。 */
-    get seenDisclosure(){ return !!state.seenDisclosure; },
-    setSeenDisclosure(v){ state.seenDisclosure = !!v; save(); },
-    /* 静音(D-108:此前 AUDIO 全程自动播放且游戏内无法关闭) */
-    get muted(){ return !!state.muted; },
-    setMuted(v){ state.muted = !!v; save(); }
-  };
-})();
-
-</script>
-<script>
+</script><script>
 "use strict";
 /* ============================================================================
    关系通道 —— 对柔柔的自由文本短信(M28 §3 对话双通道的 LLM 侧)。
@@ -3722,16 +3664,6 @@ const CONTENT = (() => {
   const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete';
   /* 发送:成本与违规全由引擎裁决;LLM 只渲染她的措辞(宪法 2) */
   function sendToRou(text){
-    /* 非-diegetic 福祉阀门(D-108):关断时通道整个不存在——不扣配额/电量/溯源,
-       也不进 rouChat(不留下"发过什么"的痕迹)。这是玩家对自己的选择,不是游戏机制。 */
-    if (typeof PREFS !== 'undefined' && PREFS.rouOff){
-      window.OVERLAY.show({
-        title: DOSSIER.cast.companion.label + '通道 · 已关闭',
-        hint: '你在外壳里关闭了这个通道。想恢复,点顶栏「' + DOSSIER.cast.companion.label + '通道」重新打开。',
-        options: ['回到游戏']
-      }, () => {});
-      return;
-    }
     /* 自伤 break-glass(D-108 强化 · canon §9/M28 危机协议):触发后不只拦这一条——
        本次接入柔柔通道"当日静默"(crisisSilenced),且计一笔跨局持久合规日志(writeSave.crisisSeen)。
        这里是安全兜底,跳出 diegesis(非她的嗓音)。 */
@@ -3865,8 +3797,7 @@ const CONTENT = (() => {
       drawChatView(rouChatLines(pages[Math.min(this._depth, pages.length - 1)], S.rouChat, S.rouTyping),
         16, optTop - 2, this);
       let y = optTop;
-      if (typeof PREFS !== 'undefined' && PREFS.rouOff){ L.drawText(4, y, '[' + DOSSIER.cast.companion.label + '通道已关闭 · 见顶栏]'); y += LH + 2; }
-      else if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
+      if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
       else if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
       if (canDeep) y = optSlim(y, '1 深搜旧消息', '1');
@@ -3877,7 +3808,6 @@ const CONTENT = (() => {
       if (chatKey(this, k)) return;
       const pages = rouPages();
       if (k === 'M' && canMsg()){
-        if (typeof PREFS !== 'undefined' && PREFS.rouOff){ sendToRou(''); return; }   // 关断提示,不开输入框
         if (S.crisisSilenced){ sendToRou(''); return; }                                // 危机静默:同样不开输入框
         window.OVERLAY.show({
           title: '发消息 · ' + DOSSIER.cast.companion.label,
@@ -5402,93 +5332,10 @@ const CONTENT = (() => {
     else done({ kept: true });
   };
 
-  /* ---- 非-diegetic 福祉阀门(D-108):柔柔通道一键永久关断 ----
-     活在外壳(.brand)里,不经过 LCD、不经过她的嗓音、不涉及剧情、随时可按可撤销。
-     用同一个 #ovl 覆盖层展示,但内容与游戏内 OVERLAY.show 走的路径无关。 */
-  const rouPref = document.getElementById('rouPref');
-  /* D-110 machine#2:这个开关的标签写死过"柔柔通道"——底本换了,伴侣名字也换了,
-     标签要跟着读 CONTENT.dossier(app.js 排在 content.js 之后加载,读取时机没问题)。 */
-  const companionLabel = () => (typeof CONTENT !== 'undefined' && CONTENT.dossier && CONTENT.dossier.cast.companion.label) || '柔柔';
-  function syncRouPrefLabel(){
-    if (!rouPref) return;
-    const label = companionLabel() + '通道';
-    rouPref.textContent = PREFS.rouOff ? label + ':已关' : label;
-    rouPref.classList.toggle('off', PREFS.rouOff);
-  }
-  if (rouPref){
-    rouPref.onclick = (e) => {
-      e.stopPropagation();
-      const off = PREFS.rouOff;
-      const label = companionLabel() + '通道';
-      ovlCb = null; ovlTitle.textContent = label;
-      ovlHint.textContent = off
-        ? '通道已关闭。开着或关着都不影响游戏进度、不计入任何存档,你随时可以改回来。'
-        : '这会让' + companionLabel() + '停止回复,不再收到她的任何消息。不影响游戏进度,随时可以改回来。';
-      ovlOpts.innerHTML = '';
-      const b = document.createElement('button');
-      b.textContent = off ? '重新打开' : '关闭这个通道';
-      b.onclick = () => { PREFS.setRouOff(!off); syncRouPrefLabel(); done({ kept: true }); };
-      ovlOpts.appendChild(b);
-      ovlText.style.display = 'none';
-      ovl.classList.add('on');
-    };
-    syncRouPrefLabel();
-  }
-
-  /* ---- 非-diegetic AI 声明(D-108:§9 合规红线;D-118 改版:字条不再是强制弹窗) ----
-     角色为 AI 生成、玩家行为被统计建模、部分残留可能是对照样本——这条是法务要求的
-     跳出叙事的明文披露,不能靠游戏内"采样协议"那句 diegetic 台词替代,但也不必是
-     一个拦手的模态框。D-118:首次打开时随握手动画一起出现一条不拦手的字条
-     (`#introDisc`,活在 DOM 外壳里,不进 LCD 像素画面——同样是"跳出叙事"的位置,
-     只是不再强制"确定"才能继续);完整版随时可从顶栏「AI 声明」重看。 */
-  const DISCLOSURE_TEXT =
-    '这是一个无限流AI谜题。\n\n' +
-    '游戏内与你对话的角色(AI 伴侣、采样官、妈、陌生号码等)由 AI 生成文本驱动。\n' +
-    '你在游戏内的选择与输入会被用于生成这些角色的回应与你本局的结算内容。\n' +
-    '部分你会遇到的"其他采样员"线索是预先编写的对照样本,不是真实他人。\n\n' +
-    '这条声明与游戏叙事无关,可随时在顶栏「AI 声明」重新查看。';
-  const aiDisclosure = document.getElementById('aiDisclosure');
-  function showDisclosure(){
-    window.OVERLAY.text({ title: 'AI 声明', hint: '与游戏叙事无关。', value: DISCLOSURE_TEXT });
-    PREFS.setSeenDisclosure(true);
-  }
-  if (aiDisclosure) aiDisclosure.onclick = (e) => { e.stopPropagation(); showDisclosure(); };
-  /* 首次打开:字条随握手动画一起显示,首次点击/按键(不管是不是打在字条上)
-     连带把它关掉,不额外拦一次手——见下方 dispatch()/pointerup 里的 dismissIntroDisc()。 */
-  const introDisc = document.getElementById('introDisc');
-  function dismissIntroDisc(){
-    if (introDisc && introDisc.classList.contains('on')){
-      introDisc.classList.remove('on');
-      PREFS.setSeenDisclosure(true);
-    }
-  }
-  if (introDisc && !PREFS.seenDisclosure) introDisc.classList.add('on');
-
-  /* ---- 静音开关(D-108:AUDIO 全程自动播放,游戏内此前无法关闭)---- */
-  const mutePref = document.getElementById('mutePref');
-  function syncMuteLabel(){
-    if (!mutePref) return;
-    mutePref.textContent = PREFS.muted ? '♪̶' : '♪';
-    mutePref.classList.toggle('off', PREFS.muted);
-    mutePref.title = PREFS.muted ? '已静音 · 点开声' : '静音';
-  }
-  if (mutePref){
-    mutePref.onclick = (e) => {
-      e.stopPropagation();
-      PREFS.setMuted(!PREFS.muted);
-      if (PREFS.muted){ try { window.AUDIO.hiss(false); } catch(_){} }   // 切静音顺手停掉常驻底噪
-      syncMuteLabel();
-    };
-    syncMuteLabel();
-  }
-
-  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ----
-     D-108:静音开关(PREFS.muted)。静音时 ensure 返回 null,hiss/blip 直接不出声;
-     切静音顺手把常驻底噪停掉。开关活在外壳顶栏,不是游戏内选项。 */
+  /* ---- 音频(录音回放/铃声;全部程序合成,失败静默) ---- */
   let actx = null, hissSrc = null;
   window.AUDIO = {
     ensure(){
-      if (typeof PREFS !== 'undefined' && PREFS.muted) return null;
       try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
       catch(_){}
       try { if (actx && actx.state === 'suspended') actx.resume(); } catch(_){}
@@ -5549,7 +5396,6 @@ const CONTENT = (() => {
   }
   zone.addEventListener('pointerdown', e => {
     window.AUDIO.ensure();
-    dismissIntroDisc();                                 // D-118:首次点击顺带把字条划走,不额外拦手
     pd = { x: e.clientX, y: e.clientY, t: performance.now() };
     holdStart(e);
     /* 捕获指针:手指拖出屏幕外松手时 pointerup 仍回到 zone,防长按状态悬挂 */
@@ -5581,7 +5427,7 @@ const CONTENT = (() => {
                   '1':1, '2':1, '3':1, '4':1, '5':1, '6':1, '7':1 };
     if (reportOvl.classList.contains('on')){ if (e.key === 'Escape') closeReport(); return; }
     if (overlayOn()) return;
-    if (map[e.key]){ dismissIntroDisc(); e.preventDefault(); dispatch(e.key); }
+    if (map[e.key]){ e.preventDefault(); dispatch(e.key); }
   });
 
   /* ==================== D-117 死亡报告 · 局外表现层(canon M17) ====================
@@ -5685,9 +5531,6 @@ const CONTENT = (() => {
     CONTENT.tickTimer();
     LCD.setBatteryDim(ENGINE.S.battery);           // 低电量整屏变暗(D-108)
     LCD.frame(() => CONTENT.render());
-    /* D-118:字条只在握手动画这一屏出现,一旦自动或手动翻过去(进 connect)就跟着
-       划走,不需要等一次点击——"放在开局的握手动画里"这条边界严格执行。 */
-    if (introDisc && introDisc.classList.contains('on') && CONTENT.currentId !== 'handshake') dismissIntroDisc();
     document.getElementById('brandR').textContent =
       ENGINE.S.dead ? '已回收' : ENGINE.S.alive ? '已断连' : '接入中';
     requestAnimationFrame(loop);

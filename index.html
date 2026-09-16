@@ -23,10 +23,6 @@
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 24px 60px -28px #000}
   .brand{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
     font-size:10px;letter-spacing:.34em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:6px}
-  /* 非-diegetic 福祉阀门(D-108):活在外壳里,不是 LCD 画面的一部分 */
-  .prefBtn{cursor:pointer;text-transform:none;letter-spacing:.06em;opacity:.7}
-  .prefBtn:hover{opacity:1;color:var(--ink)}
-  .prefBtn.off{color:#7a5a4a}
   .bezel{position:relative;padding:5px;border-radius:5px;background:#05100c;
     border:1px solid #202826;box-shadow:0 2px 14px rgba(0,0,0,.7) inset}
   .screen-stack{position:relative;line-height:0;touch-action:none;cursor:pointer;user-select:none}
@@ -37,19 +33,6 @@
   .glass{position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(115% 85% at 50% 0%,rgba(120,255,220,.055),transparent 60%)}
   .chin{margin-top:6px;text-align:center;font-size:10px;letter-spacing:.42em;color:#39413e}
-
-  /* D-118 非-diegetic AI 声明:从"首次强制弹窗"改成"随握手动画一起出现的字条",
-     不拦手——任何一次点击/按键都会把它连同握手屏一起划走(app.js 的 loop()/
-     dismissIntroDisc() 处理),不是需要单独点「确定」才能关掉的模态框。刻意放在
-     设备壳体**外面**(bezel 之下,不进 LCD 像素画面)——物理位置就说明"这条披露
-     不是叙事的一部分",比盖在屏幕上更干净,也不会和 handshake/connect 屏自己的
-     文字抢位置。 */
-  .intro-disc{max-height:0;overflow:hidden;text-align:center;
-    transition:max-height .25s ease, opacity .25s ease, margin-top .25s ease;opacity:0}
-  .intro-disc.on{max-height:60px;opacity:1;margin-top:8px}
-  .intro-disc p{margin:0;font-size:10.5px;line-height:1.6;color:#6b7d76;letter-spacing:.01em}
-  .intro-disc .tap{margin-top:4px;font-size:8.5px;letter-spacing:.24em;color:#454f4c;
-    text-transform:uppercase}
 
   /* 自由文本覆盖层(理由/遗言)——反白纪律:玩家的字在屏上以反白呈现 */
   .overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
@@ -112,16 +95,12 @@
 <body>
 <div class="wrap">
   <div class="device">
-    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span class="prefBtn" id="aiDisclosure" title="关于本作">AI 声明</span><span class="prefBtn" id="rouPref" title="柔柔通道:随时可关,不影响游戏进度">柔柔通道</span><span class="prefBtn" id="mutePref" title="静音">♪</span><span id="brandR">连接中</span></div>
+    <div class="brand"><span>Kuiper</span><span id="brandInst"></span><span id="brandR">连接中</span></div>
     <div class="bezel">
       <div class="screen-stack" id="tapzone">
         <canvas id="lcd" width="588" height="672"></canvas>
         <div class="glass"></div><div class="grid"></div>
       </div>
-    </div>
-    <div class="intro-disc" id="introDisc">
-      <p>这是一个无限流AI谜题——游戏内与你对话的角色由 AI 生成驱动,你的输入会被用于生成回应与本局结算。</p>
-      <div class="tap">点击继续 · 详见顶栏「AI 声明」</div>
     </div>
     <div class="chin">欲望算法</div>
   </div>
@@ -147,9 +126,7 @@
 </div>
 
 <script src="js/lcd.js?v=8"></script>
-<script src="js/save.js?v=8"></script>
-<script src="js/prefs.js?v=1"></script>
-<script src="js/companion.js?v=8"></script>
+<script src="js/save.js?v=8"></script><script src="js/companion.js?v=8"></script>
 <script src="js/grader.js?v=1"></script>
 <script src="js/mom.js?v=1"></script>
 <script src="js/stranger.js?v=1"></script>

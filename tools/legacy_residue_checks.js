@@ -5,7 +5,7 @@
    归还追加进漂流瓶共享池且跨机子career级持久)/ M13 非语言残响(只在已读+无数值后果)。 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const SRC = ['js/lcd.js','js/save.js','js/prefs.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
+const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
   .map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 
 let failures = 0;

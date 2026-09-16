@@ -2241,16 +2241,6 @@ const CONTENT = (() => {
   const canMsg = () => S.msgQuota > 0 && S.disposal !== 'delete';
   /* 发送:成本与违规全由引擎裁决;LLM 只渲染她的措辞(宪法 2) */
   function sendToRou(text){
-    /* 非-diegetic 福祉阀门(D-108):关断时通道整个不存在——不扣配额/电量/溯源,
-       也不进 rouChat(不留下"发过什么"的痕迹)。这是玩家对自己的选择,不是游戏机制。 */
-    if (typeof PREFS !== 'undefined' && PREFS.rouOff){
-      window.OVERLAY.show({
-        title: DOSSIER.cast.companion.label + '通道 · 已关闭',
-        hint: '你在外壳里关闭了这个通道。想恢复,点顶栏「' + DOSSIER.cast.companion.label + '通道」重新打开。',
-        options: ['回到游戏']
-      }, () => {});
-      return;
-    }
     /* 自伤 break-glass(D-108 强化 · canon §9/M28 危机协议):触发后不只拦这一条——
        本次接入柔柔通道"当日静默"(crisisSilenced),且计一笔跨局持久合规日志(writeSave.crisisSeen)。
        这里是安全兜底,跳出 diegesis(非她的嗓音)。 */
@@ -2384,8 +2374,7 @@ const CONTENT = (() => {
       drawChatView(rouChatLines(pages[Math.min(this._depth, pages.length - 1)], S.rouChat, S.rouTyping),
         16, optTop - 2, this);
       let y = optTop;
-      if (typeof PREFS !== 'undefined' && PREFS.rouOff){ L.drawText(4, y, '[' + DOSSIER.cast.companion.label + '通道已关闭 · 见顶栏]'); y += LH + 2; }
-      else if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
+      if (S.crisisSilenced){ L.drawText(4, y, '[通道已静默 · 安全]'); y += LH + 2; }
       else if (canMsg()) y = optSlim(y, '发消息(剩 ' + S.msgQuota + ')', 'M');
       else if (S.disposal === 'delete'){ L.drawText(4, y, '[线程已删除]'); y += LH + 2; }
       if (canDeep) y = optSlim(y, '1 深搜旧消息', '1');
@@ -2396,7 +2385,6 @@ const CONTENT = (() => {
       if (chatKey(this, k)) return;
       const pages = rouPages();
       if (k === 'M' && canMsg()){
-        if (typeof PREFS !== 'undefined' && PREFS.rouOff){ sendToRou(''); return; }   // 关断提示,不开输入框
         if (S.crisisSilenced){ sendToRou(''); return; }                                // 危机静默:同样不开输入框
         window.OVERLAY.show({
           title: '发消息 · ' + DOSSIER.cast.companion.label,

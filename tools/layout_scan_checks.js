@@ -11,7 +11,7 @@
    硬不变量:带框按钮 y+h 不得 > 224(推出画布=既看不见也点不到,比挤在一起更糟)。 */
 const fs = require('fs');
 const ROOT = require('path').resolve(__dirname, '..');
-const SRC = ['js/lcd.js','js/save.js','js/prefs.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
+const SRC = ['js/lcd.js','js/save.js','js/companion.js','js/grader.js','js/mom.js','js/stranger.js','js/engine.js','js/content.js']
   .map(f => fs.readFileSync(ROOT + '/' + f, 'utf8')).join('\n;\n');
 
 let failures = 0;
