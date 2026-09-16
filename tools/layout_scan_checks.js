@@ -19,6 +19,12 @@ const B_SAVE = { runCount:1, lastEnding:'captured', evidence:['E1','E2','E3'], c
   clues:{ ruleShape:true, ruleParam:true }, riskLabels:true, deletedVisitedA:true, recsA:['rec047','rec012'],
   lastCacheVal:2270, lastReason:'我想看看那扇门后面有什么', lastWords:'别信秒回的', violationsA:1,
   history:[{ inst:'#7741-A', cacheVal:460, ev:3 }], seenBottles:['#5502-D'] };
+/* D-119:上面这份夹具从来没设过 dossierId,永远落在 DOSSIER_A——D-110/D-113 之后
+   有三份底本(phone-7741/5029/3319),文本长度、称呼、线程标签都不一样,布局扫描
+   只覆盖 A 等于三分之二的内容从没被这道门禁照过。补两份同形状的 B/C 夹具,复用
+   同一套 mutate 钩子。 */
+const B_SAVE_B = Object.assign({}, B_SAVE, { dossierId:'B', history:[{ inst:'#5029-A', cacheVal:460, ev:3 }] });
+const B_SAVE_C = Object.assign({}, B_SAVE, { dossierId:'C', history:[{ inst:'#3319-A', cacheVal:460, ev:3 }] });
 
 function boot(saveObj){
   let T = 1000; const perf = { now: () => T };
@@ -123,6 +129,10 @@ const passes = [
   ['A局·长结算行', null, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   ['B局·冷渲染', B_SAVE, null],
   ['B局·长结算行', B_SAVE, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本B(5029)·冷渲染', B_SAVE_B, null],
+  ['底本B(5029)·长结算行', B_SAVE_B, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本C(3319)·冷渲染', B_SAVE_C, null],
+  ['底本C(3319)·长结算行', B_SAVE_C, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
 ];
 
 const all = {};
