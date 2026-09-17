@@ -138,11 +138,14 @@ const SAVE_CAPTURED = {
    补两份同形状、真设了 dossierId 的夹具,同一套探测逻辑复用。 */
 const SAVE_CAPTURED_B = Object.assign({}, SAVE_CAPTURED, { dossierId:'B', history:[{inst:'#5029-A',kind:'captured',cacheVal:2270,ev:4}] });
 const SAVE_CAPTURED_C = Object.assign({}, SAVE_CAPTURED, { dossierId:'C', history:[{inst:'#3319-A',kind:'captured',cacheVal:2270,ev:4}] });
+/* D-129:machine#4(phone-8842)追加,同一套夹具形状。 */
+const SAVE_CAPTURED_D = Object.assign({}, SAVE_CAPTURED, { dossierId:'D', history:[{inst:'#8842-A',kind:'captured',cacheVal:2270,ev:4}] });
 
 const rA = probeExits(null, 'A局(底本A首局)');
 const rB = probeExits(SAVE_CAPTURED, 'B局(底本A二周目,原有夹具,一直没设dossierId,本就该落DOSSIER_A)');
 const rBB = probeExits(SAVE_CAPTURED_B, 'B局(底本B/phone-5029二周目)');
 const rBC = probeExits(SAVE_CAPTURED_C, 'B局(底本C/phone-3319二周目)');
+const rBD = probeExits(SAVE_CAPTURED_D, 'B局(底本D/phone-8842二周目)');
 const wA = { visited: new Map() };
 const wB = { visited: new Map() };
 const allA = Object.keys(mkEnv(null).CONTENT.SCREENS);
@@ -150,5 +153,5 @@ const allB = Object.keys(mkEnv(SAVE_CAPTURED).CONTENT.SCREENS);
 console.log('');
 
 console.log('');
-console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length) +
-  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length) + ' 处');
+console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length) +
+  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length) + ' 处');

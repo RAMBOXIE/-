@@ -25,6 +25,7 @@ const B_SAVE = { runCount:1, lastEnding:'captured', evidence:['E1','E2','E3'], c
    同一套 mutate 钩子。 */
 const B_SAVE_B = Object.assign({}, B_SAVE, { dossierId:'B', history:[{ inst:'#5029-A', cacheVal:460, ev:3 }] });
 const B_SAVE_C = Object.assign({}, B_SAVE, { dossierId:'C', history:[{ inst:'#3319-A', cacheVal:460, ev:3 }] });
+const B_SAVE_D = Object.assign({}, B_SAVE, { dossierId:'D', history:[{ inst:'#8842-A', cacheVal:460, ev:3 }] });
 
 function boot(saveObj){
   let T = 1000; const perf = { now: () => T };
@@ -133,6 +134,8 @@ const passes = [
   ['底本B(5029)·长结算行', B_SAVE_B, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   ['底本C(3319)·冷渲染', B_SAVE_C, null],
   ['底本C(3319)·长结算行', B_SAVE_C, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本D(8842)·冷渲染', B_SAVE_D, null],
+  ['底本D(8842)·长结算行', B_SAVE_D, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   /* D-122:破局新增两个条件性按钮行(th_rou「卡边缘发」/ tools「喂假数据」),
      静态夹具默认不触发这两个条件(msgQuota/hunt 都是运行时状态),补一遍强制置位的
      渲染,确保它们各自的按钮行不会把其余选项挤出屏或压住软键。 */

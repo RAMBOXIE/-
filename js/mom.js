@@ -79,11 +79,31 @@ const MOMLLM = (() => {
     '',
     '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
   ].join('\n');
+  const CORE_D = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子苏晏(念念)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
   function triggerB(){
     return '给这个陌生号码发消息。你知道安子已经不在了。说你想说的那几句。';
   }
   function triggerC(){
     return '给这个陌生号码发消息。你知道屿屿已经不在了。说你想说的那几句。';
+  }
+  function triggerD(){
+    return '给这个陌生号码发消息。你知道念念已经不在了。说你想说的那几句。';
   }
 
   let sampleFn;
@@ -101,6 +121,7 @@ const MOMLLM = (() => {
     const id = dossierId();
     if (id === 'phone-5029') return { core: CORE_B, trig: triggerB };
     if (id === 'phone-3319') return { core: CORE_C, trig: triggerC };
+    if (id === 'phone-8842') return { core: CORE_D, trig: triggerD };
     return { core: CORE, trig: trigger };
   }
   SAMPLE = async function(){
@@ -143,6 +164,14 @@ const MOMLLM = (() => {
     '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
     '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
   ];
+  /* D-129:machine#4(苏晏/念念)。同样三路查表补一份,不重蹈 D-116 那次
+     "第三台机子忘补,借用了别人的兜底"的教训。 */
+  const TOLD_D = [
+    '妈: 这个号码,是念念的旧机吗。\n妈: 谁在用它。',
+    '妈: 念念最后,\n妈: 是不是有人陪着他。',
+    '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
+    '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
+  ];
   const rand = a => a[Math.floor(Math.random() * a.length)];
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
@@ -151,6 +180,7 @@ const MOMLLM = (() => {
     const id = dossierId();
     if (!id || id === 'phone-7741') return TOLD;
     if (id === 'phone-3319') return TOLD_C;
+    if (id === 'phone-8842') return TOLD_D;
     return TOLD_B;   // phone-5029,以及未来未及配置的新机子兜底落回 B
   }
   function fallback(){ return rand(fallbackPool()); }

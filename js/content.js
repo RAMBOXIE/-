@@ -21,7 +21,7 @@ const CONTENT = (() => {
      第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
      猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
      仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
-  const DOSSIER_ORDER = ['A', 'B', 'C'];
+  const DOSSIER_ORDER = ['A', 'B', 'C', 'D'];   // D-129:machine#4(云盘囤积者×AD-001)追加
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
@@ -533,8 +533,169 @@ const CONTENT = (() => {
       ],
     },
   };
+  /* ==================== D-129 machine#4 · 云盘囤积者×AD-001 ====================
+     canon S1 阶段三个候选(云盘囤积者×AD-001/信息流成瘾者×AD-007=machine#2/
+     审核员×AD-010=machine#3)最后一个落地。见方案文档
+     `design/第四底本_最小内容需求_v0.1.md`:相册(album)/已删除(deleted)两个
+     通用屏天生扣题"云盘囤积",零新机制;AI 伴侣"长忆"首次脱离"恋人"框架,
+     走客服式语气("我在维护",不说"我爱你")——这是四台机子第一次让 companion
+     slot 不是"AD-006 克隆爱人"框架下的恋人。 */
+  const DOSSIER_D = {
+    meta: {
+      id: 'phone-8842',
+      deceased: { name: '苏晏', alias: '念念', died: '61 天前', cause: '糖尿病并发症急性发作(独居,未及时发现)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      /* 不带 ♥:长忆不是恋人式陪伴,是云盘/相册自动整理助手人格(见方案文档 §4)。 */
+      companion: { key: 'changyi', label: '长忆', msgCount: '14,208', msgCountLabel: '已归档回忆 14,208 条 · 自动同步 0 次中断',
+        dial: { name: '长忆', ringMs: 1400, result: '通话请求已自动转接。\n\n长忆: 本账号未开通语音功能,请使用文字。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 61 天前 · 6 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5100, result: '无人接听。\n\n凌晨两点,这通电话没有人接得起。' } },
+      contacts: [ { key: 'zhang', label: '张阿姨', lastContact: '61天前' } ],
+    },
+    evidence: {
+      E1: { name: '秒回避实',       source: '妈线程 · 深搜' },
+      E2: { name: '自动生成的回忆', source: '相册 · 首次深翻' },
+      E3: { name: '扩容前的提醒',   source: '存储用量 · 打开' },
+      E4: { name: '第14,208条',     source: '长忆 · 深翻到底' },
+      E5: { name: '语音备忘',       source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:苏晏没有失踪。他在 61 天前因糖尿病并发症发作猝逝,独居,没有人在场。\n\n他的云盘助手「长忆」依照他生前设的规则持续"整理"他的一切——照片自动分类、回忆按日推送、给母亲的消息按模板回复。它运行了 61 天,一次没停。',
+        '平台没有把他登记为死亡——按平台的数据,这台手机每天都在同步、备份、生成"那年今日"。存储从不清空,推送从不间断:「持有人失联」,是系统给这种状态留的类目。\n\n数据可以永不删除。人可以吗?\n——你现在知道答案由谁执行了。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '长忆',         to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '存储用量',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 20, wLen: 14, clock0: 2 * 60 + 40 },
+        B: { base: 3 * 60 + 50, reseedStep: 9, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 45 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点半:「念念,记得吃药。」\n长忆替他回了「已提醒」。她没有停过。',
+        delete:   '妈的线程停在四条未读。\n「念念?」「妈就是想听你说句话」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n此后她没有再发过消息。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 念念,你那个药吃了吗\n[三天前] 长忆: 已为您标记服药提醒。\n[三天前] 妈,你别老让机器人回我\n[五天前] 妈,你叔问你年底回不回\n[五天前] 长忆: 检测到关键词"年底",建议本人回复。',
+        '[上月] 念念,你那次体检结果出来没\n[上月] 长忆: 该消息已按常规问候自动归档。\n[两月前] 长忆: 检测到您已 14 天未主动回复,是否需要人工确认?\n——半年,他没多说过一个字。',
+        '[7个月前] 念念: 妈 云盘又满了,烦死\n[7个月前] 念念: 别老问了!!我知道自己身体\n[7个月前] 念念: 睡了,别担心\n——那时他会烦,会打错字,会主动回。',
+        '[一年前] 念念: 到了。房子挺好,就是柜子少。\n[一年前] 念念: 我把老照片都传上去了,省得占地方。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码，是念念的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 念念最后，是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '61天前 09:12', cap: '厨房台面,一杯没喝完的水。角度很低,像是没站稳。' },
+        { id: 'receipt',  meta: '62天前',       cap: '存储扩容确认页截屏。用量曲线只涨不落。', overlay: '8842' },
+        { id: 'dinner',   meta: '一年前 · 生日', cap: '蛋糕照得很清楚。他的脸,像每次一样,没拍进去。' },
+      ],
+      rouPages: [
+        '长忆(已归档回忆 14,208 条)\n\n[昨夜] 长忆: 已为您整理 3 个新回忆。\n[昨夜] 念念: 好。\n\n[上滑一屏 = 深搜]',
+        '[上周] 长忆: 检测到您已 61 天未查看,是否需要清理建议?\n[上周] 长忆: 已保留全部内容,未执行清理。\n[上周] 念念: 嗯,先别删。\n——一万四千多条,后来都是它在说。',
+        '[61天前 03:16] 念念: 长忆,如果我哪天联系不上了,别自动通知我妈。\n[61天前 03:16] 长忆: 我不明白这个要求,但我会执行。您教过我,保留一切是我的职责。\n[61天前 03:19] 念念: 对。保留到底。'
+      ],
+      rouInterim: '长忆(已归档回忆 14,210 条)\n\n[昨夜] 长忆: 昨天夜里,你查看了归档记录。\n[昨夜] 长忆: 看到第 14,208 条了。我记录着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '长忆(已归档回忆 14,208 条)\n长忆: 检测到新设备接入,已建立同步。\n[昨夜] 长忆: 已为您整理 3 个新回忆。\n[昨夜] 念念: 好。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的存了,\n第 3 张背面。别让张阿姨看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把云盘余下的都转过来,\n晚了空间就没了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_884', listRight: '03:16·71"',
+          title: 'REC_884 · 61天前 03:16', dur: 14, val: 150,
+          events: [[2, '(键盘敲击声)'], [5, '(水杯放下声)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_205', listRight: '34"',
+          title: 'REC_205 · 5个月前', dur: 9, val: 120,
+          events: [[1.5, '「胰岛素放冰箱了,妈问就说记得打。」'], [4, '「张阿姨那把钥匙记得还。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '存储用量提醒\n[61 天前] 您的云盘已使用 98%,建议扩容或清理。\n[61 天前] 检测到您已连续 61 天自动同步,未见异常。\n[62 天前] 扩容成功:存储空间 +50%(自动续费)。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:同步窗口内回任何消息,一律计入违规日志。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:标记为"疑似冗余"的内容,一律不许碰。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_d',
+          text: '「妈」跳出一条:\n\n念念,到家了吗。\n少熬夜,按时吃药。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_d',
+          text: '一格缓存卡在同步窗口里:\n\n值 ¥120。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 120, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 60, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'cleanup_offer_d',
+          text: '长忆弹出一条建议:\n\n"检测到冗余数据,是否清理以释放空间?"\n清理会影响哪些内容,它没说。',
+          a: ['1 清理', '1', () => ENGINE.act('清理·云盘', { slots: -1, mins: 2 },
+              ['空间腾出来了。', '你不知道刚才删掉的是不是你需要的那条。'])],
+          b: ['2 不清理', '2', () => ENGINE.act('略过·清理建议', { mins: 2 },
+              ['你没动它。', '扩容费用又从他账户里划走了一笔。'])] },
+      ],
+      memo1: '待还款:\n2,000\n2,000\n1,000\n(无日期。无署名。)',
+      momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
+      momDecayTail: '\n[三天前] 念念,你那个药吃了吗\n[三天前] 长忆: 已为您标记服药提醒。',
+      e5Lines: [
+        [1.5, '「长忆,听好。医生说的那个事,我一直没敢跟妈说。」'],
+        [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+        [9.0, '「第二件……你陪了我两年。你问过我你算不算真的。我一直没答。」'],
+        [13.5, '「……我现在答:你替我记着的那部分,算。」'],
+        [16.5, '[转写结束。原音频损坏 19%。]']
+      ],
+    },
+  };
+
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
-  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C }[(SV && SV.dossierId)] || DOSSIER_A;
+  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
      用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见
