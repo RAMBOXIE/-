@@ -32,6 +32,9 @@ const B_SAVE_G = Object.assign({}, B_SAVE, { dossierId:'G', history:[{ inst:'#44
 const B_SAVE_H = Object.assign({}, B_SAVE, { dossierId:'H', history:[{ inst:'#3567-A', cacheVal:460, ev:3 }] });
 const B_SAVE_I = Object.assign({}, B_SAVE, { dossierId:'I', history:[{ inst:'#5620-A', cacheVal:460, ev:3 }] });
 const B_SAVE_J = Object.assign({}, B_SAVE, { dossierId:'J', history:[{ inst:'#9102-A', cacheVal:460, ev:3 }] });
+const B_SAVE_K = Object.assign({}, B_SAVE, { dossierId:'K', history:[{ inst:'#6047-A', cacheVal:460, ev:3 }] });
+const B_SAVE_L = Object.assign({}, B_SAVE, { dossierId:'L', history:[{ inst:'#2938-A', cacheVal:460, ev:3 }] });
+const B_SAVE_M = Object.assign({}, B_SAVE, { dossierId:'M', history:[{ inst:'#8410-A', cacheVal:460, ev:3 }] });
 
 function boot(saveObj){
   let T = 1000; const perf = { now: () => T };
@@ -154,6 +157,12 @@ const passes = [
   ['底本I(5620)·长结算行', B_SAVE_I, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   ['底本J(9102)·冷渲染', B_SAVE_J, null],
   ['底本J(9102)·长结算行', B_SAVE_J, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本K(6047)·冷渲染', B_SAVE_K, null],
+  ['底本K(6047)·长结算行', B_SAVE_K, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本L(2938)·冷渲染', B_SAVE_L, null],
+  ['底本L(2938)·长结算行', B_SAVE_L, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本M(8410)·冷渲染', B_SAVE_M, null],
+  ['底本M(8410)·长结算行', B_SAVE_M, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   /* D-122:破局新增两个条件性按钮行(th_rou「卡边缘发」/ tools「喂假数据」),
      静态夹具默认不触发这两个条件(msgQuota/hunt 都是运行时状态),补一遍强制置位的
      渲染,确保它们各自的按钮行不会把其余选项挤出屏或压住软键。 */

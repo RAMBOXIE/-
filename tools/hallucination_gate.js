@@ -140,7 +140,8 @@ A(frameworkTriggerIds.size > 0, '能从 content.js 里提取到真实证据触�
 [['DOSSIER_A(phone-7741)', null], ['DOSSIER_B(phone-5029)', { dossierId: 'B' }], ['DOSSIER_C(phone-3319)', { dossierId: 'C' }], ['DOSSIER_D(phone-8842)', { dossierId: 'D' }],
  ['DOSSIER_E(phone-6153)', { dossierId: 'E' }], ['DOSSIER_F(phone-2087)', { dossierId: 'F' }], ['DOSSIER_G(phone-4419)', { dossierId: 'G' }],
  ['DOSSIER_H(phone-3567)', { dossierId: 'H' }], ['DOSSIER_I(phone-5620)', { dossierId: 'I' }],
- ['DOSSIER_J(phone-9102)', { dossierId: 'J' }]].forEach(([label, saveObj]) => {
+ ['DOSSIER_J(phone-9102)', { dossierId: 'J' }], ['DOSSIER_K(phone-6047)', { dossierId: 'K' }],
+ ['DOSSIER_L(phone-2938)', { dossierId: 'L' }], ['DOSSIER_M(phone-8410)', { dossierId: 'M' }]].forEach(([label, saveObj]) => {
   const env = mkEnv(saveObj);
   const dossier = env.C.dossier;
   const report = [];

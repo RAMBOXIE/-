@@ -150,6 +150,10 @@ const SAVE_CAPTURED_H = Object.assign({}, SAVE_CAPTURED, { dossierId:'H', histor
 const SAVE_CAPTURED_I = Object.assign({}, SAVE_CAPTURED, { dossierId:'I', history:[{inst:'#5620-A',kind:'captured',cacheVal:2270,ev:4}] });
 /* D-135:machine#10(phone-9102)追加,同一套夹具形状。 */
 const SAVE_CAPTURED_J = Object.assign({}, SAVE_CAPTURED, { dossierId:'J', history:[{inst:'#9102-A',kind:'captured',cacheVal:2270,ev:4}] });
+/* D-137:machine#11/12/13(phone-6047/2938/8410)追加,同一套夹具形状。 */
+const SAVE_CAPTURED_K = Object.assign({}, SAVE_CAPTURED, { dossierId:'K', history:[{inst:'#6047-A',kind:'captured',cacheVal:2270,ev:4}] });
+const SAVE_CAPTURED_L = Object.assign({}, SAVE_CAPTURED, { dossierId:'L', history:[{inst:'#2938-A',kind:'captured',cacheVal:2270,ev:4}] });
+const SAVE_CAPTURED_M = Object.assign({}, SAVE_CAPTURED, { dossierId:'M', history:[{inst:'#8410-A',kind:'captured',cacheVal:2270,ev:4}] });
 
 const rA = probeExits(null, 'A局(底本A首局)');
 const rB = probeExits(SAVE_CAPTURED, 'B局(底本A二周目,原有夹具,一直没设dossierId,本就该落DOSSIER_A)');
@@ -162,6 +166,9 @@ const rBG = probeExits(SAVE_CAPTURED_G, 'B局(底本G/phone-4419二周目)');
 const rBH = probeExits(SAVE_CAPTURED_H, 'B局(底本H/phone-3567二周目)');
 const rBI = probeExits(SAVE_CAPTURED_I, 'B局(底本I/phone-5620二周目)');
 const rBJ = probeExits(SAVE_CAPTURED_J, 'B局(底本J/phone-9102二周目)');
+const rBK = probeExits(SAVE_CAPTURED_K, 'B局(底本K/phone-6047二周目)');
+const rBL = probeExits(SAVE_CAPTURED_L, 'B局(底本L/phone-2938二周目)');
+const rBM = probeExits(SAVE_CAPTURED_M, 'B局(底本M/phone-8410二周目)');
 const wA = { visited: new Map() };
 const wB = { visited: new Map() };
 const allA = Object.keys(mkEnv(null).CONTENT.SCREENS);
@@ -169,5 +176,5 @@ const allB = Object.keys(mkEnv(SAVE_CAPTURED).CONTENT.SCREENS);
 console.log('');
 
 console.log('');
-console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length+rBE.dead.length+rBF.dead.length+rBG.dead.length+rBH.dead.length+rBI.dead.length+rBJ.dead.length) +
-  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length+rBE.errs.length+rBF.errs.length+rBG.errs.length+rBH.errs.length+rBI.errs.length+rBJ.errs.length) + ' 处');
+console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length+rBE.dead.length+rBF.dead.length+rBG.dead.length+rBH.dead.length+rBI.dead.length+rBJ.dead.length+rBK.dead.length+rBL.dead.length+rBM.dead.length) +
+  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length+rBE.errs.length+rBF.errs.length+rBG.errs.length+rBH.errs.length+rBI.errs.length+rBJ.errs.length+rBK.errs.length+rBL.errs.length+rBM.errs.length) + ' 处');

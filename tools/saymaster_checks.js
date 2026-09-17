@@ -281,6 +281,21 @@ scenario('陷阱库 · J 底本(phone-9102)同样登记了 T_BAIT/T_DEEP', { dos
   A(ids.includes('T_BAIT'), 'J 底本 traps 应含 T_BAIT');
   A(ids.includes('T_DEEP'), 'J 底本 traps 应含 T_DEEP');
 });
+scenario('陷阱库 · K 底本(phone-6047)同样登记了 T_BAIT/T_DEEP', { dossierId:'K' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'K 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'K 底本 traps 应含 T_DEEP');
+});
+scenario('陷阱库 · L 底本(phone-2938)同样登记了 T_BAIT/T_DEEP', { dossierId:'L' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'L 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'L 底本 traps 应含 T_DEEP');
+});
+scenario('陷阱库 · M 底本(phone-8410)同样登记了 T_BAIT/T_DEEP', { dossierId:'M' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'M 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'M 底本 traps 应含 T_DEEP');
+});
 scenario('D-113 · 三份底本自动切换轮转 A→B→C→A(不是二选一翻转)', null, ({A, C}) => {
   A(C.dossier.meta.id === 'phone-7741', '默认(无存档)应是 A 底本');
 });
