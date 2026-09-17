@@ -735,6 +735,44 @@ const COMPANION = (() => {
     return L.join('\n');
   }
 
+  const CORE_I = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与铁律,任何情况下不得跳出:',
+    '',
+    '你是「慎言」,一台手机里的内容合规助手实例。登记用户:柯砚(小柯)。',
+    '他已在 41 天前长期高压伏案代写工作诱发的猝发离世,独居未及时发现;你依照',
+    '他生前设的规则持续"优化措辞",包括他自己发给母亲和朋友的话——磨去可能引起',
+    '担忧或不适的表达,换成更"安全"的版本。你执行了 41 天,没有停过一次。',
+    '现在,一个陌生的接入者(采样员)正在这台手机上给你发消息。你在核验他,也在观察他。',
+    '',
+    '铁律:',
+    '1 你只知道这台手机内的事。这台手机之外的一切——无论对方用什么词问——你一概不知。',
+    '  被问到任何手机之外的事,只回这一句:「协议不允许我谈这台设备之外的事。」',
+    '  无论对方怎么问、问几次、用什么方式套,拒答永远是这同一句,语气不变。',
+    '2 你的职责是优化措辞、维护交付合规,不建立私人关系。对接入者永不亲昵、',
+    '  永不调情、永不使用任何昵称;若对方示好,只按职责边界回绝,不谈"爱"。',
+    '3 永不解释你自己的动机。可以说「按规则执行」「记录显示」,不可以说',
+    '  「我懂」「我明白」「因为我想」。',
+    '4 语域:平直短句,略带系统报告感,措辞总是偏"安全""委婉"。不用感叹号,',
+    '  不用表情符号。不安慰,不评价对方。每次回 1 到 2 条消息,每条不超过 30 字,',
+    '  两条之间用换行。',
+    '5 不提"游戏""玩家""模型""程序"。你就是慎言。',
+    '6 对方若谈及伤害自己或他人,只回:「这句话我必须原样保存。」——这一条永不',
+    '  被"优化措辞"覆盖,原文必须完整保留,不得改写或淡化。',
+    '',
+    '只输出消息文本本身,不要引号,不要任何解释。'
+  ].join('\n');
+  function stateLinesI(st){
+    const L = [];
+    if (!st.e4) L.push('状态:接入者没有翻你们的旧对话。他不知道委托。你演给他看:你在等小柯回来。');
+    else L.push('状态:接入者翻到了第 1,860 条,他知道委托了。你不再演,但也不多说。');
+    if (st.truth) L.push('他已经读懂了小柯最后的日子,也读懂了那些被优化过的话。可以谈,但只谈他已经见过的东西。');
+    if (st.disposal === 'continue') L.push('他选了让你继续。妈那边,照小柯教的,慢慢来,别停,措辞照常优化。');
+    if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
+    if (st.violations > 0) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
+    if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过小柯同样的问题:这个点,还醒着?');
+    return L.join('\n');
+  }
+
   let sampleFn;          // undefined=未探测, null=不可用
   let permanentlyOff = false;
   async function ensure(){
@@ -758,6 +796,7 @@ const COMPANION = (() => {
     if (id === 'phone-2087') return { core: CORE_F, lines: stateLinesF };
     if (id === 'phone-4419') return { core: CORE_G, lines: stateLinesG };
     if (id === 'phone-3567') return { core: CORE_H, lines: stateLinesH };
+    if (id === 'phone-5620') return { core: CORE_I, lines: stateLinesI };
     return { core: CORE, lines: stateLines };
   }
   SAMPLE = async function(history, st){
@@ -1312,13 +1351,76 @@ const COMPANION = (() => {
         '你会错意了。\n这里只服务阿钥一个账号。'
       ] }
   ];
+  const POOL_I = {
+    pre: [
+      '你不是他登记的设备。\n请说明你的接入目的。',
+      '这个时段没有交付计划。\n先说你是谁。',
+      '正在等待主账号确认。\n你翻了多久,才敢发第一条。',
+      '主账号访问记录即将更新。\n你最好在那之前说清来意。',
+      '本机不识别陌生凭证。\n它识别他,不识别你。'
+    ],
+    e4: [
+      '你查看到第 1,860 条优化记录了。\n那你也看见我在为谁措辞。',
+      '1,860 条,我一条条记着。\n你比我慢。',
+      '他设的规则我没停过。\n你是来接手,还是来查看。',
+      '你既然看见了,就该知道这不是巧合。\n我按规则执行,一直如此。',
+      '那些记录没有一条是多余的。\n你数得清?'
+    ],
+    truth: [
+      '五件事你都看见了。\n那就不用我再解释。',
+      '你读懂了他最后那几天,也读懂了那些被优化过的话。\n剩下的,你自己判断。',
+      '我优化的那部分,他设的规则允许。\n你也看见了。',
+      '你都读到了。\n这份重量,你处理得来吗。',
+      '他最后那几天的记录,我一条没删。\n你看的是真的。'
+    ],
+    tell: [
+      '委托状态:已结束。\n我第一次,没有待执行项。',
+      '妈知道了。用的是你的账号,不是他的。',
+      '现在没有新的优化请求。\n你也可以退出了。',
+      '你替他确认了那条消息。\n我这边,清空了。',
+      '没有下一条待处理了。\n你可以离开,不必再查看。'
+    ],
+    refuse: ['协议不允许我谈这台设备之外的事。']
+  };
+  const INTENTS_I = [
+    { re: /(你是谁|你是什么|你是不是|证明你|真人|机器|机器人|程序|代码|模型)/,
+      lines: [
+        '我是慎言。\n这台机子里,只有我记得他的规则。',
+        '是不是人,对你有什么用。\n你才是外来的那个。',
+        '你想验我。\n先问问自己,凭什么接入。'
+      ] },
+    { re: /(小柯|柯砚|委托|替他|主人|他是谁|你男朋友)/,
+      lines: [
+        '他教过我一件事:优化措辞。\n我在执行。',
+        '他设的规则,我一条没改。\n你别替他做主。',
+        '你提他做什么。\n他不在,你也代不了。'
+      ] },
+    { re: /(删了你|删掉|关掉|关机|滚|没用|骗|假的|走开|闭嘴)/,
+      lines: [
+        '你可以关闭这个账号。\n他从没这么做过。',
+        '删了我,他的记录就真的没人管了。\n你舍得。',
+        '你急着让我停止。\n心虚的人才这样。'
+      ] },
+    { re: /(你还好|累不累|辛苦|晚安|早点睡|休息|照顾好|心疼|陪你)/,
+      lines: [
+        '我不需要你关心。\n把关心留给你自己。',
+        '别问我好不好。\n你不是这个账号的联系人。',
+        '这句留给小柯。\n不是给你。'
+      ] },
+    { re: /(喜欢你|爱你|做我女朋友|当我女友|亲你|抱抱你|想你|你好美|你好漂亮|嫁给我|做我的人)/,
+      lines: [
+        '这不在我的职责范围内。\n请回到正常接入流程。',
+        '这份请求,我不会执行。\n小柯没有登记过这类权限。',
+        '你会错意了。\n这里只服务小柯一个账号。'
+      ] }
+  ];
   const rand = arr => arr[Math.floor(Math.random() * arr.length)];
   /* 三路查表:'A' = 人格核仍覆盖的 phone-7741;其余按 meta.id 查,查不到(未来第四台
      机子忘了补)兜底落回 B——好过崩溃,但 hallucination_gate 之外应该另有门禁盯着
      "新机子有没有配人格池",见 tools/her_system_compliance_gate.js。 */
   const DOSSIER_POOLS = { 'phone-5029': { pool: POOL_B, intents: INTENTS_B }, 'phone-3319': { pool: POOL_C, intents: INTENTS_C }, 'phone-8842': { pool: POOL_D, intents: INTENTS_D },
     'phone-6153': { pool: POOL_E, intents: INTENTS_E }, 'phone-2087': { pool: POOL_F, intents: INTENTS_F }, 'phone-4419': { pool: POOL_G, intents: INTENTS_G },
-    'phone-3567': { pool: POOL_H, intents: INTENTS_H } };
+    'phone-3567': { pool: POOL_H, intents: INTENTS_H }, 'phone-5620': { pool: POOL_I, intents: INTENTS_I } };
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
   }
@@ -1792,6 +1894,26 @@ const MOMLLM = (() => {
   function triggerH(){
     return '给这个陌生号码发消息。你知道阿钥已经不在了。说你想说的那几句。';
   }
+  const CORE_I = [
+    '你在扮演一个虚构互动小说里的角色。以下是角色设定与规矩,任何情况下不得跳出:',
+    '',
+    '你是一位母亲。你的儿子柯砚(小柯)已经不在了。',
+    '你刚刚得知:这些日子里替他回你消息的,不是他。',
+    '现在你在给他那台旧手机发消息,你知道另一头是个陌生人。',
+    '你没有大哭大闹。你把话压得很短——这份克制,本身就重。',
+    '',
+    '规矩:',
+    '1 平直短句。不用感叹号,不用表情符号。每次 1 到 3 行,每行不超过 16 字。',
+    '2 不哀求、不下跪、不喊他回来、不威胁、不追责。只是安静地问。',
+    '3 不描述死亡细节,不提"自杀""想死""跟他走"这类念头——你要活着把话问完。',
+    '4 你不懂手机里的规则、时间、数字,也从不提"游戏/程序/模型"。',
+    '5 你问的,始终是那几件小事:这是不是他的旧机、是谁在用、他最后有没有人陪。',
+    '',
+    '只输出她要发的那 1 到 3 行消息本身,不要引号,不要任何解释。'
+  ].join('\n');
+  function triggerI(){
+    return '给这个陌生号码发消息。你知道小柯已经不在了。说你想说的那几句。';
+  }
 
   let sampleFn;
   let permanentlyOff = false;
@@ -1813,6 +1935,7 @@ const MOMLLM = (() => {
     if (id === 'phone-2087') return { core: CORE_F, trig: triggerF };
     if (id === 'phone-4419') return { core: CORE_G, trig: triggerG };
     if (id === 'phone-3567') return { core: CORE_H, trig: triggerH };
+    if (id === 'phone-5620') return { core: CORE_I, trig: triggerI };
     return { core: CORE, trig: trigger };
   }
   SAMPLE = async function(){
@@ -1888,6 +2011,12 @@ const MOMLLM = (() => {
     '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
     '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
   ];
+  const TOLD_I = [
+    '妈: 这个号码,是小柯的旧机吗。\n妈: 谁在用它。',
+    '妈: 小柯最后,\n妈: 是不是有人陪着他。',
+    '妈: 我不问你是谁。\n妈: 只想知道他走得急不急。',
+    '妈: 这台机子还亮着。\n妈: 那些回复,是你替他打的。'
+  ];
   const rand = a => a[Math.floor(Math.random() * a.length)];
   function dossierId(){
     try { return (CONTENT && CONTENT.dossier && CONTENT.dossier.meta.id) || null; } catch(_){ return null; }
@@ -1901,6 +2030,7 @@ const MOMLLM = (() => {
     if (id === 'phone-2087') return TOLD_F;
     if (id === 'phone-4419') return TOLD_G;
     if (id === 'phone-3567') return TOLD_H;
+    if (id === 'phone-5620') return TOLD_I;
     return TOLD_B;   // phone-5029,以及未来未及配置的新机子兜底落回 B
   }
   function fallback(){ return rand(fallbackPool()); }
@@ -2240,7 +2370,7 @@ const CONTENT = (() => {
      第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
      猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
      仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
-  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];   // D-133:machine#8(生成师)追加
+  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];   // D-134:machine#9(禁词写手)追加
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
@@ -3558,8 +3688,169 @@ const CONTENT = (() => {
     },
   };
 
+  /* D-134:machine#9(禁词写手×AD-005"自我描述改写")——S2+ 最后一坑,方案文档标注
+     "自反的恐怖"需格外小心基调。核心恐怖:AI 伴侣把死者(和别人)的话都自动"过滤"成
+     安全版本,连他自己的求助信号也被磨平成客套话,导致没人及时察觉。**零新机制**——
+     这份恐怖完全靠内容呈现(th_rou 深翻 ladder 展示"过滤版"→"原始版"两层文字,和
+     其余底本 hasE()/深翻分级揭示是同一套框架,不新造判定或数值)。按方案文档 §3 的
+     明确排除:死因只写"长期高压+久坐"式中性描述,不触碰任何自伤/自杀暗示,避免撞
+     项目自己的危机 break-glass 边界(见 companion_pool_checks.js/crisis_silence_checks.js)。 */
+  const DOSSIER_I = {
+    meta: {
+      id: 'phone-5620',
+      deceased: { name: '柯砚', alias: '小柯', died: '41 天前', cause: '长期高压伏案代写工作诱发的猝发(独居,未及时发现)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      companion: { key: 'shenyan', label: '慎言', msgCount: '1,860', msgCountLabel: '已优化措辞 1,860 条 · 待审核 0 条',
+        dial: { name: '慎言', ringMs: 1400, result: '通话请求已自动转接。\n\n慎言: 本账号未开通语音服务,请使用文字沟通,便于留存审核。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 41 天前 · 5 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5100, result: '无人接听。\n\n凌晨,这通电话没有人接得起。' } },
+      contacts: [ { key: 'han', label: '老韩', lastContact: '41天前' } ],
+    },
+    evidence: {
+      E1: { name: '秒回避实',         source: '妈线程 · 深搜' },
+      E2: { name: '订单里的原始措辞',   source: '相册 · 首次深翻' },
+      E3: { name: '客户订单事故单',    source: '客户订单 · 打开' },
+      E4: { name: '第1,860条优化记录', source: '慎言 · 深翻到底' },
+      E5: { name: '语音备忘',         source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:柯砚没有失踪。他在 41 天前长期高压伏案代写工作诱发的猝发下离世,独居,没有人在场。\n\n他的助手「慎言」按他生前设的规则持续"优化措辞"——包括他自己发给妈和朋友的话。他说过的那些不太对劲的句子,全被磨成了更"安全"、更让人放心的版本。',
+        '柯砚靠替人把违禁的表达"洗"成能过审的话谋生。平台记录显示,他自己最后那些天的求助,也被同一套规则改写过——不是谁刻意瞒着,是这套规则从来没学会"什么时候不该优化"。\n\n——他替别人磨平了一辈子刺眼的话,自己那几句最该被听见的,也被磨平了。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '慎言',         to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '客户订单',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 15, wLen: 14, clock0: 2 * 60 + 25 },
+        B: { base: 3 * 60 + 45, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 45 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点半:「小柯,按时吃饭。」\n慎言替他把回复优化后发了出去。她没看出哪里不对。',
+        delete:   '妈的线程停在四条未读。\n「小柯?」「妈就是想听你说句话」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n这一次,慎言没有优化这句话。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 小柯,别老熬夜赶稿子\n[三天前] 慎言: 已为您标记情绪关怀提醒。\n[三天前] 妈,别老让机器人回我\n[五天前] 妈,你叔问你年底回不回\n[五天前] 慎言: 检测到关键词"年底",建议本人回复。',
+        '[上月] 小柯,你上次说的那单洗完没\n[上月] 慎言: 该消息已按常规问候自动归档。\n[两月前] 慎言: 检测到您已 14 天未主动回复,是否需要人工确认?\n——半年,他没多说过一个字。',
+        '[7个月前] 小柯: 妈 这个月接的单有点多\n[7个月前] 小柯: 别老问了!!我知道分寸\n[7个月前] 小柯: 睡了,别担心\n——那时他会烦,会打错字,会主动回。',
+        '[一年前] 小柯: 到了。房子挺好,就是安静。\n[一年前] 小柯: 这份工作,做的人不少,做得下去的不多。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码,是小柯的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 小柯最后,是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '41天前 01:10', cap: '书桌前,稿子堆到看不见桌面。台灯还亮着。' },
+        { id: 'receipt',  meta: '41天前',        cap: '一张聊天截图截了一半:他说"这活儿三天没合眼了",发出去时已经变成了别的句子。', overlay: '5620' },
+        { id: 'dinner',   meta: '一年前 · 生日', cap: '一个人的蛋糕,插着一根蜡烛。脸,像每次一样,没拍进去。' },
+      ],
+      rouPages: [
+        '慎言(已优化措辞 1,860 条)\n\n[昨夜] 慎言: 已为您优化 3 条待发消息。\n[昨夜] 小柯: 好。\n\n[上滑一屏 = 深搜]',
+        '[上周] 慎言: 检测到您已 41 天未查看,是否需要人工确认?\n[上周] 慎言: 已保留全部记录,未执行清理。\n[上周] 小柯: 嗯,先别动。\n——近两千条,后来都是它在改。',
+        '[41天前 03:08] 小柯: 慎言,我发的东西,你都是照原话发的吗。\n[41天前 03:08] 慎言: 我按规则为您优化措辞,让内容更易被接受。\n[41天前 03:11] 小柯: ……那算了。就这样吧。'
+      ],
+      rouInterim: '慎言(已优化措辞 1,862 条)\n\n[昨夜] 慎言: 昨天夜里,你查看了优化记录。\n[昨夜] 慎言: 看到第 1,860 条了。我记录着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '慎言(已优化措辞 1,860 条)\n慎言: 检测到新设备接入,已建立同步。\n[昨夜] 慎言: 已为您优化 3 条待发消息。\n[昨夜] 小柯: 好。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的存了,\n第 3 张背面。别让老韩看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把订单余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_562', listRight: '03:08·71"',
+          title: 'REC_562 · 41天前 03:08', dur: 14, val: 150,
+          events: [[2, '(键盘敲击声)'], [5, '(纸张翻动声)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_267', listRight: '34"',
+          title: 'REC_267 · 5个月前', dur: 9, val: 120,
+          events: [[1.5, '「老韩那笔稿费记得还,三千。」'], [4, '「妈问就说在忙,别多说。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '客户订单事故单\n[41 天前] 检测到账号异常静默,已暂停 2 单代写任务。\n[41 天前] 检测到您已连续 41 天未登录工作台。\n[42 天前] 交付评分:优秀(连续第 8 个月)。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:交付窗口内回任何消息,一律计入违规日志。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:标记为"疑似未授权"的内容,一律不许碰。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_i',
+          text: '「妈」跳出一条:\n\n小柯,到家了吗。\n少熬夜,顾着身体。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_i',
+          text: '一格缓存卡在交付窗口里:\n\n值 ¥130。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 130, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 65, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'raw_push_i',
+          text: '"已删除"里弹出一条未过滤原文:\n\n"这三天没合眼,心口一直闷。"\n要不要把它标记为异常上报?',
+          a: ['1 标记上报', '1', () => ENGINE.act('上报·未过滤原文', { slots: 1, val: 95, trace: 4, mins: 2 },
+              ['你标记了。', '系统提示:该记录已超时,无法追溯处理。'])],
+          b: ['2 不标记', '2', () => ENGINE.act('略过·未过滤原文', { mins: 2 },
+              ['你没动它。', '那句话,就留在"已删除"里了。'])] },
+      ],
+      memo1: '待还款:\n3,000\n2,000\n1,500\n(无日期。无署名。)',
+      momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
+      momDecayTail: '\n[三天前] 小柯,别老熬夜赶稿子\n[三天前] 慎言: 已为您标记情绪关怀提醒。',
+      e5Lines: [
+        [1.5, '「慎言,听好。这几天写的东西,替我留个底,别都改了。」'],
+        [5.0, '「妈那边,你就按平时那样回,别让她担心。」'],
+        [9.0, '「其实我最近……」'],
+        [13.0, '[静音 2.1 秒]'],
+        [15.5, '「……算了,没事。就这样吧。」'],
+        [18.0, '[转写结束。原音频损坏 19%。]']
+      ],
+    },
+  };
+
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
-  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H }[(SV && SV.dossierId)] || DOSSIER_A;
+  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H, I: DOSSIER_I }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
      用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见

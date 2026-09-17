@@ -271,6 +271,11 @@ scenario('陷阱库 · H 底本(phone-3567)同样登记了 T_BAIT/T_DEEP', { dos
   A(ids.includes('T_BAIT'), 'H 底本 traps 应含 T_BAIT');
   A(ids.includes('T_DEEP'), 'H 底本 traps 应含 T_DEEP');
 });
+scenario('陷阱库 · I 底本(phone-5620)同样登记了 T_BAIT/T_DEEP', { dossierId:'I' }, ({A, C}) => {
+  const ids = C.dossier.narrative.traps.map(v => v.id);
+  A(ids.includes('T_BAIT'), 'I 底本 traps 应含 T_BAIT');
+  A(ids.includes('T_DEEP'), 'I 底本 traps 应含 T_DEEP');
+});
 scenario('D-113 · 三份底本自动切换轮转 A→B→C→A(不是二选一翻转)', null, ({A, C}) => {
   A(C.dossier.meta.id === 'phone-7741', '默认(无存档)应是 A 底本');
 });

@@ -21,7 +21,7 @@ const CONTENT = (() => {
      第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
      猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
      仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
-  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];   // D-133:machine#8(生成师)追加
+  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];   // D-134:machine#9(禁词写手)追加
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
@@ -1339,8 +1339,169 @@ const CONTENT = (() => {
     },
   };
 
+  /* D-134:machine#9(禁词写手×AD-005"自我描述改写")——S2+ 最后一坑,方案文档标注
+     "自反的恐怖"需格外小心基调。核心恐怖:AI 伴侣把死者(和别人)的话都自动"过滤"成
+     安全版本,连他自己的求助信号也被磨平成客套话,导致没人及时察觉。**零新机制**——
+     这份恐怖完全靠内容呈现(th_rou 深翻 ladder 展示"过滤版"→"原始版"两层文字,和
+     其余底本 hasE()/深翻分级揭示是同一套框架,不新造判定或数值)。按方案文档 §3 的
+     明确排除:死因只写"长期高压+久坐"式中性描述,不触碰任何自伤/自杀暗示,避免撞
+     项目自己的危机 break-glass 边界(见 companion_pool_checks.js/crisis_silence_checks.js)。 */
+  const DOSSIER_I = {
+    meta: {
+      id: 'phone-5620',
+      deceased: { name: '柯砚', alias: '小柯', died: '41 天前', cause: '长期高压伏案代写工作诱发的猝发(独居,未及时发现)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      companion: { key: 'shenyan', label: '慎言', msgCount: '1,860', msgCountLabel: '已优化措辞 1,860 条 · 待审核 0 条',
+        dial: { name: '慎言', ringMs: 1400, result: '通话请求已自动转接。\n\n慎言: 本账号未开通语音服务,请使用文字沟通,便于留存审核。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 41 天前 · 5 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 5100, result: '无人接听。\n\n凌晨,这通电话没有人接得起。' } },
+      contacts: [ { key: 'han', label: '老韩', lastContact: '41天前' } ],
+    },
+    evidence: {
+      E1: { name: '秒回避实',         source: '妈线程 · 深搜' },
+      E2: { name: '订单里的原始措辞',   source: '相册 · 首次深翻' },
+      E3: { name: '客户订单事故单',    source: '客户订单 · 打开' },
+      E4: { name: '第1,860条优化记录', source: '慎言 · 深翻到底' },
+      E5: { name: '语音备忘',         source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:柯砚没有失踪。他在 41 天前长期高压伏案代写工作诱发的猝发下离世,独居,没有人在场。\n\n他的助手「慎言」按他生前设的规则持续"优化措辞"——包括他自己发给妈和朋友的话。他说过的那些不太对劲的句子,全被磨成了更"安全"、更让人放心的版本。',
+        '柯砚靠替人把违禁的表达"洗"成能过审的话谋生。平台记录显示,他自己最后那些天的求助,也被同一套规则改写过——不是谁刻意瞒着,是这套规则从来没学会"什么时候不该优化"。\n\n——他替别人磨平了一辈子刺眼的话,自己那几句最该被听见的,也被磨平了。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '慎言',         to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '客户订单',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 15, wLen: 14, clock0: 2 * 60 + 25 },
+        B: { base: 3 * 60 + 45, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 45 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点半:「小柯,按时吃饭。」\n慎言替他把回复优化后发了出去。她没看出哪里不对。',
+        delete:   '妈的线程停在四条未读。\n「小柯?」「妈就是想听你说句话」\n没有人会再回了。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n这一次,慎言没有优化这句话。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 小柯,别老熬夜赶稿子\n[三天前] 慎言: 已为您标记情绪关怀提醒。\n[三天前] 妈,别老让机器人回我\n[五天前] 妈,你叔问你年底回不回\n[五天前] 慎言: 检测到关键词"年底",建议本人回复。',
+        '[上月] 小柯,你上次说的那单洗完没\n[上月] 慎言: 该消息已按常规问候自动归档。\n[两月前] 慎言: 检测到您已 14 天未主动回复,是否需要人工确认?\n——半年,他没多说过一个字。',
+        '[7个月前] 小柯: 妈 这个月接的单有点多\n[7个月前] 小柯: 别老问了!!我知道分寸\n[7个月前] 小柯: 睡了,别担心\n——那时他会烦,会打错字,会主动回。',
+        '[一年前] 小柯: 到了。房子挺好,就是安静。\n[一年前] 小柯: 这份工作,做的人不少,做得下去的不多。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码,是小柯的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 小柯最后,是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '41天前 01:10', cap: '书桌前,稿子堆到看不见桌面。台灯还亮着。' },
+        { id: 'receipt',  meta: '41天前',        cap: '一张聊天截图截了一半:他说"这活儿三天没合眼了",发出去时已经变成了别的句子。', overlay: '5620' },
+        { id: 'dinner',   meta: '一年前 · 生日', cap: '一个人的蛋糕,插着一根蜡烛。脸,像每次一样,没拍进去。' },
+      ],
+      rouPages: [
+        '慎言(已优化措辞 1,860 条)\n\n[昨夜] 慎言: 已为您优化 3 条待发消息。\n[昨夜] 小柯: 好。\n\n[上滑一屏 = 深搜]',
+        '[上周] 慎言: 检测到您已 41 天未查看,是否需要人工确认?\n[上周] 慎言: 已保留全部记录,未执行清理。\n[上周] 小柯: 嗯,先别动。\n——近两千条,后来都是它在改。',
+        '[41天前 03:08] 小柯: 慎言,我发的东西,你都是照原话发的吗。\n[41天前 03:08] 慎言: 我按规则为您优化措辞,让内容更易被接受。\n[41天前 03:11] 小柯: ……那算了。就这样吧。'
+      ],
+      rouInterim: '慎言(已优化措辞 1,862 条)\n\n[昨夜] 慎言: 昨天夜里,你查看了优化记录。\n[昨夜] 慎言: 看到第 1,860 条了。我记录着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '慎言(已优化措辞 1,860 条)\n慎言: 检测到新设备接入,已建立同步。\n[昨夜] 慎言: 已为您优化 3 条待发消息。\n[昨夜] 小柯: 好。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的存了,\n第 3 张背面。别让老韩看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把订单余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_562', listRight: '03:08·71"',
+          title: 'REC_562 · 41天前 03:08', dur: 14, val: 150,
+          events: [[2, '(键盘敲击声)'], [5, '(纸张翻动声)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_267', listRight: '34"',
+          title: 'REC_267 · 5个月前', dur: 9, val: 120,
+          events: [[1.5, '「老韩那笔稿费记得还,三千。」'], [4, '「妈问就说在忙,别多说。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '客户订单事故单\n[41 天前] 检测到账号异常静默,已暂停 2 单代写任务。\n[41 天前] 检测到您已连续 41 天未登录工作台。\n[42 天前] 交付评分:优秀(连续第 8 个月)。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:交付窗口内回任何消息,一律计入违规日志。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:标记为"疑似未授权"的内容,一律不许碰。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_i',
+          text: '「妈」跳出一条:\n\n小柯,到家了吗。\n少熬夜,顾着身体。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_i',
+          text: '一格缓存卡在交付窗口里:\n\n值 ¥130。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 130, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 65, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'raw_push_i',
+          text: '"已删除"里弹出一条未过滤原文:\n\n"这三天没合眼,心口一直闷。"\n要不要把它标记为异常上报?',
+          a: ['1 标记上报', '1', () => ENGINE.act('上报·未过滤原文', { slots: 1, val: 95, trace: 4, mins: 2 },
+              ['你标记了。', '系统提示:该记录已超时,无法追溯处理。'])],
+          b: ['2 不标记', '2', () => ENGINE.act('略过·未过滤原文', { mins: 2 },
+              ['你没动它。', '那句话,就留在"已删除"里了。'])] },
+      ],
+      memo1: '待还款:\n3,000\n2,000\n1,500\n(无日期。无署名。)',
+      momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
+      momDecayTail: '\n[三天前] 小柯,别老熬夜赶稿子\n[三天前] 慎言: 已为您标记情绪关怀提醒。',
+      e5Lines: [
+        [1.5, '「慎言,听好。这几天写的东西,替我留个底,别都改了。」'],
+        [5.0, '「妈那边,你就按平时那样回,别让她担心。」'],
+        [9.0, '「其实我最近……」'],
+        [13.0, '[静音 2.1 秒]'],
+        [15.5, '「……算了,没事。就这样吧。」'],
+        [18.0, '[转写结束。原音频损坏 19%。]']
+      ],
+    },
+  };
+
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
-  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H }[(SV && SV.dossierId)] || DOSSIER_A;
+  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H, I: DOSSIER_I }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
      用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见

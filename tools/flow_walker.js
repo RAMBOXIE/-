@@ -146,6 +146,8 @@ const SAVE_CAPTURED_F = Object.assign({}, SAVE_CAPTURED, { dossierId:'F', histor
 const SAVE_CAPTURED_G = Object.assign({}, SAVE_CAPTURED, { dossierId:'G', history:[{inst:'#4419-A',kind:'captured',cacheVal:2270,ev:4}] });
 /* D-133:machine#8(phone-3567)追加,同一套夹具形状。 */
 const SAVE_CAPTURED_H = Object.assign({}, SAVE_CAPTURED, { dossierId:'H', history:[{inst:'#3567-A',kind:'captured',cacheVal:2270,ev:4}] });
+/* D-134:machine#9(phone-5620)追加,同一套夹具形状。 */
+const SAVE_CAPTURED_I = Object.assign({}, SAVE_CAPTURED, { dossierId:'I', history:[{inst:'#5620-A',kind:'captured',cacheVal:2270,ev:4}] });
 
 const rA = probeExits(null, 'A局(底本A首局)');
 const rB = probeExits(SAVE_CAPTURED, 'B局(底本A二周目,原有夹具,一直没设dossierId,本就该落DOSSIER_A)');
@@ -156,6 +158,7 @@ const rBE = probeExits(SAVE_CAPTURED_E, 'B局(底本E/phone-6153二周目)');
 const rBF = probeExits(SAVE_CAPTURED_F, 'B局(底本F/phone-2087二周目)');
 const rBG = probeExits(SAVE_CAPTURED_G, 'B局(底本G/phone-4419二周目)');
 const rBH = probeExits(SAVE_CAPTURED_H, 'B局(底本H/phone-3567二周目)');
+const rBI = probeExits(SAVE_CAPTURED_I, 'B局(底本I/phone-5620二周目)');
 const wA = { visited: new Map() };
 const wB = { visited: new Map() };
 const allA = Object.keys(mkEnv(null).CONTENT.SCREENS);
@@ -163,5 +166,5 @@ const allB = Object.keys(mkEnv(SAVE_CAPTURED).CONTENT.SCREENS);
 console.log('');
 
 console.log('');
-console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length+rBE.dead.length+rBF.dead.length+rBG.dead.length+rBH.dead.length) +
-  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length+rBE.errs.length+rBF.errs.length+rBG.errs.length+rBH.errs.length) + ' 处');
+console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length+rBE.dead.length+rBF.dead.length+rBG.dead.length+rBH.dead.length+rBI.dead.length) +
+  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length+rBE.errs.length+rBF.errs.length+rBG.errs.length+rBH.errs.length+rBI.errs.length) + ' 处');
