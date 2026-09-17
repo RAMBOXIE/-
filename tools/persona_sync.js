@@ -71,6 +71,7 @@ compareCore('均分', cli, 'const CORE_F = [', fn, 'const CORE_F = [');
 compareCore('留声', cli, 'const CORE_G = [', fn, 'const CORE_G = [');
 compareCore('拟真', cli, 'const CORE_H = [', fn, 'const CORE_H = [');
 compareCore('慎言', cli, 'const CORE_I = [', fn, 'const CORE_I = [');
+compareCore('晚知', cli, 'const CORE_J = [', fn, 'const CORE_J = [');
 /* 采样官:grader.js CORE ↔ rou.js GRADER_CORE(D-101 块3) */
 compareCore('采样官', grd, 'const CORE = [', fn, 'const GRADER_CORE = [');
 /* 妈告知态:mom.js CORE ↔ rou.js MOM_CORE(D-103) */
@@ -84,6 +85,7 @@ compareCore('妈告知态-F', mom, 'const CORE_F = [', fn, 'const MOM_CORE_F = [
 compareCore('妈告知态-G', mom, 'const CORE_G = [', fn, 'const MOM_CORE_G = [');
 compareCore('妈告知态-H', mom, 'const CORE_H = [', fn, 'const MOM_CORE_H = [');
 compareCore('妈告知态-I', mom, 'const CORE_I = [', fn, 'const MOM_CORE_I = [');
+compareCore('妈告知态-J', mom, 'const CORE_J = [', fn, 'const MOM_CORE_J = [');
 /* 陌生人:stranger.js CORE ↔ rou.js STRANGER_CORE(D-104 块3) */
 compareCore('陌生人', stg, 'const CORE = [', fn, 'const STRANGER_CORE = [');
 

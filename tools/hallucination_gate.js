@@ -139,7 +139,8 @@ A(frameworkTriggerIds.size > 0, '能从 content.js 里提取到真实证据触�
 /* ---------- ③ 对两份真底本各跑一遍(A 默认,B 靠存档 dossierId 切换) ---------- */
 [['DOSSIER_A(phone-7741)', null], ['DOSSIER_B(phone-5029)', { dossierId: 'B' }], ['DOSSIER_C(phone-3319)', { dossierId: 'C' }], ['DOSSIER_D(phone-8842)', { dossierId: 'D' }],
  ['DOSSIER_E(phone-6153)', { dossierId: 'E' }], ['DOSSIER_F(phone-2087)', { dossierId: 'F' }], ['DOSSIER_G(phone-4419)', { dossierId: 'G' }],
- ['DOSSIER_H(phone-3567)', { dossierId: 'H' }], ['DOSSIER_I(phone-5620)', { dossierId: 'I' }]].forEach(([label, saveObj]) => {
+ ['DOSSIER_H(phone-3567)', { dossierId: 'H' }], ['DOSSIER_I(phone-5620)', { dossierId: 'I' }],
+ ['DOSSIER_J(phone-9102)', { dossierId: 'J' }]].forEach(([label, saveObj]) => {
   const env = mkEnv(saveObj);
   const dossier = env.C.dossier;
   const report = [];
