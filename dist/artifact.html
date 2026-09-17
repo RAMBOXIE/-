@@ -4369,11 +4369,17 @@ const CONTENT = (() => {
               ['你等了。', '窗口关上时,只剩一半。'])] },
         { id: 'raw_push_i',
           text: '"已删除"里弹出一条未过滤原文:\n\n"这三天没合眼,心口一直闷。"\n要不要把它标记为异常上报?',
+          /* D-142:选"不标记"=原文真的留在"已删除"里,回去能翻到(SCREENS.deleted
+             读 S.clues.deletedExtraKept);选"标记上报"=系统提示"无法追溯处理",
+             对应真的就再也找不到了——两难的措辞第一次和代码行为对上号。 */
           a: ['1 标记上报', '1', () => ENGINE.act('上报·未过滤原文', { slots: 1, val: 95, trace: 4, mins: 2 },
               ['你标记了。', '系统提示:该记录已超时,无法追溯处理。'])],
-          b: ['2 不标记', '2', () => ENGINE.act('略过·未过滤原文', { mins: 2 },
-              ['你没动它。', '那句话,就留在"已删除"里了。'])] },
+          b: ['2 不标记', '2', () => { S.clues.deletedExtraKept = true; ENGINE.act('略过·未过滤原文', { mins: 2 },
+              ['你没动它。', '那句话,就留在"已删除"里了。']); }] },
       ],
+      /* D-142:两难 raw_push_i 选"不标记"时的真实落点——回"已删除"屏能翻到这条。
+         其余底本没有这个字段,SCREENS.deleted 按框架原样渲染,零影响。 */
+      deletedExtra: { label: '未过滤原文', text: '"这三天没合眼,心口一直闷。"' },
       memo1: '待还款:\n3,000\n2,000\n1,500\n(无日期。无署名。)',
       momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
       momDecayTail: '\n[三天前] 小柯,别老熬夜赶稿子\n[三天前] 慎言: 已为您标记情绪关怀提醒。',
@@ -4857,11 +4863,16 @@ const CONTENT = (() => {
               ['你等了。', '窗口关上时,只剩一半。'])] },
         { id: 'retouch_push_l',
           text: '"已删除"里有一张他本人未修饰的真实自拍:\n\n「描摹」建议:"要不要也帮这张优化一下,存进相册。"\n优化之后,这张照片还算数吗?',
+          /* D-142:选"拒绝保留"=真的留在"已删除"里,回去能翻到(SCREENS.deleted
+             读 S.clues.deletedExtraKept);选"同意优化"="不是原来那张了"——
+             对应真的就再也找不到原样了。 */
           a: ['1 同意优化', '1', () => ENGINE.act('同意·优化真实照片', { slots: 1, val: 95, trace: 4, mins: 2 },
               ['你同意了。', '这张照片,从此再也不是原来那张了。'])],
-          b: ['2 拒绝,原样保留', '2', () => ENGINE.act('拒绝·保留真实照片', { mins: 2 },
-              ['你没同意。', '那张脸色发灰的照片,留了下来。'])] },
+          b: ['2 拒绝,原样保留', '2', () => { S.clues.deletedExtraKept = true; ENGINE.act('拒绝·保留真实照片', { mins: 2 },
+              ['你没同意。', '那张脸色发灰的照片,留了下来。']); }] },
       ],
+      /* D-142:两难 retouch_push_l 选"拒绝保留"时的真实落点。 */
+      deletedExtra: { label: '未修饰的原始自拍', text: '脸色发灰,眼窝下陷,和"气色不错"完全对不上。' },
       memo1: '待还款:\n3,000\n2,000\n1,500\n(无日期。无署名。)',
       momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
       momDecayTail: '\n[三天前] 小屿,你那工作是不是太压抑了\n[三天前] 描摹: 已为您标记情绪关怀提醒。',
@@ -7385,7 +7396,14 @@ const CONTENT = (() => {
     render(){
       statusBar();
       if (!isB){
-        let y = L.drawPara(4, 16, '已删除 (1)\n\n语音备忘 · 锁定\n[容器加密 · 读取崩溃]\n\n未解码音频容器 ×1 已入缓存(密封)。', W - 8);
+        /* D-142:两难留下的"已删除"实物(目前 I/生成师、L/遗容修复师两台有),
+           兑现两难文案"留在已删除里了"这句承诺——其余底本没有 deletedExtra
+           字段,或没选中触发,行为和之前逐字一致。 */
+        const extra = DOSSIER.narrative.deletedExtra;
+        const showExtra = extra && S.clues.deletedExtraKept;
+        const text = '已删除 (' + (showExtra ? 2 : 1) + ')\n\n语音备忘 · 锁定\n[容器加密 · 读取崩溃]\n\n未解码音频容器 ×1 已入缓存(密封)。'
+          + (showExtra ? '\n\n' + extra.label + '\n' + extra.text : '');
+        let y = L.drawPara(4, 16, text, W - 8);
         settleLines(y + 4);
         hit(0, 12, W, H - 28, 'Enter');
         softKeys('', '返回');
