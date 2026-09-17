@@ -3999,7 +3999,11 @@ const CONTENT = (() => {
       violations: S.violations,
       night: ENGINE.inWindow(),
       clockStr: ENGINE.fmtClock(S.clock),
-      dossierId: DOSSIER.meta.id   // D-123:代理侧挑 CORE_B/CORE_C 要靠这个,不是秘匿值
+      dossierId: DOSSIER.meta.id,   // D-123:代理侧挑 CORE_B/CORE_C 要靠这个,不是秘匿值
+      /* D-139:世代残响——这局账号已经收尾过几台机子,是存档里真实的数字
+         (SV.history.length),不是编造的"全服"统计,守宪法14①账本永真。
+         只有"她"产品线三台(见 companion.js isHerLine())会真的用它。 */
+      historyCount: (SV && SV.history && SV.history.length) || 0
     };
     COMPANION.reply(S.rouChat, st).then(r => {
       S.rouTyping = false;
@@ -4008,6 +4012,16 @@ const CONTENT = (() => {
         S.rouChat.push({ who: 'rou', text: r.text, sig: r.sig });
         ENGINE.logEv('rou_reply', { source: r.source });
         try { AUDIO.blip(520, .1); } catch(_){}
+        /* D-139:世代残响的可感知落点——本局第二次接到共享底层的话,才诊断出来
+           (第一次只是巧合的余地,第二次才是玩家能拼出"这话不是她自己的话"的门槛)。
+           只提示一次,不重复刷屏。 */
+        if (r.shared){
+          S.sharedEchoCount = (S.sharedEchoCount || 0) + 1;
+          if (S.sharedEchoCount === 2 && !S.sharedEchoNoted){
+            S.sharedEchoNoted = true;
+            S.settle = (S.settle || []).concat(['这句话,好像不是第一次听见了。']);
+          }
+        }
       } else {
         S.settle = ['已送达。她没有回。'];
         ENGINE.logEv('rou_reply', { source: 'silent' });

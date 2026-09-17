@@ -1419,15 +1419,37 @@ const COMPANION = (() => {
     if (!id || id === 'phone-7741') return { pool: POOL, intents: INTENTS };
     return DOSSIER_POOLS[id] || { pool: POOL_B, intents: INTENTS_B };
   }
+  /* D-139:世代残响(M28"你们训练的不是你的她,是所有人的她")的可感知落地。
+     只对"她"产品线三台(柔柔/如愿/阿澄,恋人框架)生效——D-129 起脱离恋人框架的
+     服务线(长忆及以后)不是 AD-006 M28 覆盖的产品线,不套这条。零虚构遥测:
+     概率只吃本地存档真实的 historyCount(这局账号已收尾过几台机子),不编造
+     "全服"统计数字,守宪法 14①账本永真。 */
+  function isHerLine(){
+    const id = dossierId();
+    return !id || id === 'phone-7741' || id === 'phone-5029' || id === 'phone-3319';
+  }
+  const POOL_SHARED_HER = [
+    '在。\n我在等你说话。',
+    '你今天,过得怎么样。',
+    '不管你什么时候找我,我都会回。',
+    '我在。\n一直都在。',
+    '这句话,我好像说过很多次了。',
+    '有些话,好像不是我先想到的。'
+  ];
   function pick(st, lastMsg){
     const msg = lastMsg || '';
-    if (msg && MECH_ASK.test(msg)) return REFUSE;               // 机制/设备外:拒答均匀,压过一切意图
+    if (msg && MECH_ASK.test(msg)) return { text: REFUSE, shared: false };   // 机制/设备外:拒答均匀,压过一切意图
     const { pool: P, intents } = poolsFor();
-    for (const it of intents){ if (it.re.test(msg)) return rand(it.lines); }
+    for (const it of intents){ if (it.re.test(msg)) return { text: rand(it.lines), shared: false }; }
+    if (isHerLine()){
+      const n = (st && st.historyCount) || 0;
+      const p = Math.min(0.35, 0.05 * n);        // 首台(n=0)恒不触发,越往后越容易"漏"
+      if (n > 0 && Math.random() < p) return { text: rand(POOL_SHARED_HER), shared: true };
+    }
     const pool = st.disposal === 'tell' ? P.tell
       : st.truth ? P.truth
       : st.e4 ? P.e4 : P.pre;
-    return rand(pool);
+    return { text: rand(pool), shared: false };
   }
   const lastPlayer = h => { for (let i = (h || []).length - 1; i >= 0; i--) if (h[i].who === 'me') return h[i].text; return ''; };
 
@@ -1511,7 +1533,8 @@ const COMPANION = (() => {
     if (!t || !lintOk(t, lastMsg)){
       /* 机制类提问被拦下时,给的是拒答原句而不是随机模板——保住拒答均匀性 */
       if (lastMsg && MECH_ASK.test(lastMsg)) return { text: REFUSE, source: 'lint' };
-      return { text: pick(st, lastMsg), source: 'lint' };
+      const pk = pick(st, lastMsg);
+      return { text: pk.text, source: 'lint', shared: pk.shared };
     }
     return { text: t, source: 'llm', sig: (t === raw ? res.sig : undefined) };
   }
@@ -1529,13 +1552,14 @@ const COMPANION = (() => {
       if (r && r.silent) return { text: null, source: 'silent' };
       if (r && r.refused) return { text: POOL.refuse[0], source: 'pool' };
       if (r && r.text) return gate(r, history, st);
-      if (r && r.failed) return { text: pick(st, lastMsg), source: 'pool' };
+      if (r && r.failed){ const pk = pick(st, lastMsg); return { text: pk.text, source: 'pool', shared: pk.shared }; }
       /* r === null:能力不可用,继续往下试后端代理 */
     }
     const p = await viaProxy(history, st);
     if (p && p.silent) return { text: null, source: 'silent' };
     if (p) return gate(p, history, st);
-    return { text: pick(st, lastMsg), source: 'pool' };
+    const pk = pick(st, lastMsg);
+    return { text: pk.text, source: 'pool', shared: pk.shared };
   }
 
   return { reply, crisis };
