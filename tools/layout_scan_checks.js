@@ -29,6 +29,7 @@ const B_SAVE_D = Object.assign({}, B_SAVE, { dossierId:'D', history:[{ inst:'#88
 const B_SAVE_E = Object.assign({}, B_SAVE, { dossierId:'E', history:[{ inst:'#6153-A', cacheVal:460, ev:3 }] });
 const B_SAVE_F = Object.assign({}, B_SAVE, { dossierId:'F', history:[{ inst:'#2087-A', cacheVal:460, ev:3 }] });
 const B_SAVE_G = Object.assign({}, B_SAVE, { dossierId:'G', history:[{ inst:'#4419-A', cacheVal:460, ev:3 }] });
+const B_SAVE_H = Object.assign({}, B_SAVE, { dossierId:'H', history:[{ inst:'#3567-A', cacheVal:460, ev:3 }] });
 
 function boot(saveObj){
   let T = 1000; const perf = { now: () => T };
@@ -145,6 +146,8 @@ const passes = [
   ['底本F(2087)·长结算行', B_SAVE_F, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   ['底本G(4419)·冷渲染', B_SAVE_G, null],
   ['底本G(4419)·长结算行', B_SAVE_G, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
+  ['底本H(3567)·冷渲染', B_SAVE_H, null],
+  ['底本H(3567)·长结算行', B_SAVE_H, g => { g.E.S.settle = LONG_SETTLE.slice(); }],
   /* D-122:破局新增两个条件性按钮行(th_rou「卡边缘发」/ tools「喂假数据」),
      静态夹具默认不触发这两个条件(msgQuota/hunt 都是运行时状态),补一遍强制置位的
      渲染,确保它们各自的按钮行不会把其余选项挤出屏或压住软键。 */

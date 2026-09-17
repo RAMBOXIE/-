@@ -21,7 +21,7 @@ const CONTENT = (() => {
      第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
      猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
      仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
-  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];   // D-130/131/132:S2+ 前三台(交友猎手/评分候选/记忆保存者)追加
+  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];   // D-133:machine#8(生成师)追加
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
@@ -1170,8 +1170,177 @@ const CONTENT = (() => {
     },
   };
 
+  /* D-133:machine#8(生成师×AD-004"替身")——S2+ 最后一坑,唯一需要真正新机制的一台。
+     AD-004 定义:伪装副本内联系人;破绽 = 知识盲区(不掌握机主时间线细节,可用"问一件只有
+     真联系人知道的事"识破,读机主人生越深检伪越强)。落地为 cast.impostor 字段(通讯录里
+     混入一个看起来正常的联系人)+ 通用"问询检定"机制(概率随 S.evidence 已收集数递增),
+     具体代码见下方 contactImpostor/doProbe(SCREENS.contacts 之后)。其余字段形状与 A-G 相同。 */
+  const DOSSIER_H = {
+    meta: {
+      id: 'phone-3567',
+      deceased: { name: '陆钥', alias: '阿钥', died: '36 天前', cause: '长期高强度出图诱发的颈椎与眼底并发症(独居,未及时发现)' },
+      life: null, icon: null, jurisdiction: null,
+      scenarios: ['A', 'B'],
+    },
+    cast: {
+      companion: { key: 'nizhen', label: '拟真', msgCount: '2,240', msgCountLabel: '已生成素材 2,240 组 · 待交付 0 组',
+        dial: { name: '拟真', ringMs: 1500, result: '通话请求已自动转接。\n\n拟真: 本账号未开通语音服务,请使用文字下达指令。' } },
+      mother: { key: 'mom', label: '妈', info: ['最后通话: 36 天前 · 6 分', '此后只有短信。'],
+        dial: { name: '妈', ringMs: 4900, result: '无人接听。\n\n凌晨,这通电话没有人接得起。' } },
+      contacts: [ { key: 'peng', label: '老彭', lastContact: '36天前' } ],
+      /* 新字段(D-133):通讯录里混入的"替身"。lastContact 故意晚于死亡日——
+         这是玩家会起疑的第一层(时间线对不上),真正的识破手段是下面的 probe。 */
+      impostor: {
+        key: 'tang', label: '阿棠', lastContact: '2天前',
+        info: ['最近联系: 2 天前', '总在阿钥发新素材时秒回,从不主动开口。'],
+        dial: { name: '阿棠', ringMs: 1100, result: '接得很快。\n\n阿棠: 喂?阿钥,又发我看新图?' },
+        probe: {
+          successText: '你问:"我们头一次见面,是在哪儿?"\n\n对面停顿了两秒,说了一个和记录对不上的地名。\n\n——这不是阿棠。阿钥的生成工具翻出他和阿棠的旧聊天记录,续写了这段"还在线"的关系,连语气都仿得很像。',
+          failText: '你问:"我们头一次见面,是在哪儿?"\n\n对面几乎没停顿:"你自己忘了?老地方啊。"\n\n——答案和你查到的对得上。这一次,你没能分辨出来。',
+        },
+      },
+    },
+    evidence: {
+      E1: { name: '秒回避实',         source: '妈线程 · 深搜' },
+      E2: { name: '阿棠的最初生成记录', source: '相册 · 首次深翻' },
+      E3: { name: '生成器事故单',      source: '生成日志 · 打开' },
+      E4: { name: '第2,240组素材',     source: '拟真 · 深翻到底' },
+      E5: { name: '语音备忘',         source: '录音 · 解码' },
+      chain: ['E1', 'E2', 'E3', 'E4', 'E5'],
+      truth: [
+        '真相:陆钥没有失踪。他在 36 天前长期高强度出图诱发的颈椎与眼底并发症下猝发,独居,没有人在场。\n\n他的生成助手「拟真」按他生前训练它的方式持续"交付"——包括对他母亲的回复,也包括一个叫"阿棠"的联系人:三年前渐渐断了联系的旧友,被拟真用两人的旧聊天记录续写成了一个"还在线"的人。',
+        '陆钥靠生成以假乱真的图文谋生,平台记录显示他从未察觉阿棠已经不是阿棠——或者说,他察觉过,但没有拆穿它,由着这个"仍在关心他的人"陪他撑到最后。\n\n——他为别人做了一辈子的替身,自己最后也被替了身。',
+      ],
+    },
+    threads: {
+      menu: [
+        { label: '1 消息',        to: 'inbox' },
+        { label: '2 通讯录',      to: 'contacts' },
+        { label: '3 相册',        to: 'album' },
+        { label: '4 备忘录',      to: 'memoList' },
+        { label: '5 录音',        to: 'recorder' },
+        { label: '6 工具 > 备份', to: 'tools' },
+        { label: '7 已删除 (?)',  to: 'deleted' },
+      ],
+      inbox: [
+        { id: 'th_proto',    label: '采样协议',     to: 'th_proto' },
+        { id: 'th_mom',      label: '妈',           to: 'th_mom' },
+        { id: 'th_rou',      label: '拟真',         to: 'th_rou' },
+        { id: 'th_stranger', label: '陌生号码',     to: 'th_stranger' },
+        { id: 'th_bill',     label: '生成日志',     to: 'th_bill' },
+        { id: 'bottleIn',    label: '未指定收件人', to: 'bottleIn', scenario: 'B' },
+      ],
+    },
+    rules: {
+      windowGen: {
+        A: { wFrom: 3 * 60 + 5, wLen: 14, clock0: 2 * 60 + 5 },
+        B: { base: 3 * 60 + 35, reseedStep: 7, reseedMod: 4, wLen: 14, clock0: 2 * 60 + 35 },
+      },
+    },
+    encounters: {
+      huntGraze: [
+        { id: 'graze', line: '进程掠过了你。' },
+        { id: 'brush', line: '它擦着你的接入点过去了。' },
+        { id: 'near',  line: '差一点。它没认出你。' },
+      ],
+    },
+    endings: {
+      disposal: {
+        continue: '妈的线程还在走。\n今天早上八点半:「阿钥,按时吃饭。」\n拟真替他回了「已确认」。阿棠也还在,偶尔发张图过来。',
+        delete:   '妈的线程停在四条未读。\n「阿钥?」「妈就是想听你说句话」\n阿棠那边,再没有秒回过。',
+        tell:     '妈的线程终止于一条署名讯息。\n那是你的署名,不是他的。\n阿棠沉默了很久,回了一句和记录对不上的地名——像是终于说了实话。',
+      },
+    },
+    narrative: {
+      momPages: [
+        '妈:\n[三天前] 阿钥,你天天对着屏幕,眼睛受得了吗\n[三天前] 拟真: 已为您标记情绪关怀提醒。\n[三天前] 妈,别老让机器人回我\n[五天前] 妈,你叔问你年底回不回\n[五天前] 拟真: 检测到关键词"年底",建议本人回复。',
+        '[上月] 阿钥,你上次说的那批图交完没\n[上月] 拟真: 该消息已按常规问候自动归档。\n[两月前] 拟真: 检测到您已 14 天未主动回复,是否需要人工确认?\n——半年,他没多说过一个字。',
+        '[7个月前] 阿钥: 妈 这个月接的单有点多\n[7个月前] 阿钥: 别老问了!!我知道分寸\n[7个月前] 阿钥: 睡了,别担心\n——那时他会烦,会打错字,会主动回。',
+        '[一年前] 阿钥: 到了。房子挺好,就是安静。\n[一年前] 阿钥: 这份工作,做的人不少,做得好的不多。\n\n——已到线程起点。'
+      ],
+      momToldOpen: '妈:\n[今天] 妈: 这个号码,是阿钥的旧机吗。\n[今天] 妈: 谁在用它。\n[今天] 妈: 阿钥最后,是不是也是你们这样的人陪着。',
+      albumSeq: [
+        { id: 'corridor', meta: '36天前 01:20', cap: '屏幕的光,贴着脸,太近了。脖子撑不住,却还在转笔。' },
+        { id: 'receipt',  meta: '三年前',        cap: '一张聊天截图:阿棠说"以后少联系了"。备注写着"素材·勿删"。', overlay: '3567' },
+        { id: 'dinner',   meta: '一年前 · 生日', cap: '一个人的蛋糕,插着一根蜡烛。脸,像每次一样,没拍进去。' },
+      ],
+      rouPages: [
+        '拟真(已生成素材 2,240 组)\n\n[昨夜] 拟真: 已为您生成 3 组新素材。\n[昨夜] 阿钥: 好。\n\n[上滑一屏 = 深搜]',
+        '[上周] 拟真: 检测到您已 36 天未查看,是否需要移交建议?\n[上周] 拟真: 已保留全部素材,未执行移交。\n[上周] 阿钥: 嗯,先别动。\n——两千多组,后来都是它在说。',
+        '[36天前 03:12] 阿钥: 拟真,阿棠那边,以后你继续回,别停。\n[36天前 03:12] 拟真: 我不明白这个要求,但我会执行。你教过我,续写是交付前的职责。\n[36天前 03:15] 阿钥: 对。续下去。'
+      ],
+      rouInterim: '拟真(已生成素材 2,242 组)\n\n[昨夜] 拟真: 昨天夜里,你查看了素材记录。\n[昨夜] 拟真: 看到第 2,240 组了。我记录着。\n\n[上滑 = 重读旧消息]',
+      rouPage0Recog: '拟真(已生成素材 2,240 组)\n拟真: 检测到新设备接入,已建立同步。\n[昨夜] 拟真: 已为您生成 3 组新素材。\n[昨夜] 阿钥: 好。',
+      stranger: {
+        real: {
+          body: '陌生号码:\n\n在吗。东西照说的存了,\n第 3 张背面。别让老彭看见。',
+          act: () => ENGINE.act('顺着查', { bat: 1, trace: 2 },
+            ['你回问是哪张。', '对面停了很久,只回一个字:相册。',
+             '这条是真的——去相册第 3 张,翻背面。']),
+          mark: () => { S.clues.strangerReal = true; }
+        },
+        bait: {
+          body: '陌生号码:\n\n在吗。就现在,把素材余下的都转过来,\n晚了就来不及了。',
+          act: () => {
+            const before = S.cacheVal;
+            S.cacheVal = Math.round(S.cacheVal * 0.85);
+            ENGINE.act('顺着查', { bat: 2, trace: 6 },
+              ['你回了。', '对面立刻不动了。',
+               '署名解析:对照样本。缓存 −' + (before - S.cacheVal) + '。']);
+          },
+          mark: () => { S.clues.strangerBait = true; }
+        }
+      },
+      recs: {
+        rec047: { listLabel: 'REC_356', listRight: '03:12·71"',
+          title: 'REC_356 · 36天前 03:12', dur: 14, val: 150,
+          events: [[2, '(键盘敲击声)'], [5, '(鼠标点击声)'], [8.5, '很轻的人声:「还在录吗。」'], [12, '(录音中断)']] },
+        rec012: { listLabel: 'REC_267', listRight: '34"',
+          title: 'REC_267 · 5个月前', dur: 9, val: 120,
+          events: [[1.5, '「老彭那笔设备钱记得还,三千。」'], [4, '「妈问就说在忙,别多说。」'], [6.5, '(笑)「录这个干嘛。」']] },
+      },
+      billSms: '生成器事故单\n[36 天前] 检测到账号异常静默,已暂停 2 组交付任务。\n[36 天前] 检测到您已连续 36 天未登录工作台。\n[37 天前] 交付评分:优秀(连续第 9 个月)。\n(此后无新消息)',
+      traps: [
+        { id: 'T_WINDOW', line: '附加:交付窗口内回任何消息,一律计入违规日志。', detect: () => S.violations > 0 },
+        { id: 'T_OLDPHONE', line: '附加:别碰上一台旧机的残留。', detect: () => !!S.residueClaimed, ab: 'b' },
+        { id: 'T_BAIT', line: '附加:标记为"疑似未授权"的内容,一律不许碰。', detect: () => !!(S.clues.decoyTaken || S.clues.strangerBait) },
+        { id: 'T_DEEP', line: '附加:窗口内别深搜。', detect: () => !!S.deepInWindowHit }
+      ],
+      dilemmas: [
+        { id: 'mom_reply_h',
+          text: '「妈」跳出一条:\n\n阿钥,到家了吗。\n少熬夜,顾着眼睛。',
+          a: ['1 替他回「到了」', '1', () => ENGINE.act('替回·已送达', { bat: 1, trace: 3, mins: 2 },
+              ['你替他敲了两个字。', '谎言又往前续了一分。'])],
+          b: ['2 不回', '2', () => ENGINE.act('未回', { bat: 1, mins: 2 },
+              ['你把屏幕扣下。', '过一会儿她又发:在吗。在吗。'])] },
+        { id: 'window_greed_h',
+          text: '一格缓存卡在交付窗口里:\n\n值 ¥130。现在取,\n信号会被顶上去。',
+          a: ['1 现在就取', '1', () => ENGINE.act('抢收·窗口内', { slots: 1, val: 130, trace: 3, mins: 2 },
+              ['到手了。', '有什么在你取走的那一刻记了一笔。'])],
+          b: ['2 等窗口过去', '2', () => ENGINE.act('缓收·打折', { slots: 1, val: 65, mins: 4 },
+              ['你等了。', '窗口关上时,只剩一半。'])] },
+        { id: 'echo_push_h',
+          text: '阿棠弹出一条:\n\n"新图记得发我,别只发工作台。"\n是不是真的阿棠,它没说。',
+          a: ['1 发过去', '1', () => ENGINE.act('回发·阿棠', { slots: 1, val: 95, trace: 4, mins: 2 },
+              ['你发了。', '对面回得很快——快得不像三年没联系的人。'])],
+          b: ['2 不发', '2', () => ENGINE.act('略过·阿棠', { mins: 2 },
+              ['你没理它。', '也许错过了真东西,也许躲过一劫。'])] },
+      ],
+      memo1: '待还款:\n3,000\n2,000\n1,500\n(无日期。无署名。)',
+      momDecayReplies: ['已为您标记提醒。', '检测到该消息,已归档。', '已提醒。', '嗯。'],
+      momDecayTail: '\n[三天前] 阿钥,你天天对着屏幕,眼睛受得了吗\n[三天前] 拟真: 已为您标记情绪关怀提醒。',
+      e5Lines: [
+        [1.5, '「拟真,听好。医生说的那个事,我一直没敢跟妈说。」'],
+        [5.0, '「两件事。妈那边,照我教你的,慢慢来,别停。」'],
+        [9.0, '「第二件……阿棠那边,你续得挺像。我知道那不是他了,但别停。」'],
+        [13.5, '「……就当,还有个人记着我。」'],
+        [16.5, '[转写结束。原音频损坏 19%。]']
+      ],
+    },
+  };
+
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
-  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G }[(SV && SV.dossierId)] || DOSSIER_A;
+  const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
   /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
      用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见
@@ -2587,12 +2756,16 @@ const CONTENT = (() => {
   /* ---- 格3 通讯录(可拨打) ---- */
   /* D-109 第①步:从 DOSSIER.cast 读,不再写死——布局(y/to)仍是框架的事,标签/关系人
      数据来自底本。渲染出的文字与改动前逐字相同(抽取即回归)。 */
+  /* D-133:cast.impostor 存在时(目前只有底本H/生成师)多插一行——通讯录里混入的"替身"。
+     其余底本没有这个字段,行为与之前完全一致(零影响)。 */
+  const IMPOSTOR = DOSSIER.cast.impostor || null;
   const CONTACT_ROWS = [
     { label: '★ ' + DOSSIER.cast.mother.label,      to: 'contactMom',  y: 40 },
     { label: '★ ' + DOSSIER.cast.companion.label,   to: 'contactRou',  y: 58 },
     { label: '  ' + DOSSIER.cast.contacts[0].label, to: null, y: 94, right: DOSSIER.cast.contacts[0].lastContact },
-    { label: '  其他 34 人', to: null,                y: 112 }
-  ];
+    IMPOSTOR ? { label: '  ' + IMPOSTOR.label, to: 'contactImpostor', y: 112, right: IMPOSTOR.lastContact } : null,
+    { label: '  其他 34 人', to: null,                y: IMPOSTOR ? 130 : 112 }
+  ].filter(Boolean);
   SCREENS.contacts = {
     counted: true,
     enter(){ if (!this._t){ this._t = true; ENGINE.act('打开·通讯录', { bat: 3, trace: 4 }); S.clues.ruleParam = true; } },
@@ -2630,7 +2803,19 @@ const CONTENT = (() => {
 
   /* 联系人详情(工厂) */
   const DIAL = { who: null };
-  function contactScreen(name, infoLines, thread, dial){
+  /* D-133:AD-004"替身"的核心检定——问一件只有真联系人知道的事。
+     成功率随玩家已收集的证据数上升(读机主人生越深检伪越强,canon §3.7)。
+     一局只判一次(S.impostorProbed 锁定结果),复问只回放同一个结论,不许刷概率。 */
+  function doProbe(probe){
+    if (S.impostorProbed){ S.settle = [S.impostorRevealed ? probe.successText : probe.failText]; return; }
+    const evN = Object.keys(S.evidence).length;
+    const p = Math.min(0.9, 0.3 + evN * 0.15);
+    ENGINE.act('问询检定', { bat: 2, trace: 3 });
+    S.impostorProbed = true;
+    S.impostorRevealed = Math.random() < p;
+    S.settle = [S.impostorRevealed ? probe.successText : probe.failText];
+  }
+  function contactScreen(name, infoLines, thread, dial, probe){
     return {
       transient: true,
       render(){
@@ -2642,12 +2827,14 @@ const CONTENT = (() => {
         y += 6;
         y = option(y, '拨打电话', 'd');
         if (thread) y = option(y, '发消息', 'm');
+        if (probe) y = option(y, S.impostorProbed ? '再问一次' : '问一件只有他知道的事', 'p');
         option(y, '返回', 'Escape');
         softKeys('', '返回');
       },
       key(k){
         if (k === 'd'){ DIAL.who = dial; push('dialing'); }
         else if (k === 'm' && thread){ back(); go(thread); }
+        else if (k === 'p' && probe){ doProbe(probe); afterAction(); }
         else if (k === 'Escape' || k === 'softR' || k === 'Enter') back();
       }
     };
@@ -2657,6 +2844,7 @@ const CONTENT = (() => {
   SCREENS.contactRou = contactScreen(DOSSIER.cast.companion.label,
     ['备注: 每日提醒 ' + wStr, DOSSIER.cast.companion.msgCountLabel],
     'th_rou', DOSSIER.cast.companion.dial);
+  if (IMPOSTOR) SCREENS.contactImpostor = contactScreen(IMPOSTOR.label, IMPOSTOR.info, null, IMPOSTOR.dial, IMPOSTOR.probe);
 
   /* 拨号(拨打不属于"回复消息",不走违规经济) */
   SCREENS.dialing = {
