@@ -44,7 +44,7 @@ function boot(saveObj){
    动态读 RULE.from,见上),夹具补个 dossierId 就能跑三份底本共用同一套断言。 */
 function fixtures(dossierId){
   const base = { runCount:1, history:[{cacheVal:100, inst:'#7741-A'}] };
-  if (dossierId) Object.assign(base, { dossierId, history:[{cacheVal:100, inst:'#' + ({B:'5029',C:'3319',D:'8842'}[dossierId]) + '-A'}] });
+  if (dossierId) Object.assign(base, { dossierId, history:[{cacheVal:100, inst:'#' + ({B:'5029',C:'3319',D:'8842',E:'6153',F:'2087',G:'4419'}[dossierId]) + '-A'}] });
   return {
     with5502: Object.assign({}, base, { seenBottles:['#3120-K','#1177-B','#8891-R'] }),
     withOther: Object.assign({}, base, { seenBottles:['#5502-D','#1177-B'] })
@@ -73,7 +73,7 @@ function driveToViolation(g){
 }
 
 /* D-126:三份底本各跑一遍(dossierId=undefined 即默认底本A/phone-7741)。 */
-for (const dossierId of [undefined, 'B', 'C', 'D']){
+for (const dossierId of [undefined, 'B', 'C', 'D', 'E', 'F', 'G']){
   const tag = '[' + (dossierId || 'A') + '] ';
   const { with5502: B_SAVE_5502, withOther: B_SAVE_OTHER } = fixtures(dossierId);
 

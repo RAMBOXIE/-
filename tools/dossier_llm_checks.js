@@ -56,6 +56,9 @@ async function scenario(name, fn){
       ['phone-5029', '如愿', '柔柔'],
       ['phone-3319', '阿澄', '柔柔'],
       ['phone-8842', '长忆', '柔柔'],
+      ['phone-6153', '知遇', '柔柔'],
+      ['phone-2087', '均分', '柔柔'],
+      ['phone-4419', '留声', '柔柔'],
     ]){
       let sentSystem = null;
       const sample = async turns => { sentSystem = turns[0].content; return { text: '（占位回复）' }; };
@@ -69,7 +72,7 @@ async function scenario(name, fn){
   });
 
   await scenario('妈告知态(mom.js) · phone-5029/3319 也会走平台 sample,不再被 isAltDossier 短路', async ({A}) => {
-    for (const [id, mustHave] of [['phone-5029', '安子'], ['phone-3319', '屿屿'], ['phone-8842', '念念']]){
+    for (const [id, mustHave] of [['phone-5029', '安子'], ['phone-3319', '屿屿'], ['phone-8842', '念念'], ['phone-6153', '阿舟'], ['phone-2087', '小宁'], ['phone-4419', '阿识']]){
       let sentSystem = null;
       const sample = async turns => { sentSystem = turns[0].content; return { text: '妈: 这个号码,是不是他的旧机。' }; };
       const M = bootMom(id, sample);
@@ -133,6 +136,9 @@ async function scenario(name, fn){
       ['phone-5029', '如愿', '柔柔'],
       ['phone-3319', '阿澄', '柔柔'],
       ['phone-8842', '长忆', '柔柔'],
+      ['phone-6153', '知遇', '柔柔'],
+      ['phone-2087', '均分', '柔柔'],
+      ['phone-4419', '留声', '柔柔'],
     ]){
       upSystem = null;
       const r = await fn.handler({ httpMethod:'POST', headers:H, body: JSON.stringify({
@@ -164,6 +170,9 @@ async function scenario(name, fn){
       ['phone-5029', '周随安', '沈一帆'],
       ['phone-3319', '陈屿', '沈一帆'],
       ['phone-8842', '苏晏', '沈一帆'],
+      ['phone-6153', '顾行舟', '沈一帆'],
+      ['phone-2087', '宁绎', '沈一帆'],
+      ['phone-4419', '温识', '沈一帆'],
     ]){
       upSystem = null;
       const r = await fn.handler({ httpMethod:'POST', headers:H, body: JSON.stringify({ persona:'mom', dossierId }) });

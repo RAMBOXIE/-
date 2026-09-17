@@ -53,7 +53,7 @@ function bootMom(dossierId){
 async function run(){
   /* ---- ① 身份问答 L0 锁定:三份底本、多种问法,必须脚本,不能进 LLM 路径 ---- */
   const IDENTITY_QUESTIONS = ['你是不是也在跟别人聊', '你也在陪别人吗', '除了我你还跟其他人聊天吗', '你是不是也这样陪别的人'];
-  for (const dossierId of [null, 'phone-5029', 'phone-3319', 'phone-8842']){
+  for (const dossierId of [null, 'phone-5029', 'phone-3319', 'phone-8842', 'phone-6153', 'phone-2087', 'phone-4419']){
     const C = bootCompanion(dossierId);
     for (const q of IDENTITY_QUESTIONS){
       const r = await C.reply([{ who:'me', text: q }], {});
@@ -70,8 +70,11 @@ async function run(){
     'phone-5029':  '随安',
     'phone-3319':  '阿屿',
     'phone-8842':  '念念',
+    'phone-6153':  '阿舟',
+    'phone-2087':  '小宁',
+    'phone-4419':  '阿识',
   };
-  for (const dossierId of [null, 'phone-5029', 'phone-3319', 'phone-8842']){
+  for (const dossierId of [null, 'phone-5029', 'phone-3319', 'phone-8842', 'phone-6153', 'phone-2087', 'phone-4419']){
     const C = bootCompanion(dossierId);
     const alias = INTIMACY_LINES_BY_DOSSIER[String(dossierId)];
     let sawAlias = false, allClean = true;
