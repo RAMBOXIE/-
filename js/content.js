@@ -4304,8 +4304,14 @@ const CONTENT = (() => {
       if (this.page === 0){ this.page = 1; return; }
       S.beats.truthDone = true;
       ENGINE.logEv('truth_done', {});
+      /* D-146:通关根因修复(续)——D-145 让"案卷"真相能可靠弹出来了,但真机
+         复测发现玩家读完真相后,只给了一句"去X线程执行"的结算提示,自己
+         再没去找那个线程——"处置"永远没人点,S.disposal 永远不写,底本
+         永远不切。真相本来就是"呼吸屏:去她的线程执行处置"(见上方注释),
+         这里不再只是提示,直接把玩家送过去,"处置 · 署名时刻"当场就在
+         眼前,不需要玩家自己想起来该去哪找。 */
       S.settle = ['任务卡更新: 处置 · 在' + DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + '线程执行'];
-      back();
+      go('th_rou', true);
     }
   };
 
