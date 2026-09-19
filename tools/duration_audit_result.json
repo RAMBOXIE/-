@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-19T07:57:35.810Z",
+  "generatedAt": "2026-09-19T08:13:04.855Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -130,7 +130,7 @@
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2137,
+      "readChars": 2162,
       "decisionCount": 13,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -158,7 +158,7 @@
       "topScreens": [
         {
           "screen": "report",
-          "chars": 247
+          "chars": 273
         },
         {
           "screen": "menu",
@@ -199,29 +199,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.27,
+          "read": 4.32,
           "decision": 0.65,
           "wait": 0.74,
-          "total": 5.66
+          "total": 5.71
         },
         "普通": {
-          "read": 7.63,
+          "read": 7.72,
           "decision": 1.3,
           "wait": 0.74,
-          "total": 9.67
+          "total": 9.76
         },
         "沉浸": {
-          "read": 15.43,
+          "read": 15.61,
           "decision": 2.6,
           "wait": 0.74,
-          "total": 18.77
+          "total": 18.95
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2753,
+      "readChars": 2778,
       "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -266,12 +266,12 @@
           "chars": 306
         },
         {
-          "screen": "th_rou",
-          "chars": 249
+          "screen": "report",
+          "chars": 273
         },
         {
-          "screen": "report",
-          "chars": 248
+          "screen": "th_rou",
+          "chars": 249
         },
         {
           "screen": "inbox",
@@ -304,22 +304,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.51,
+          "read": 5.56,
           "decision": 1.2,
           "wait": 1.07,
-          "total": 7.78
+          "total": 7.83
         },
         "普通": {
-          "read": 9.83,
+          "read": 9.92,
           "decision": 2.4,
           "wait": 1.07,
-          "total": 13.3
+          "total": 13.39
         },
         "沉浸": {
-          "read": 19.88,
+          "read": 20.06,
           "decision": 4.8,
           "wait": 1.07,
-          "total": 25.75
+          "total": 25.93
         }
       }
     },

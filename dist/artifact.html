@@ -8110,9 +8110,22 @@ const CONTENT = (() => {
 
   /* ---- 结局:回收单 / 断连回执 ---- */
   SCREENS.report = {
+    /* D-148:失败结局的恐怖感——用户反馈"最终失败的恐怖感不足"。这一屏
+       是全项目唯一的失败/死亡结局出口(exhausted=力竭,其余=被捕获),
+       此前进屏没有任何冲击,直接是一份冷淡的数据报表。复用既有的屏幕
+       干扰原语(LCD.shake/L.R.corrupt/flicker),不新造视觉资产;恐怖
+       三律不破:不血腥,不露正脸,只在虚构屏幕内发生,时长收在 1 秒内。 */
     enter(){ this.page = 0; ENGINE.logEv('report_open', {});
-      writeSave(S.exhausted ? 'exhausted' : 'captured'); },
+      writeSave(S.exhausted ? 'exhausted' : 'captured');
+      LCD.shake(2.6, 340);
+      try { AUDIO.hiss(true); setTimeout(() => { try { AUDIO.hiss(false); } catch(_){} }, 220); } catch(_){}
+      this._glitchUntil = performance.now() + 900;
+    },
     render(){
+      if (this._glitchUntil){
+        if (performance.now() < this._glitchUntil){ L.R.corrupt = .06; L.R.flicker = .22; }
+        else { L.R.corrupt = .0004; L.R.flicker = 0; this._glitchUntil = null; }
+      }
       statusBar();
       const ev = Object.keys(S.evidence).length;
       const predLine = '预测命中: ' + S.predictions.filter(p => p.hit).length + '/' + S.predictions.length;
@@ -8123,8 +8136,11 @@ const CONTENT = (() => {
         else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
         else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
         else cf = '反事实: 上传之前,清洗和断连都还在。';
+        /* D-148:一句系统视角的冷观察,不写死亡细节本身,只写信号中断的
+           瞬间——恐怖感来自"它看着,没有犹豫",不来自任何画面描写。 */
         let t = '设备回收单 · #' + DOSSIER_NUM + (isB ? '-B' : '-A') + '\n────────────\n缓存价值: ¥' + S.cacheVal +
-          '\n未完成传输,全部散佚于原设备。\n' + (predLine ? predLine + '\n' : '') +
+          '\n未完成传输,全部散佚于原设备。\n信号格在那一刻从满格跳成零。没有中间过程,没有犹豫。\n' +
+          (predLine ? predLine + '\n' : '') +
           '致死因子: ' + S.causeOfDeath + '\n' + cf;
         L.drawPara(4, 16, t, W - 8);
         hit(0, 12, W, H - 28, 'Enter');
