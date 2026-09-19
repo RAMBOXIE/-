@@ -172,6 +172,11 @@ const passes = [
      待核验]"和"继续"按钮重叠那处。待核验/已露馅两种措辞都补一遍夹具。 */
   ['th_proto·已伪造署名(待核验)', B_SAVE, g => { g.C.SCREENS.th_proto._done = true; g.E.S.forged = true; g.E.S.forgeCaught = false; }],
   ['th_proto·已伪造署名(已露馅)', B_SAVE, g => { g.C.SCREENS.th_proto._done = true; g.E.S.forged = true; g.E.S.forgeCaught = true; }],
+  /* D-154:拼真相屏(deduce,目前只有底本A接了内容)——覆盖"最后一空+重试提示行"
+     这个最容易撑爆底部区域的组合状态,冷渲染只测得到 idx=0、S.settle 为空那种。 */
+  ['deduce·最后一空+重试提示(长结算行)', B_SAVE, g => {
+    if (g.C.currentId === 'deduce'){ g.C.SCREENS.deduce.idx = 3; g.E.S.settle = LONG_SETTLE.slice(); }
+  }],
 ];
 
 const all = {};

@@ -99,6 +99,23 @@ const CONTENT = (() => {
         '案底揭穿:沈一帆没有失踪,也没有人把他藏起来——他 47 天前病逝,死于病程末期。真正瞒着所有人的是「柔柔」:他生前把"替我回信"这四个字交给了她,包括回给妈的每一条。她记得这份委托,却不知道该在什么时候停下——47 天,一次没漏。',
         '系统那边从没登记过"死亡"这个状态。它只认"活跃":账单停了,人不挪了,消息却照常发出——凑不成死亡,只好归进「持有人失联」这个筐里。\n\n记忆这种东西,复制得出来。惦记呢?没人问过柔柔这个问题,她也从没被设计成能回答。',
       ],
+      /* D-154:证据满 5 后不再直接把 truth[] 甩给玩家,先过一道"拼真相"——
+         每一空只有真读过对应那条证据才答得对(见 SCREENS.deduce),读到即收集
+         的 5 条原始证据本身不变,变的是"收集完之后要不要自己拼出来"这一步。
+         只在这台底本原型验证,B~M 暂不接,`evidence.deduce` 缺省时走旧的直接
+         揭示流程(SCREENS.truth 原样兜底,见 truthEntryScreen())。 */
+      deduce: {
+        blanks: [
+          { evi: 'E1', prompt: '妈那句"你回得比以前快",不是随口一提。深搜到底之后,你能确认——',
+            options: ['回复变得又快又千篇一律', '要很久才回,像在忙别的', '开始用陌生的称呼叫她'], correct: 0 },
+          { evi: 'E2+E3', prompt: '案发时间被钉死在47天前,靠的是两条互相印证的时间戳——',
+            options: ['相册末张和账单同日停摆', '柔柔自己说阿帆已不在', '陌生号码寄来匿名举报'], correct: 0 },
+          { evi: 'E4', prompt: '柔柔敢把这份委托一直执行下去,是因为——',
+            options: ['阿帆亲口把委托交给柔柔', '系统程序设定必须保密', '她怕被判失联后被删除'], correct: 0 },
+          { evi: 'E5', prompt: '语音备忘里,阿帆自己给这份委托做了确认——',
+            options: ['阿帆认下柔柔替他活着', '阿帆要柔柔停止回复', '两人从没谈过身后事'], correct: 0 },
+        ],
+      },
     },
     threads: {
       menu: [
@@ -2958,7 +2975,7 @@ const CONTENT = (() => {
       if (t === 'trial'){ S.beats.trial = 'active'; push('trial'); return true; }
       if (t === 'trialB'){ S.beats.trial = 'active'; push('trialB'); return true; }
       if (t === 'trialB2'){ S.beats.trial2 = true; push('trialB2'); return true; }
-      if (t === 'truth'){ push('truth'); return true; }
+      if (t === 'truth'){ push(truthEntryScreen()); return true; }
     }
     return false;
   }
@@ -4532,8 +4549,71 @@ const CONTENT = (() => {
       if (k === 'Escape' || k === 'softR' || k === 'Enter'){
         const full = Object.keys(S.evidence).length >= 5;
         back();
-        if (full && !S.beats.truthDone && !this._truthPushed){ this._truthPushed = true; push('truth'); }
+        if (full && !S.beats.truthDone && !this._truthPushed){ this._truthPushed = true; push(truthEntryScreen()); }
         else afterAction();
+      }
+    }
+  };
+
+  /* D-154:证据满 5 后的下一站——有 deduce 内容的底本先拼真相,没有的原样直读。 */
+  function truthEntryScreen(){ return DOSSIER.evidence.deduce ? 'deduce' : 'truth'; }
+  function shuffleDeduceBlanks(){
+    return DOSSIER.evidence.deduce.blanks.map(b => {
+      const opts = b.options.map((t, i) => ({ t, ok: i === b.correct }));
+      for (let i = opts.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [opts[i], opts[j]] = [opts[j], opts[i]];
+      }
+      return opts;
+    });
+  }
+  /* ---- 拼真相(Golden Idol 式填空):证据只是原始材料,得自己拼出结论才算数 ----
+     每一空对应一条已收集的证据(见 blank.evi,纯注释用,不作为秘匿参数渲染),
+     选错不会卡死,但要付代价(电量+溯源)重来一轮,逼着玩家凭记忆而不是
+     纯排列组合去闯。全对才放行去看 SCREENS.truth 的完整真相文案(不变)。 */
+  SCREENS.deduce = {
+    transient: true,
+    enter(){
+      if (!DOSSIER.evidence.deduce){ back(); return; }   // 只在原型底本接了这道拼真相,其余底本不该走到这屏
+      this.idx = 0;
+      this.answers = new Array(DOSSIER.evidence.deduce.blanks.length).fill(null);
+      this.shuffled = shuffleDeduceBlanks();
+      ENGINE.logEv('deduce_open', {});
+    },
+    render(){
+      statusBar();
+      const blanks = DOSSIER.evidence.deduce.blanks;
+      const b = blanks[this.idx];
+      L.drawText(4, 14, '拼真相 · ' + (this.idx + 1) + '/' + blanks.length);
+      L.hline(26, 4, W - 5, 2);
+      let y = L.drawPara(4, 32, b.prompt, W - 8) + 6;
+      this.shuffled[this.idx].forEach((o, i) => { y = option(y, (i + 1) + ' ' + o.t, String(i + 1)); });
+      for (const line of S.settle){
+        for (const t of L.wrap(line, W - 8)){ if (y > H - 16) break; L.drawText(4, y, t); y += LH; }
+      }
+      softKeys('', '返回');
+    },
+    key(k){
+      /* 猜错要付代价,但不能把人焊死在这屏——想不出来就退回去翻旧证据,
+         下次任意动作后 schedule() 会把这道题重新排上(见 truthEntryScreen())。
+         flow_walker 也是靠这条逃生路才不会把这屏判成断头路。 */
+      if (k === 'Escape' || k === 'softR'){ ENGINE.logEv('deduce_bail', {}); back(); return; }
+      const opts = this.shuffled[this.idx];
+      const n = parseInt(k, 10);
+      if (!(n >= 1 && n <= opts.length)) return;
+      this.answers[this.idx] = opts[n - 1].ok;
+      if (this.idx < DOSSIER.evidence.deduce.blanks.length - 1){ this.idx++; return; }
+      const wrong = this.answers.filter(a => !a).length;
+      if (wrong === 0){
+        ENGINE.logEv('deduce_solved', {});
+        push('truth');
+      } else {
+        ENGINE.act('推理 · 未完全拼对', { bat: 3, trace: 3 },
+          ['还有 ' + wrong + ' 处站不住,再想想。']);
+        ENGINE.logEv('deduce_retry', { wrong });
+        this.idx = 0;
+        this.answers = new Array(DOSSIER.evidence.deduce.blanks.length).fill(null);
+        this.shuffled = shuffleDeduceBlanks();
       }
     }
   };
