@@ -167,6 +167,11 @@ const passes = [
      静态夹具默认不触发这两个条件(msgQuota/hunt 都是运行时状态),补一遍强制置位的
      渲染,确保它们各自的按钮行不会把其余选项挤出屏或压住软键。 */
   ['B局·回收进程倒计时中(喂假数据可见)', B_SAVE, g => { g.E.S.hunt = { steps: 2 }; g.E.S.cacheSlots = 3; g.E.S.cacheVal = 900; }],
+  /* D-153:th_proto 的"已伪造署名"分支只在 S.forged 置位后才会多画一行状态文字,
+     冷渲染永远走不到这个状态,门禁从来没照过它——正是这次真机撞见的"[已伪造署名 ·
+     待核验]"和"继续"按钮重叠那处。待核验/已露馅两种措辞都补一遍夹具。 */
+  ['th_proto·已伪造署名(待核验)', B_SAVE, g => { g.C.SCREENS.th_proto._done = true; g.E.S.forged = true; g.E.S.forgeCaught = false; }],
+  ['th_proto·已伪造署名(已露馅)', B_SAVE, g => { g.C.SCREENS.th_proto._done = true; g.E.S.forged = true; g.E.S.forgeCaught = true; }],
 ];
 
 const all = {};

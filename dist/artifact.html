@@ -6627,12 +6627,16 @@ const CONTENT = (() => {
         let head = ['采样官: ' + S.directive.line];
         if (S.trap) head = head.concat(L.wrap(S.trap.line, SCROLL_W));
         const canForge = !S.forged && !S.directive.met();
-        const rows = canForge ? 2 : 1;
+        /* D-153:S.forged 分支多画一行"[已伪造署名…]"状态文字,却一直沿用 canForge
+           那套"1 行=不占额外行"的 rows 计算,导致这行状态文字和下面的"继续"按钮
+           挤在同一个 y——挤出来就是文字和按钮重叠。canForge/已伪造 两种情况都要
+           多占一行,只有"什么都没发生"的默认态才是纯 1 行。 */
+        const rows = (canForge || S.forged) ? 2 : 1;
         const lines = head.concat(['']).concat(L.wrap(PROTO_TXT, SCROLL_W)).concat(settleFlat(SCROLL_W));
         scrollView(lines, 16, H - 15 - rows * 23 - 4, this);
         let y = H - 15 - rows * 23;
         if (canForge) y = option(y, '伪造署名达标 · 赌一把', 'F');
-        else if (S.forged) { L.drawText(4, y - 2, S.forgeCaught ? '[署名已被核验:伪造露馅]' : '[已伪造署名 · 待核验]'); }
+        else if (S.forged) { L.drawText(4, y - 2, S.forgeCaught ? '[署名已被核验:伪造露馅]' : '[已伪造署名 · 待核验]'); y += 23; }
         option(y, '继续', 'Enter');
       }
       softKeys('', '返回');
