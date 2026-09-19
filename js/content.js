@@ -3223,6 +3223,101 @@ const CONTENT = (() => {
 
   /* ==================== 剧本 B 屏群结束(收束屏在下方各处分支) ==================== */
 
+  /* D-149:仪式感——用户反馈"切到下一台机子,开机动画不该还是最开始那个
+     握手,需要暗示新故事"。开机整体节奏(标题"欲望算法"淡入/副标题/OS
+     行的时序)保留不变——那是产品本身的开机品牌,不是某个案子的专属
+     内容;只把中央那段图形动画换成按底本区分的图案,13 台底本各自
+     不同,不再共用同一份握手动画。全部复用已有绘图原语(rect/disc/
+     frameRect/hline/setPx/ring),不新增素材文件。 */
+  function drawMotifFeed(p, my){                       // B·如愿:信息流瀑布式刷新
+    for (let i = 0; i < 5; i++){
+      const rowP = Math.min(1, Math.max(0, p * 5 - i));
+      if (rowP <= 0) continue;
+      const y = my - 24 + i * 12;
+      L.rect(30, y, Math.round(136 * rowP), 4, 1);
+    }
+  }
+  function drawMotifStamp(p, my){                       // C·阿澄:审核印章落下
+    const drop = Math.round((my - 60) * Math.pow(1 - p, 2));
+    L.frameRect(78, my - 40 + drop, 40, 18);
+    L.hline(my - 31 + drop, 84, 112, 2);
+    if (p > .7) L.ring(98, my + 6, 14 + Math.round((p - .7) * 20), 2);
+  }
+  function drawMotifCloudSync(p, my){                   // D·长忆:云盘同步
+    L.disc(78, my, 16, 1); L.disc(94, my - 6, 12, 1); L.disc(110, my, 15, 1);
+    L.rect(72, my, 46, 12, 1);
+    const a = p * Math.PI * 4;
+    L.setPx(98 + Math.round(Math.cos(a) * 10), my + Math.round(Math.sin(a) * 10), 1);
+    L.setPx(98 + Math.round(Math.cos(a + Math.PI) * 10), my + Math.round(Math.sin(a + Math.PI) * 10), 1);
+  }
+  function drawMotifMatch(p, my){                       // E·知遇:雷达匹配
+    L.ring(98, my, Math.round(4 + p * 30), 1);
+    const a = p * Math.PI * 6;
+    L.disc(98 + Math.round(Math.cos(a) * 26), my + Math.round(Math.sin(a) * 26), 3, 1);
+    L.disc(70, my + 10, 3, 1); L.disc(126, my - 10, 3, 1);
+    if (p > .8) L.hline(my, 70, 126, 2);
+  }
+  function drawMotifStars(p, my){                       // F·均分:星级评分
+    for (let i = 0; i < 5; i++){
+      if (p * 5 < i) continue;
+      const x = 58 + i * 20;
+      L.rect(x, my - 2, 6, 6, 1); L.setPx(x + 2, my - 5, 1); L.setPx(x + 2, my + 8, 1);
+    }
+  }
+  function drawMotifReel(p, my){                        // G·留声:磁带卷轴
+    const a = p * Math.PI * 8;
+    L.ring(72, my, 14, 2); L.ring(124, my, 14, 2);
+    L.setPx(72 + Math.round(Math.cos(a) * 8), my + Math.round(Math.sin(a) * 8), 1);
+    L.setPx(124 + Math.round(Math.cos(-a) * 8), my + Math.round(Math.sin(-a) * 8), 1);
+    L.hline(my, 86, 110, 3);
+  }
+  function drawMotifGenerate(p, my){                    // H·拟真:马赛克蜕变
+    for (let j = 0; j < 6; j++) for (let i = 0; i < 14; i++){
+      const settled = Math.random() < p;
+      L.setPx(64 + i * 5, my - 15 + j * 5, settled ? ((i + j) % 3 === 0 ? 1 : 0) : (Math.random() < .5 ? 1 : 0));
+    }
+  }
+  function drawMotifRedact(p, my){                      // I·慎言:涂黑审查
+    L.hline(my, 40, 156, 2);
+    const n = Math.round(p * 5);
+    for (let i = 0; i < n; i++) L.rect(46 + i * 22, my - 4, 16, 8, 1);
+  }
+  function drawMotifHunt(p, my){                        // J·晚知:回收单元追猎
+    const a = p * Math.PI * 5;
+    L.disc(98 + Math.round(Math.cos(a) * 30), my + Math.round(Math.sin(a) * 10), 3, 1);
+    L.ring(98 + Math.round(Math.cos(a + .6) * (30 - p * 20)), my + Math.round(Math.sin(a + .6) * (10 - p * 6)), 8, 1);
+  }
+  function drawMotifWave(p, my){                        // K·接续:调度声波
+    for (let i = 0; i < 18; i++){
+      const amp = 3 + Math.round(Math.abs(Math.sin(i * .8 + p * 10)) * 14);
+      L.rect(40 + i * 6, my - amp / 2, 3, amp, 1);
+    }
+  }
+  function drawMotifMirror(p, my){                      // L·描摹:镜面对称
+    L.hline(my - 20 + Math.round(p * 40), 96, 100, 1);
+    L.disc(98 - Math.round(20 * p), my, 10, 1);
+    L.disc(98 + Math.round(20 * p), my, 10, 1);
+  }
+  function drawMotifEcg(p, my){                         // M·看护:心电监测
+    const n = 40, x0 = 28;
+    for (let i = 0; i < n * p; i++){
+      const x = x0 + i * 3.5;
+      const spike = i % 12 === 6 ? -18 : (i % 12 === 7 ? 14 : 0);
+      L.setPx(Math.round(x), my + spike, 1);
+    }
+  }
+  const BOOT_MOTIF = {
+    A: drawHumanHand, B: drawMotifFeed, C: drawMotifStamp, D: drawMotifCloudSync,
+    E: drawMotifMatch, F: drawMotifStars, G: drawMotifReel, H: drawMotifGenerate,
+    I: drawMotifRedact, J: drawMotifHunt, K: drawMotifWave, L: drawMotifMirror, M: drawMotifEcg,
+  };
+  function drawBootMotif(p, my){
+    const letter = (SV && SV.dossierId) || 'A';
+    const fn = BOOT_MOTIF[letter];
+    if (letter === 'A'){ drawHumanHand(p, my); drawRobotHand(p, my); }
+    else if (fn) fn(p, my);
+    else { drawHumanHand(p, my); drawRobotHand(p, my); }
+  }
   /* ---- 开机:握手动画(人手 × 机器手) ---- */
   function drawHumanHand(p, my){
     const o = Math.round(-64 + 64 * p);
@@ -3264,10 +3359,10 @@ const CONTENT = (() => {
       const p = Math.min(1, t / 1.3);
       const ease = 1 - Math.pow(1 - p, 3);
       const my = 136;
-      drawHumanHand(ease, my);
-      drawRobotHand(ease, my);
+      const letter = (SV && SV.dossierId) || 'A';
+      drawBootMotif(ease, my);
       if (t > 1.3){
-        if (t < 1.9) spark(94, my - 2);
+        if (t < 1.9 && letter === 'A') spark(94, my - 2);
         const title = '欲望算法';
         L.drawTextScaled(cxof(title, 2), 30, title, 2,
           { threshold: Math.max(L.R.threshold, .9 - (t - 1.3) * .5) });
