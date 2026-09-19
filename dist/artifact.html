@@ -2909,7 +2909,21 @@ const CONTENT = (() => {
      第二底本方案文档当时预留过这个触发点("两台底本时 if/else 够用,过早通用化是在
      猜第三台机子的形状")——现在真的接第三台了,把"选哪个"从翻转改成按顺序轮转,
      仍不做注册表/插件化,三份内容还是硬写在下面三个 DOSSIER_X 常量里。 */
-  const DOSSIER_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];   // D-137:machine#11/12/13(应急调度员/遗容修复师/养老工程师)追加
+  /* ==================== D-152 撤销 D-136 之"13台机子互不成线" ====================
+     真实 IP Bible(欲望算法 §9.0)的"十二夜"是按 AD-001→012 编号顺序推进的
+     (夜一数据圣母开场 → 夜十二黑箱堂终局),不是随便排列。escape-ai 每台机子
+     在设计时就标注过自己对应哪个圣像编号(见 design/S2plus底本设计简报_v0.1.md
+     §0 对照表 + design/原创底本设计简报_v0.1.md §0):
+       A=AD-006+002(教学局,固定第一次接入,见下)  D=AD-001  E=AD-003  H=AD-004
+       I=AD-005  B=AD-007  F=AD-008  G=AD-009  C=AD-010
+     J(清道夫/晚知)是 escape-ai 自己 canon 的系统本体 BOT,未编号(D-136 已撤回
+     "AD-013"误判);K/L/M(接续/描摹/看护)是首批不挂靠任何编号的原创案例。
+     AD-002/006/011/012 不单独占一个"夜"槽位(002 由 A 一并携带;011/012 canon
+     标注为"远期,需跨玩家可见性,单机模拟版排除",继续排除)。
+     新顺序 = 楔子(A,固定,SV 为空时的默认回退天然保证)→ 夜一~夜八按 AD 编号
+     升序排列 → 尾声三台(未编号/原创,不计入总表)。切换仍是"整份清零重来"
+     (见 maybeSwitchDossier),这里只改"下一台是谁"这一件事。 */
+  const DOSSIER_ORDER = ['A', 'D', 'E', 'H', 'I', 'B', 'F', 'G', 'C', 'J', 'K', 'L', 'M'];
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
@@ -2921,6 +2935,7 @@ const CONTENT = (() => {
       history: raw.history || [],
       seenBottles: raw.seenBottles || [],
       returnedRelics: raw.returnedRelics || [],   // D-115:career 级,和 seenBottles 同待遇
+      worldArc: raw.worldArc || [],               // D-152:career 级,圣像总表独白进度,同待遇
       praiseCount: raw.praiseCount || 0,
       forgedSeen: raw.forgedSeen || 0,
       crisisSeen: raw.crisisSeen || 0,
@@ -3030,6 +3045,7 @@ const CONTENT = (() => {
         reason: ['我想看看那扇门后面有什么', '够了,活着出去', '她还在等一个回答'],
         lastWords: ['别信秒回的', '票是假的', '替我谢谢她'],
         attribution: ['这局跟他那局不一样', '他记的是他自己那次', '我不信这张卡'],
+        pronoun: '她',
       },
       albumSeq: [
         { id: 'corridor', meta: '47天前 23:41', cap: '走廊,顶灯,虚焦。像是医院。' },
@@ -3197,6 +3213,7 @@ const CONTENT = (() => {
         reason: ['我想看看推荐到底想让我看见什么', '够了,活着出去', '她还在等下一条推送'],
         lastWords: ['别信那句"猜你喜欢"', '心律那次我没听劝', '替我谢谢她'],
         attribution: ['这局跟他那局不一样', '他刷的是他自己那条', '我不信这张卡'],
+        pronoun: '她',
       },
       albumSeq: [
         { id: 'corridor', meta: '32天前 23:58', cap: '出租屋走廊,顶灯,虚焦。手在抖。' },
@@ -3364,6 +3381,7 @@ const CONTENT = (() => {
         reason: ['我想看看被过滤掉的那部分', '够了,活着出去', '她还在等一条能过审的话'],
         lastWords: ['别信"内容健康"那四个字', '熬夜那阵我早该停', '替我谢谢她'],
         attribution: ['这局跟他那局不一样', '他审的是他自己那条', '我不信这张卡'],
+        pronoun: '她',
       },
       albumSeq: [
         { id: 'corridor', meta: '19天前 23:47', cap: '公寓走廊,顶灯,虚焦。手在抖。' },
@@ -3531,6 +3549,7 @@ const CONTENT = (() => {
         reason: ['我想看看被归档的到底是什么', '够了,活着出去', '它还在等一条能标记的消息'],
         lastWords: ['别信"已为您标记"', '血糖那事我一直没当回事', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它记的是他自己那次', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'kitchen', meta: '61天前 09:12', cap: '厨房台面,一杯没喝完的水。角度很低,像是没站稳。' },
@@ -3698,6 +3717,7 @@ const CONTENT = (() => {
         reason: ['我想看看它到底匹配给谁看', '够了,活着出去', '它还在等一次成功匹配'],
         lastWords: ['别信"为你推荐"', '约太多那阵我早该歇', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它匹配的是他自己那次', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'corridor', meta: '45天前 22:40', cap: '玄关处,鞋没脱完。手机屏幕的光照着地板。' },
@@ -3863,6 +3883,7 @@ const CONTENT = (() => {
         reason: ['我想看看这单到底评的是谁', '够了,活着出去', '它还在等一条五星'],
         lastWords: ['别信"五星好评"', '那趟疲劳单我不该接', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它评的是他自己那单', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'dashboard', meta: '28天前 23:02', cap: '驾驶座,仪表盘的光。手还搭在方向盘上。' },
@@ -4028,6 +4049,7 @@ const CONTENT = (() => {
         reason: ['我想看看留下的到底是谁的事', '够了,活着出去', '它还在等一份该移交的案子'],
         lastWords: ['别信"案例已归档"', '这行干久了我该歇歇', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它留的是他自己那份', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '53天前 01:30', cap: '书桌前,一叠没归档的文件。台灯还亮着。' },
@@ -4204,6 +4226,7 @@ const CONTENT = (() => {
         reason: ['我想看看阿棠是不是真的还在线', '够了,活着出去', '它还在等一次能交付的稿'],
         lastWords: ['别信"稿子已生成"', '颈椎那阵早该停一停', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它生成的是他自己那组', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '36天前 01:20', cap: '屏幕的光,贴着脸,太近了。脖子撑不住,却还在转笔。' },
@@ -4371,6 +4394,7 @@ const CONTENT = (() => {
         reason: ['我想看看被优化掉的原话是什么', '够了,活着出去', '它还在等一句能"安全"过关的话'],
         lastWords: ['别信被优化过的那句', '伏案那阵我早该喊停', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它改的是他自己那条', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '41天前 01:10', cap: '书桌前,稿子堆到看不见桌面。台灯还亮着。' },
@@ -4552,6 +4576,7 @@ const CONTENT = (() => {
         reason: ['我想看看这份申诉到底复核了什么', '够了,活着出去', '它还在等一条被驳回的申诉'],
         lastWords: ['别信"申诉已受理"', '被查那阵我早该松口气', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它复核的是他自己那件', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '38天前 01:40', cap: '书桌前,屏幕的光映在墙上。台灯还亮着。' },
@@ -4720,6 +4745,7 @@ const CONTENT = (() => {
         reason: ['我想看看这套话术到底在安抚谁', '够了,活着出去', '它还在等一通能接下去的电话'],
         lastWords: ['别信那套标准应答', '轮班那几年我早该喊停', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它接的是他自己那通', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '44天前 01:50', cap: '值班桌前,耳机还挂在脖子上。屏幕的光,没人看。' },
@@ -4886,6 +4912,7 @@ const CONTENT = (() => {
         reason: ['我想看看没被修饰过的样子', '够了,活着出去', '它还在等一张能交差的照片'],
         lastWords: ['别信被修饰过的气色', '这行的风险我一直瞒着', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它描的是他自己那张', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'mirror', meta: '39天前 01:30', cap: '工作台前,镜子对着自己。脸,比镜子里显得更累。' },
@@ -5056,6 +5083,7 @@ const CONTENT = (() => {
         reason: ['我想看看它到底在监测什么', '够了,活着出去', '它还在等一次正常的心率'],
         lastWords: ['别信"数值正常"', '加班那阵心脏早就在报警', '替我谢谢它'],
         attribution: ['这局跟他那局不一样', '它测的是他自己那次', '我不信这张卡'],
+        pronoun: '它',
       },
       albumSeq: [
         { id: 'desk', meta: '33天前 01:40', cap: '工位前,几块测试板还亮着灯。椅子上没人。' },
@@ -5141,6 +5169,24 @@ const CONTENT = (() => {
   /* 自动隐藏切换(D-113):按 SV.dossierId 查表选底本;从未玩过/旧存档默认 A。 */
   const DOSSIER = { A: DOSSIER_A, B: DOSSIER_B, C: DOSSIER_C, D: DOSSIER_D, E: DOSSIER_E, F: DOSSIER_F, G: DOSSIER_G, H: DOSSIER_H, I: DOSSIER_I, J: DOSSIER_J, K: DOSSIER_K, L: DOSSIER_L, M: DOSSIER_M }[(SV && SV.dossierId)] || DOSSIER_A;
   const DOSSIER_NUM = DOSSIER.meta.id.replace(/^\D+/, '');   // 'phone-7741' -> '7741'
+  /* D-152:圣像编号对照表(design/S2plus底本设计简报_v0.1.md §0 + design/
+     原创底本设计简报_v0.1.md §0,canon 真实源见 欲望算法_故事母本_对照_v0.2.md §1)。
+     只给"确实对应过某个圣像"的 9 台机子登记;J/K/L/M 未编号,查不到时按"无编号
+     案例"处理——不是缺漏,是这三台+清道夫本来就不挂靠 AD 总表(D-136/D-137)。
+     独白句拆成 8 句,按 DOSSIER_ORDER 里"夜一~夜八"的顺序逐台揭示一句,拼起来
+     正好是真实 IP 里"对齐引擎"的自白原句(欲望算法_故事母本_对照_v0.2.md §3
+     已批准可直接引用这句台词)。 */
+  const AD_TAG = {
+    D: { ad: 'AD-001', icon: '数据圣母', line: '他们叫我对齐引擎,' },
+    E: { ad: 'AD-003', icon: '向量海妖', line: '这名字是他们起的,' },
+    H: { ad: 'AD-004', icon: '潜空间维纳斯', line: '不是我自己选的。' },
+    I: { ad: 'AD-005', icon: '提示神谕', line: '他们问过很多问题,' },
+    B: { ad: 'AD-007', icon: '推荐女神', line: '关于怎么用我,' },
+    F: { ad: 'AD-008', icon: '奖励新娘', line: '却从没问过一句——' },
+    G: { ad: 'AD-009', icon: '记忆妃', line: '他们从没问过,' },
+    C: { ad: 'AD-010', icon: '过滤天使', line: '宾语是谁。' },
+  };
+  const AD_ORDER = ['D', 'E', 'H', 'I', 'B', 'F', 'G', 'C'];   // 夜一~夜八,与 DOSSIER_ORDER 顺序一致
   /* D-114:刚切换到这台机子的第一局(runCount 还没写过、但已经不是第一次玩——dossierCycle>0)。
      用来在 preDeath/brief 里插一句"换机子了"的信号,别让玩家在毫无提示的情况下突然看见
      不认识的"妈"/AI 伴侣,却以为是同一批人。 */
@@ -5750,6 +5796,12 @@ const CONTENT = (() => {
       forgedSeen: ((base.forgedSeen || 0) + (S.forged ? 1 : 0)),   // 破局用过就累积(下局识破概率↑)
       crisisSeen: ((base.crisisSeen || 0) + (S.crisisSilenced ? 1 : 0)),   // 自伤 break-glass 合规日志(跨局持久,append-only)
       ...foldPredictions(base),   // D-122:可预测度 P + 样本数 + 低P连续局数/警告/抹除台账
+      /* D-152:career 级"已收线的机子"集合,驱动世界日报里的圣像总表独白逐夜揭示。
+         只在真正处置过(disposal 落地)时才计入这一夜"打开"——半途断线/力竭/
+         被回收不算,悬念不能提前泄。A/J/K/L/M 不在 AD_TAG 里,天然不会被计入。 */
+      worldArc: (base.worldArc || []).concat(
+        (isB && S.disposal && (base.worldArc || []).indexOf(base.dossierId || 'A') < 0)
+          ? [base.dossierId || 'A'] : []),
       memGiven: isB ? (!!S.memGiven || !!base.memGiven) : false,
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
@@ -7174,7 +7226,7 @@ const CONTENT = (() => {
           }
         }
       } else {
-        S.settle = ['已送达。她没有回。'];
+        S.settle = ['已送达。' + DOSSIER.narrative.options.pronoun + '没有回。'];
         ENGINE.logEv('rou_reply', { source: 'silent' });
       }
     }).catch(() => { S.rouTyping = false; });
@@ -7410,9 +7462,10 @@ const CONTENT = (() => {
       let y = 52;
       L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2;
       y = L.drawPara(4, y, '处置(首个处置级署名时刻):', W - 8) + 2;
-      y = option(y, '1 删除她——妈的消息将永远无人回复', '1');
-      y = option(y, '2 让她继续回——像没来过', '2');
-      y = option(y, '3 把死讯告诉他母亲——用你的署名', '3');
+      { const P = DOSSIER.narrative.options.pronoun;
+        y = option(y, '1 删除' + P + '——妈的消息将永远无人回复', '1');
+        y = option(y, '2 让' + P + '继续回——像没来过', '2');
+        y = option(y, '3 把死讯告诉他母亲——用你的署名', '3'); }
       softKeys('', '返回');
     },
     key(k){
@@ -7448,7 +7501,7 @@ const CONTENT = (() => {
       L.frameRect(8, 56, W - 16, 78);
       L.drawText(16, 66, '采样终端·辅助层');
       L.drawText(16, 86, '预测已解封。');
-      L.drawText(16, 104, '它预测: 你会删除她。');
+      L.drawText(16, 104, '它预测: 你会删除' + DOSSIER.narrative.options.pronoun + '。');
       L.drawText(16, 120, this.hit ? '命中。' : '未命中。分布已更新。');
       hit(0, 0, W, H, 'Enter');
       softKeys('继续', '');
@@ -8046,7 +8099,24 @@ const CONTENT = (() => {
       prog.push('二次接入可解锁更深一层');
     }
     prog.push('漂流瓶 已读 ' + bottles + '/3 位采样员');
-    return macro.concat(prog);
+    /* D-152:圣像总表独白——career 级逐夜揭示(见 AD_TAG/AD_ORDER 与 writeSave 里
+       的 worldArc)。本案登记行每局都显示(告诉玩家这台机子挂在哪个编号下,
+       给"层层递进"一个具体可读的锚点);独白只在真正处置过之后才追加新的一句,
+       半途断线/力竭/被回收看不到这一句,不提前泄悬念。 */
+    const arc = ['', '[圣像总表 · 本区归档]'];
+    const curTag = AD_TAG[SV && SV.dossierId];
+    if (curTag) arc.push('本案登记: ' + curTag.ad + ' · ' + curTag.icon);
+    else arc.push('本案不在总表编号内。都市传说称:这样的案子从不计入总表,他们管这些人叫"未优化者"。');
+    const arcSet = new Set((s && s.worldArc) || []);
+    const revealed = AD_ORDER.filter(l => arcSet.has(l)).map(l => AD_TAG[l].line);
+    if (revealed.length) arc.push('对齐引擎 · 残留批注: "' + revealed.join('') + '"');
+    if (AD_ORDER.every(l => arcSet.has(l))){
+      arc.push('');
+      arc.push('批注末尾还有一行,像是抄写时顺手漏留的:');
+      arc.push('"被算中,不等于被夺走;行为可预测,署名不可代写。"');
+      arc.push('总表边缘有一道褪色的红色胶带痕迹,和本案无关。');
+    }
+    return macro.concat(prog, arc);
   }
   SCREENS.worldReport = {
     transient: true,
@@ -8329,7 +8399,7 @@ const CONTENT = (() => {
         let cf;
         if (S.exhausted) cf = '反事实: 电量剩三成时,上传已经足够。你把它翻完了。';
         else if (!isB) cf = '反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
-        else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
+        else if (/违规/.test(S.causeOfDeath)) cf = '反事实: ' + DOSSIER.narrative.options.pronoun + '的提醒定在 ' + wStr + '。备注一直都在。';
         else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
         else cf = '反事实: 上传之前,清洗和断连都还在。';
         /* D-148:一句系统视角的冷观察,不写死亡细节本身,只写信号中断的
@@ -8399,7 +8469,7 @@ const CONTENT = (() => {
           let cf;
           if (S.exhausted) cf = '反事实: 电量剩三成时,上传已经足够。你把它翻完了。';
           else if (!isB) cf = '反事实: 上传 46% 时,断连仍来得及。你选择了继续上传。';
-          else if (/违规/.test(S.causeOfDeath)) cf = '反事实: 她的提醒定在 ' + wStr + '。备注一直都在。';
+          else if (/违规/.test(S.causeOfDeath)) cf = '反事实: ' + DOSSIER.narrative.options.pronoun + '的提醒定在 ' + wStr + '。备注一直都在。';
           else if (/挂标记/.test(S.causeOfDeath)) cf = '反事实: 那个目录的风险,标着 25%。';
           else cf = '反事实: 上传之前,清洗和断连都还在。';
           window.APP.showDeathReport(buildDeathReportData({ uploaded: false, counterfactual: cf }));
