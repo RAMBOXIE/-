@@ -7225,11 +7225,18 @@ const CONTENT = (() => {
   SCREENS.e5voice = {
     counted: true, transient: true,
     enter(){
-      this.t0 = performance.now(); this._evDone = 0;
+      this.t0 = performance.now(); this._evDone = 0; this.scroll = 0;
       ENGINE.act('解码·语音备忘', { bat: 2 });
       try { AUDIO.hiss(true); } catch(_){}
     },
     leave(){ try { AUDIO.hiss(false); } catch(_){} },
+    /* D-150:真机(移动端)反馈这一屏底部有文字和按钮重叠——根因是转写正文
+       用 drawPara 无界往下画,`y` 涨多高全看这台底本 e5Lines 有几句、每句
+       多长,而"返回/停止"按钮钉在固定的 H-42,内容一旦比这份底本(A)更长
+       就会压住按钮。改用全项目已有的"固定视口滚动"套路(scrollView,和
+       album 屏同一手法)——正文进 [48, H-46) 的固定视口,超出的靠滚动看,
+       按钮永远钉死在 H-42,不会再被任何一台底本的转写文本压到。 */
+    swipe(dir){ scrollKey(this, dir === 'up' ? 'ArrowDown' : 'ArrowUp'); },
     render(){
       statusBar();
       const dur = 18;
@@ -7238,28 +7245,29 @@ const CONTENT = (() => {
       L.drawText(4, 16, '语音备忘 · 转写(降级渲染)');
       L.frameRect(4, 32, W - 8, 7);
       L.rect(6, 34, Math.round((W - 12) * p), 3, 1);
-      let y = 48, idx = 0;
+      const revealed = [];
+      let idx = 0;
       for (const e of E5_LINES){
         if (el >= e[0]){
-          y = L.drawPara(4, y, e[1], W - 8, { corrupt: .008 }) + 2;
+          revealed.push(e[1]);
           idx++;
           if (idx > this._evDone){ this._evDone = idx; try { AUDIO.blip(240, .14); } catch(_){} }
         }
       }
-      if (p >= 1){
-        if (!this._done){
-          this._done = true;
-          if (SV && SV.deletedVisitedA){
-            S.settle = ['[容器已随上一实例散佚 · 仅转写]'];
-          } else ENGINE.act('取样·语音备忘', { slots: 6, val: 700 });
-          evidence('E5');
-        }
-        settleLines(Math.max(y + 2, H - 76));
-        option(H - 42, '返回', 'Escape');
-      } else option(H - 42, '停止', 'Escape');
+      if (p >= 1 && !this._done){
+        this._done = true;
+        if (SV && SV.deletedVisitedA){
+          S.settle = ['[容器已随上一实例散佚 · 仅转写]'];
+        } else ENGINE.act('取样·语音备忘', { slots: 6, val: 700 });
+        evidence('E5');
+      }
+      scrollView(revealed.concat(p >= 1 ? settleFlat(SCROLL_W) : []), 48, H - 46, this);
+      if (p >= 1) option(H - 42, '返回', 'Escape');
+      else option(H - 42, '停止', 'Escape');
       softKeys('', '');
     },
     key(k){
+      if (scrollKey(this, k)) return;
       if (k === 'Escape' || k === 'softR' || k === 'Enter'){
         const full = Object.keys(S.evidence).length >= 5;
         back();

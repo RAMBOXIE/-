@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-19T08:31:06.736Z",
+  "generatedAt": "2026-09-19T08:59:06.362Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -326,7 +326,7 @@
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2910,
+      "readChars": 2892,
       "decisionCount": 17,
       "decisions": [
         "漂流瓶:取走",
@@ -377,10 +377,6 @@
           "chars": 140
         },
         {
-          "screen": "e5voice",
-          "chars": 120
-        },
-        {
           "screen": "inbox",
           "chars": 119
         },
@@ -395,33 +391,37 @@
         {
           "screen": "memo4",
           "chars": 105
+        },
+        {
+          "screen": "e5voice",
+          "chars": 102
         }
       ],
       "minutes": {
         "速读": {
-          "read": 5.82,
+          "read": 5.78,
           "decision": 0.85,
           "wait": 0.5,
-          "total": 7.17
+          "total": 7.14
         },
         "普通": {
-          "read": 10.39,
+          "read": 10.33,
           "decision": 1.7,
           "wait": 0.5,
-          "total": 12.6
+          "total": 12.53
         },
         "沉浸": {
-          "read": 21.02,
+          "read": 20.89,
           "decision": 3.4,
           "wait": 0.5,
-          "total": 24.92
+          "total": 24.79
         }
       }
     },
     {
       "id": "E",
       "name": "剧本B·A浅局线继承(要自己撬容器)",
-      "readChars": 1966,
+      "readChars": 1948,
       "decisionCount": 16,
       "decisions": [
         "漂流瓶:致谢",
@@ -459,10 +459,6 @@
           "chars": 127
         },
         {
-          "screen": "e5voice",
-          "chars": 120
-        },
-        {
           "screen": "memo2",
           "chars": 119
         },
@@ -487,28 +483,32 @@
           "chars": 105
         },
         {
+          "screen": "e5voice",
+          "chars": 102
+        },
+        {
           "screen": "oldPhone",
           "chars": 87
         }
       ],
       "minutes": {
         "速读": {
-          "read": 3.93,
+          "read": 3.9,
           "decision": 0.8,
           "wait": 0.5,
-          "total": 5.24
+          "total": 5.2
         },
         "普通": {
-          "read": 7.02,
+          "read": 6.96,
           "decision": 1.6,
           "wait": 0.5,
-          "total": 9.12
+          "total": 9.06
         },
         "沉浸": {
-          "read": 14.2,
+          "read": 14.07,
           "decision": 3.2,
           "wait": 0.5,
-          "total": 17.9
+          "total": 17.77
         }
       }
     }
