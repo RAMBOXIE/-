@@ -121,7 +121,8 @@ scenario('卡边缘发 · 蒙混过关不计违规、不触发 T_WINDOW', ({A, r
   A(g.S.edgePlayed === false, '用过一次后 edgePlayed 应清空,实际 ' + g.S.edgePlayed);
 });
 
-scenario('卡边缘发 · 算错=普通违规,后果和不赌一把时一样', ({A, rnd}) => {
+scenario('卡边缘发 · 算错=普通违规,后果和不赌一把时一样(不含 D-160 的赌注本身代价)', ({A, rnd}) => {
+  const EDGE_COST = 3;   // D-160:赌一把这个动作本身固定收的代价,和"算不算对"无关
   const gEdge = boot({ runCount:1, history:[{cacheVal:100,inst:'#7741-A'}] });
   gEdge.E.setClock(0, gEdge.E.RULE.from);
   gEdge.S.edgePlayed = true;
@@ -135,7 +136,11 @@ scenario('卡边缘发 · 算错=普通违规,后果和不赌一把时一样', (
   gPlain.C.go('th_rou', true);
   gPlain.C.key('M');
   A(violEdge === gPlain.S.violations, '算错后 violations 应和普通违规一致,实际 ' + violEdge + ' vs ' + gPlain.S.violations);
-  A(traceEdge === gPlain.S.trace, '算错后溯源不该额外加罚,应和普通违规一致,实际 ' + traceEdge + ' vs ' + gPlain.S.trace);
+  /* D-160:赌一把本身固定扣一笔(EDGE_COST),不看结果、不看是否真在窗口内——
+     这笔代价之外,"算错被抓"这一步不该比普通违规多罚一分,canon 的"算错=
+     不加罚"仍然成立,只是不再拿这次赌注本身的成本混进这句断言里。 */
+  A(traceEdge === gPlain.S.trace + EDGE_COST,
+    '算错后溯源应等于"普通违规+赌注本身代价",不该在这之外额外加罚,实际 ' + traceEdge + ' vs ' + (gPlain.S.trace + EDGE_COST));
 });
 
 /* ---- 破局 · 喂假数据反投 ---- */
