@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-20T11:07:32.235Z",
+  "generatedAt": "2026-09-20T11:50:55.691Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -130,7 +130,7 @@
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2152,
+      "readChars": 2188,
       "decisionCount": 13,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -199,29 +199,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 4.3,
+          "read": 4.38,
           "decision": 0.65,
           "wait": 0.74,
-          "total": 5.69
+          "total": 5.76
         },
         "普通": {
-          "read": 7.69,
+          "read": 7.81,
           "decision": 1.3,
           "wait": 0.74,
-          "total": 9.72
+          "total": 9.85
         },
         "沉浸": {
-          "read": 15.54,
+          "read": 15.8,
           "decision": 2.6,
           "wait": 0.74,
-          "total": 18.88
+          "total": 19.14
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2768,
+      "readChars": 2817,
       "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -282,12 +282,12 @@
           "chars": 185
         },
         {
-          "screen": "memo2",
-          "chars": 119
+          "screen": "recPlay",
+          "chars": 127
         },
         {
-          "screen": "recPlay",
-          "chars": 114
+          "screen": "memo2",
+          "chars": 119
         },
         {
           "screen": "th_proto",
@@ -304,29 +304,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.54,
+          "read": 5.63,
           "decision": 1.2,
           "wait": 1.07,
-          "total": 7.81
+          "total": 7.91
         },
         "普通": {
-          "read": 9.89,
+          "read": 10.06,
           "decision": 2.4,
           "wait": 1.07,
-          "total": 13.36
+          "total": 13.53
         },
         "沉浸": {
-          "read": 19.99,
+          "read": 20.35,
           "decision": 4.8,
           "wait": 1.07,
-          "total": 25.86
+          "total": 26.22
         }
       }
     },
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2963,
+      "readChars": 2990,
       "decisionCount": 17,
       "decisions": [
         "漂流瓶:取走",
@@ -399,29 +399,29 @@
       ],
       "minutes": {
         "速读": {
-          "read": 5.93,
+          "read": 5.98,
           "decision": 0.85,
           "wait": 0.5,
-          "total": 7.28
+          "total": 7.33
         },
         "普通": {
-          "read": 10.58,
+          "read": 10.68,
           "decision": 1.7,
           "wait": 0.5,
-          "total": 12.79
+          "total": 12.88
         },
         "沉浸": {
-          "read": 21.4,
+          "read": 21.59,
           "decision": 3.4,
           "wait": 0.5,
-          "total": 25.3
+          "total": 25.5
         }
       }
     },
     {
       "id": "E",
       "name": "剧本B·A浅局线继承(要自己撬容器)",
-      "readChars": 1949,
+      "readChars": 1976,
       "decisionCount": 16,
       "decisions": [
         "漂流瓶:致谢",
@@ -493,22 +493,22 @@
       ],
       "minutes": {
         "速读": {
-          "read": 3.9,
+          "read": 3.95,
           "decision": 0.8,
           "wait": 0.5,
-          "total": 5.2
+          "total": 5.26
         },
         "普通": {
-          "read": 6.96,
+          "read": 7.06,
           "decision": 1.6,
           "wait": 0.5,
-          "total": 9.06
+          "total": 9.16
         },
         "沉浸": {
-          "read": 14.08,
+          "read": 14.27,
           "decision": 3.2,
           "wait": 0.5,
-          "total": 17.78
+          "total": 17.97
         }
       }
     }
