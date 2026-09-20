@@ -116,13 +116,13 @@ scenario('存档 · lastGrade/praiseCount 正确写入', null, ({A, C, S}) => {
   A(S.grade === 'praise', '真相集齐+达标应 praise');
 });
 
-/* ---- 世界日报:出现"采样官评级"行 ---- */
-scenario('世界日报 · 出现采样官评级行', { runCount:2, lastGrade:'praise', history:[{cacheVal:100},{cacheVal:100}] },
+/* ---- 世界日报:出现"监察评级"行 ---- */
+scenario('世界日报 · 出现监察评级行', { runCount:2, lastGrade:'praise', history:[{cacheVal:100},{cacheVal:100}] },
   ({A, C, frame}) => {
     C.go('worldReport', true);
     let all = frame();
     for (let i=0;i<14;i++){ C.key('ArrowDown'); all += frame(); }
-    A(all.includes('采样官评级') && all.includes('赏识'), '世界日报应含采样官评级·赏识');
+    A(all.includes('监察评级') && all.includes('赏识'), '世界日报应含监察评级·赏识');
   });
 
 /* ---- 块1b 破局:未达标伪造署名,没被识破=白嫖(视作达标但只 pass 不 praise) ---- */

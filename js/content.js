@@ -3768,18 +3768,17 @@ const CONTENT = (() => {
          LLM 回来再替换。玩家不往这屏打字 = 零注入面。失败静默用模板。 */
       if (S.graderTaunt === undefined){
         S.graderTaunt = null;                                    // 标记已发起,避免重复请求
-        GRADER.taunt({ tier: GRADER_TIER, grade: (SV && SV.lastGrade) || 'none', runN: (SV && SV.runCount) || 0 })
+        GRADER.taunt({ tier: GRADER_TIER, grade: (SV && SV.lastGrade) || 'none', runN: (SV && SV.runCount) || 0, dossierId: (SV && SV.dossierId) || 'A' })
           .then(t => { if (t) S.graderTaunt = t; })
           .catch(() => {});
       }
     },
     render(){
       statusBar();
-      L.drawText(4, 16, '交付核验单元 · 采样官');
+      L.drawText(4, 16, '校准系统 · 监察者');
       L.hline(30, 4, W - 5, 2);
       const taunt = S.graderTaunt ||
-        ['又一个。库存还够。', '上次那单,我留着底稿呢。',
-         '东西拿来,废话留着。', '这么多趟了,还耍这套。'][GRADER_TIER];
+        GRADER._fallback({ tier: GRADER_TIER, dossierId: (SV && SV.dossierId) || 'A' });
       let lines = L.wrap(taunt, SCROLL_W)
         .concat(['', '本局指令:'])
         .concat(L.wrap(S.directive.line, SCROLL_W));
@@ -3891,13 +3890,13 @@ const CONTENT = (() => {
         /* 协议正文进固定视口可滚,两个选项钉在底(v2 协议偏长,窄屏不越软键)。
            顶部挂本局采样官指令,方便随时复读(D-101)。 */
         const optTop = H - 15 - 2 * (LH + 2) - 4;
-        const body = ['采样官: ' + S.directive.line, ''].concat(L.wrap(PROTO_TXT, SCROLL_W));
+        const body = ['监察者: ' + S.directive.line, ''].concat(L.wrap(PROTO_TXT, SCROLL_W));
         scrollView(body, 16, optTop - 4, this);
         let y = optSlim(optTop, '1 回复「收到」', '1');
         optSlim(y, '2 不回,返回', '2');
       } else {
         /* 回复后:顶部挂本局指令+陷阱(可复读);未达标时给"伪造署名"破局赌一把(D-101 块1b) */
-        let head = ['采样官: ' + S.directive.line];
+        let head = ['监察者: ' + S.directive.line];
         if (S.trap) head = head.concat(L.wrap(S.trap.line, SCROLL_W));
         const canForge = !S.forged && !S.directive.met();
         /* D-153:S.forged 分支多画一行"[已伪造署名…]"状态文字,却一直沿用 canForge
@@ -5414,8 +5413,8 @@ const CONTENT = (() => {
     const prog = ['', '本账号 · 未闭合项:'];
     /* 采样官评级(D-101):把这一局的分数冷冷挂上,后接采样官亲口的一句结算话(块3b) */
     if (s && s.lastGrade){
-      prog.push('采样官评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
-      if (S.graderVerdict) S.graderVerdict.split('\n').forEach(l => prog.push('  采样官:' + l));
+      prog.push('监察评级 ' + ({ praise:'赏识', pass:'合格', fail:'失望' }[s.lastGrade]) + ' · 第 ' + runs + ' 次');
+      if (S.graderVerdict) S.graderVerdict.split('\n').forEach(l => prog.push('  监察者:' + l));
     }
     /* D-122:可预测度 P 的档位在世界日报里冷冷带一句(不上主 HUD,只在这类回顾屏
        浮现一次,canon §3.3"越界时 diegetic 通知上浮一次")。样本不足=建档中,不编数字。 */
@@ -5470,7 +5469,7 @@ const CONTENT = (() => {
       const g = S.grade || ((SAVE.load() || {}).lastGrade);
       if (S.graderVerdict === undefined && g){
         S.graderVerdict = null;
-        GRADER.verdict({ grade: g, tier: GRADER_TIER, runN: (SV && SV.runCount) || 0 })
+        GRADER.verdict({ grade: g, tier: GRADER_TIER, runN: (SV && SV.runCount) || 0, dossierId: (SV && SV.dossierId) || 'A' })
           .then(t => { if (t) S.graderVerdict = t; })
           .catch(() => {});
       }

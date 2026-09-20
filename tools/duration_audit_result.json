@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-20T06:41:41.315Z",
+  "generatedAt": "2026-09-20T07:36:02.403Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -130,7 +130,7 @@
     {
       "id": "B",
       "name": "普通线·中等探索死亡",
-      "readChars": 2163,
+      "readChars": 2164,
       "decisionCount": 13,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -202,26 +202,26 @@
           "read": 4.33,
           "decision": 0.65,
           "wait": 0.74,
-          "total": 5.71
+          "total": 5.72
         },
         "普通": {
-          "read": 7.72,
+          "read": 7.73,
           "decision": 1.3,
           "wait": 0.74,
-          "total": 9.76
+          "total": 9.77
         },
         "沉浸": {
-          "read": 15.62,
+          "read": 15.63,
           "decision": 2.6,
           "wait": 0.74,
-          "total": 18.96
+          "total": 18.97
         }
       }
     },
     {
       "id": "C",
       "name": "全内容线·贪婪全翻死亡",
-      "readChars": 2779,
+      "readChars": 2780,
       "decisionCount": 24,
       "decisions": [
         "采样协议:回「收到」/不回",
@@ -316,17 +316,17 @@
           "total": 13.4
         },
         "沉浸": {
-          "read": 20.07,
+          "read": 20.08,
           "decision": 4.8,
           "wait": 1.07,
-          "total": 25.94
+          "total": 25.95
         }
       }
     },
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 3000,
+      "readChars": 3001,
       "decisionCount": 17,
       "decisions": [
         "漂流瓶:取走",
@@ -402,10 +402,10 @@
           "read": 6,
           "decision": 0.85,
           "wait": 0.5,
-          "total": 7.35
+          "total": 7.36
         },
         "普通": {
-          "read": 10.71,
+          "read": 10.72,
           "decision": 1.7,
           "wait": 0.5,
           "total": 12.92
@@ -414,7 +414,7 @@
           "read": 21.67,
           "decision": 3.4,
           "wait": 0.5,
-          "total": 25.57
+          "total": 25.58
         }
       }
     },

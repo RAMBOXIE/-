@@ -168,7 +168,7 @@ function scenario(name, fn){
     const out = JSON.parse(r.body);
     A(out.text === '又一个。别磨蹭。', '应返回模型台词');
     A(out.sig === undefined, 'grader 单向、无回放 → 不签名,实际 sig=' + out.sig);
-    A(sent.system.includes('采样官'), 'system 应含采样官人格核');
+    A(sent.system.includes('监察者'), 'system 应含监察者人格核');
     A(sent.system.includes('你对他要求很高了'), 'tier2 态势应注入 system');
     A(sent.system.includes('他来过几趟'), 'runN=3 应收成"来过几趟"(定性,不吐数字)');
     A(!/\d{1,2}:\d{2}/.test(JSON.stringify(sent)), 'grader prompt 不得含时刻');
