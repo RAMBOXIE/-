@@ -3778,8 +3778,8 @@ const CONTENT = (() => {
       L.drawText(4, 16, '交付核验单元 · 采样官');
       L.hline(30, 4, W - 5, 2);
       const taunt = S.graderTaunt ||
-        ['又一个。别磨蹭。', '你上次那点表现,我记着。',
-         '这次别再让我失望。', '你已经很熟了。所以标准我提了。'][GRADER_TIER];
+        ['又一个。库存还够。', '上次那单,我留着底稿呢。',
+         '东西拿来,废话留着。', '这么多趟了,还耍这套。'][GRADER_TIER];
       let lines = L.wrap(taunt, SCROLL_W)
         .concat(['', '本局指令:'])
         .concat(L.wrap(S.directive.line, SCROLL_W));
