@@ -243,7 +243,7 @@
     exportFeedback(){
       const data = ENGINE.exportFeedback(CONTENT.exportExtra ? CONTENT.exportExtra() : undefined);
       window.OVERLAY.text({
-        title: '反馈数据', hint: '全选复制,发给开发者。感谢试玩。', value: data
+        title: '案卷导出', hint: '全选复制,自行保存。', value: data
       });
       try { navigator.clipboard?.writeText(data); } catch(_){}
     }

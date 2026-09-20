@@ -5509,7 +5509,7 @@ const CONTENT = (() => {
       if (S.disposal && DOSSIER.endings.disposal[S.disposal]) t += '\n────────────\n' + DOSSIER.endings.disposal[S.disposal];
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 18, H - 70, this);
-      let oy = optSlim(H - 66, '1 导出反馈', '1');
+      let oy = optSlim(H - 66, '1 导出记录', '1');
       oy = optSlim(oy, '2 回访', '2');
       optSlim(oy, '3 局外报告', '3');
       softKeys('', '');
@@ -5798,12 +5798,12 @@ const CONTENT = (() => {
         softKeys('下一页', '');
       } else {
         let t = isB
-          ? '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-C: 未排期。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。'
-          : '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-B 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。\n\n————\n感谢试玩 M2 切片。';
+          ? '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-C: 未排期。\n档案不关闭。\n下一个编号,还是你。'
+          : '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-B 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。';
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
-        yy = optSlim(yy, '1 导出反馈', '1');
+        yy = optSlim(yy, '1 导出记录', '1');
         yy = optSlim(yy, (isB ? '2 回访' : '2 重新接入'), '2');
         optSlim(yy, '3 局外报告', '3');
         softKeys('', '');
@@ -5866,7 +5866,7 @@ const CONTENT = (() => {
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 20, H - 70, this);
-      let oy = optSlim(H - 66, '1 导出反馈', '1');
+      let oy = optSlim(H - 66, '1 导出记录', '1');
       oy = optSlim(oy, isB ? '2 回访' : '2 重新接入', '2');
       optSlim(oy, '3 局外报告', '3');
       softKeys('', '');

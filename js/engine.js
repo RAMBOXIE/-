@@ -122,10 +122,11 @@ const ENGINE = (() => {
   /* 拨表:事件自带时间戳 */
   function setClock(h, m){ S.clock = h * 60 + m; }
 
-  /* 反馈导出(跑测记录表的自动化);extra = content 注入的场景层字段 */
+  /* 案卷导出(D-161:原是跑测记录表的自动化,字段名带着内部项目代号直接
+     甩给玩家看,已去掉);extra = content 注入的场景层字段 */
   function exportFeedback(extra){
     return JSON.stringify({
-      version: 'M2-slice-0.3',
+      schema: 'case-record-v1',
       ...(extra || {}),
       firstTelemetryMs: S.firstTelemetry,
       predictions: S.predictions,
