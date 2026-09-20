@@ -56,19 +56,10 @@ const STRANGERLLM = (() => {
   };
   /*[SITE-STRIP-END]*/
 
-  /* 手写兜底(= 原离线正文)。真/饵各一组。 */
-  const BODY = {
-    real: [
-      '在吗。东西照说的放了,\n第 3 张背面。别让老周看见。',
-      '放好了,你懂的那个位置。\n别声张,回头当面说。'
-    ],
-    bait: [
-      '在吗。就现在,把余下的\n都转过来,晚了就来不及了。',
-      '快,剩下的一次性打过来。\n过这村没这店了。'
-    ]
-  };
-  const rand = a => a[Math.floor(Math.random() * a.length)];
-  function fallback(kind){ return rand(BODY[kind === 'bait' ? 'bait' : 'real']); }
+  /* 手写兜底(D-165 之前 = 原离线正文,与底本无关的通用两句)。
+     离线/无采样权限是常态(演示站没有后端),这份兜底几乎总是真正显示的文案——
+     必须按 dossier 走,不能再是套全 13 台机子的通用两句。 */
+  function fallback(kind, dossierBody){ return dossierBody || (kind === 'bait' ? '在吗。就现在,把余下的\n都转过来,晚了就来不及了。' : '在吗。东西照说的放了,\n第 3 张背面,你懂的。'); }
 
   const BAD = /(游戏|玩家|模型|程序|AI|assistant)/i;
   const CRISIS = /(自杀|自残|轻生|不想活|想死|了结)/;
@@ -102,10 +93,10 @@ const STRANGERLLM = (() => {
   }
   function clean(t){ return String(t).trim().slice(0, 60); }
 
-  async function msg(kind){
+  async function msg(kind, dossierBody){
     if (SAMPLE){ const r = await SAMPLE(kind); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
     const p = await viaProxy(kind); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
-    return fallback(kind);
+    return fallback(kind, dossierBody);
   }
 
   return { msg, _lintOk: lintOk, _fallback: fallback };

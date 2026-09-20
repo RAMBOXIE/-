@@ -78,8 +78,13 @@ const bMom = (extra) => Object.assign({ runCount:3, evidence:['E1','E2'], caseOp
 scenario('妈线程 told·对陌生号码说话', bMom({ disposalHistory:['continue','tell'], momLocked:'told', evidence:['E1','E2','E3','E4'] }),
   ({A, CONTENT, frame}) => {
     CONTENT.go('th_mom', true); const t = frame();
-    A(t.includes('谁在用它'), 'told 后走「对陌生号码」文案');
-    A(t.includes('是帆的旧机吗'), 'told 首句应问旧机');
+    /* D-165:底本 A 的 momToldOpen 在去模板化重写后换了措辞("有人跟我说,
+       这个号码早该注销了。"/"那这些日子,回我的到底是谁。"),不再是旧的
+       "是帆的旧机吗"/"谁在用它"这两句具体台词——判定放宽到"号码"+"谁"
+       两个关键字,验证的是"这段话在问号码是谁在用"这个叙事事实,不锁死
+       某一句具体台词。 */
+    A(t.includes('号码'), 'told 后应提到这个号码');
+    A(t.includes('谁'), 'told 文案应问"是谁在用"这层意思');
   });
 
 /* ---- 妈线程 · deleted(停摆,不可读) + inbox 标签 ---- */
