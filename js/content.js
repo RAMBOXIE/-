@@ -4728,9 +4728,12 @@ const CONTENT = (() => {
       statusBar();
       const blanks = DOSSIER.evidence.deduce.blanks;
       const b = blanks[this.idx];
-      L.drawText(4, 14, '拼真相 · ' + (this.idx + 1) + '/' + blanks.length);
+      L.drawText(4, 14, '案卷 · 结论核验 ' + (this.idx + 1) + '/' + blanks.length);
       L.hline(26, 4, W - 5, 2);
-      let y = L.drawPara(4, 32, b.prompt, W - 8) + 6;
+      /* D-158:只在第一空提示一次玩法本身——"从证据里选,选错扣代价",别让玩家
+         猜这屏到底在问什么;后面几空不重复,免得每屏都占一行显得啰嗦。 */
+      const prefix = this.idx === 0 ? '从证据里选出站得住的一条。选错要扣代价。\n\n' : '';
+      let y = L.drawPara(4, 32, prefix + b.prompt, W - 8) + 6;
       this.shuffled[this.idx].forEach((o, i) => { y = option(y, (i + 1) + ' ' + o.t, String(i + 1)); });
       for (const line of S.settle){
         for (const t of L.wrap(line, W - 8)){ if (y > H - 16) break; L.drawText(4, y, t); y += LH; }

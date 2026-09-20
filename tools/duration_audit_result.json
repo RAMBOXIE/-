@@ -1,6 +1,6 @@
 {
   "tool": "duration_audit",
-  "generatedAt": "2026-09-20T04:50:22.669Z",
+  "generatedAt": "2026-09-20T06:41:41.315Z",
   "charModel": "CJK=1 字,半角=0.5(与 LCD 半宽格同口径),空白不计;按屏 Set 去重;过滤 /^[\\d:%-]+$/ 状态栏噪声",
   "hookedFns": [
     "LCD.drawText",
@@ -326,7 +326,7 @@
     {
       "id": "D",
       "name": "剧本B·A普通线继承·断连成功",
-      "readChars": 2986,
+      "readChars": 3000,
       "decisionCount": 17,
       "decisions": [
         "漂流瓶:取走",
@@ -389,32 +389,32 @@
           "chars": 115
         },
         {
-          "screen": "memo4",
-          "chars": 105
+          "screen": "deduce",
+          "chars": 107
         },
         {
-          "screen": "e5voice",
-          "chars": 102
+          "screen": "memo4",
+          "chars": 105
         }
       ],
       "minutes": {
         "速读": {
-          "read": 5.97,
+          "read": 6,
           "decision": 0.85,
           "wait": 0.5,
-          "total": 7.33
+          "total": 7.35
         },
         "普通": {
-          "read": 10.66,
+          "read": 10.71,
           "decision": 1.7,
           "wait": 0.5,
-          "total": 12.87
+          "total": 12.92
         },
         "沉浸": {
-          "read": 21.57,
+          "read": 21.67,
           "decision": 3.4,
           "wait": 0.5,
-          "total": 25.47
+          "total": 25.57
         }
       }
     },
