@@ -57,8 +57,13 @@ const HIST2 = [{ inst:'#7741-A', ending:'captured', cacheVal:400, ev:2 },
 const bMom = (extra) => Object.assign({ runCount:3, evidence:['E1','E2'], caseOpen:true, history:HIST2 }, extra);
 
 /* ---- 妈线程 · 弱察觉四档 ---- */
-[ [0,'吃过了,睡吧',       null],
-  [1,'不冷。睡吧',       null],
+/* D-170:底本 A 的 momDecayReplies 在"给关系人换血"重写后换了措辞
+   (前两档从"吃过了,睡吧"/"不冷。睡吧"改成"不冷。妈你早点睡。"/"不冷。
+   早点睡。"),后两档("嗯。睡吧。"/"嗯。")文本没变,断言同步更新前两档,
+   验证的仍是"继续次数越多,回复越短越冷淡"这个降档机制,不是这几个字
+   本身。 */
+[ [0,'不冷。妈你早点睡。', null],
+  [1,'不冷。早点睡。',     null],
   [2,'嗯。睡吧',         '越来越快'],
   [3,'嗯。',             '你还是你吗']
 ].forEach(([cont, reply, aware]) => {
@@ -78,13 +83,12 @@ const bMom = (extra) => Object.assign({ runCount:3, evidence:['E1','E2'], caseOp
 scenario('妈线程 told·对陌生号码说话', bMom({ disposalHistory:['continue','tell'], momLocked:'told', evidence:['E1','E2','E3','E4'] }),
   ({A, CONTENT, frame}) => {
     CONTENT.go('th_mom', true); const t = frame();
-    /* D-165:底本 A 的 momToldOpen 在去模板化重写后换了措辞("有人跟我说,
-       这个号码早该注销了。"/"那这些日子,回我的到底是谁。"),不再是旧的
-       "是帆的旧机吗"/"谁在用它"这两句具体台词——判定放宽到"号码"+"谁"
-       两个关键字,验证的是"这段话在问号码是谁在用"这个叙事事实,不锁死
-       某一句具体台词。 */
+    /* D-170:底本 A 的 momToldOpen 又换了一版措辞("这个号码，是帆那台旧机
+       吗。"/"有没有人听见他说话。"),不再含"谁"字——判定跟着放宽到
+       "号码"+"旧机",验证的仍是"这段话在追问这台设备/号码的真实身份"
+       这个叙事事实,不锁死某一句具体台词。 */
     A(t.includes('号码'), 'told 后应提到这个号码');
-    A(t.includes('谁'), 'told 文案应问"是谁在用"这层意思');
+    A(t.includes('旧机'), 'told 文案应追问这台设备的真实身份');
   });
 
 /* ---- 妈线程 · deleted(停摆,不可读) + inbox 标签 ---- */

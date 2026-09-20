@@ -68,7 +68,11 @@ function mkEnv(saveObj){
   A(d && d.uploaded === true, 'receiptFull: 应标记 uploaded=true');
   A(d && d.grade === 'S', 'receiptFull: truthDone=true 时评级应为 S,实际 ' + (d && d.grade));
   A(d && d.evCount === 5, 'receiptFull: evCount 应为 5,实际 ' + (d && d.evCount));
-  A(d && d.disposalEcho && d.disposalEcho.includes('妈的线程还在走'), 'receiptFull: 选了 continue 应带出对应处置回声');
+  /* D-170:底本 A 的 continue 回声文案在"去妈线程模板化"重写后换了开场
+     (不再是"妈的线程还在走"这句模板开场),断言放宽到文案里仍然真实存在的
+     "妈发来一张汤的照片"这个具体细节——验证的是"continue 分支确实带出了
+     对应的处置回声"这件事,不锁死某一句具体开场白。 */
+  A(d && d.disposalEcho && d.disposalEcho.includes('妈发来一张汤的照片'), 'receiptFull: 选了 continue 应带出对应处置回声');
 }
 
 /* ---- receiptAlive 屏(裸退) ---- */

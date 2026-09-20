@@ -41,7 +41,10 @@ async function scenario(name, fn){
   else console.log('OK ['+name+']');
 }
 
-const LINES = { graze:'进程掠过了你。', brush:'它擦着你的接入点过去了。', near:'差一点。它没认出你。' };
+/* D-170:底本 A 的 huntGraze 三句在这轮重构里也换了词(见 决策日志 D-170),
+   跟着换成实际当前文案——测的是"选中的 id 能正确带出对应叙述"这个机制,
+   不是这三句话本身。 */
+const LINES = { graze:'它停在你的输入框外。', brush:'接入点亮了一下。它没有进来。', near:'差一点。像有人敲了门，又走了。' };
 
 (async () => {
   /* ---- 客户端:LLM 预挑的 id 被采用(擦过叙述=该 id 的引擎文案,数值恒定) ---- */
