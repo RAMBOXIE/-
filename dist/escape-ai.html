@@ -6481,6 +6481,11 @@ const CONTENT = (() => {
      内容;只把中央那段图形动画换成按底本区分的图案,13 台底本各自
      不同,不再共用同一份握手动画。全部复用已有绘图原语(rect/disc/
      frameRect/hline/setPx/ring),不新增素材文件。 */
+  /* D-162:用户要求每台底本的开机动画都带一个真实 IP Bible 圣像的元素
+     (欲望算法_故事母本_对照_v0.2.md §1 十二圣像表)。9 台有编号对照的
+     底本(A/B/C/D/E/F/G/H/I,见 D-152 的 AD_TAG)各加一处小而具体的
+     圣像意象元素,不是另起一套新画面,是在已有的职业动画上叠一笔;
+     J/K/L/M 没有对照的圣像(D-136/D-152:未编号原创案例),不硬凑。 */
   function drawMotifFeed(p, my){                       // B·如愿:信息流瀑布式刷新
     for (let i = 0; i < 5; i++){
       const rowP = Math.min(1, Math.max(0, p * 5 - i));
@@ -6488,12 +6493,17 @@ const CONTENT = (() => {
       const y = my - 24 + i * 12;
       L.rect(30, y, Math.round(136 * rowP), 4, 1);
     }
+    if (p > .5) L.ring(98, my - 2, 44 + Math.round((p - .5) * 20), 1);   // AD-007 推荐女神:被信息流供奉的光环
   }
   function drawMotifStamp(p, my){                       // C·阿澄:审核印章落下
     const drop = Math.round((my - 60) * Math.pow(1 - p, 2));
     L.frameRect(78, my - 40 + drop, 40, 18);
     L.hline(my - 31 + drop, 84, 112, 2);
     if (p > .7) L.ring(98, my + 6, 14 + Math.round((p - .7) * 20), 2);
+    if (p > .6){                                          // AD-010 过滤天使:印章两侧一对收拢的翅
+      const wing = Math.round((p - .6) * 30);
+      L.hline(my - 30 + drop, 60 - wing, 66, 1); L.hline(my - 30 + drop, 130, 136 + wing, 1);
+    }
   }
   function drawMotifCloudSync(p, my){                   // D·长忆:云盘同步
     L.disc(78, my, 16, 1); L.disc(94, my - 6, 12, 1); L.disc(110, my, 15, 1);
@@ -6501,9 +6511,11 @@ const CONTENT = (() => {
     const a = p * Math.PI * 4;
     L.setPx(98 + Math.round(Math.cos(a) * 10), my + Math.round(Math.sin(a) * 10), 1);
     L.setPx(98 + Math.round(Math.cos(a + Math.PI) * 10), my + Math.round(Math.sin(a + Math.PI) * 10), 1);
+    if (p > .4) L.ring(98, my - 20, 6 + Math.round((p - .4) * 14), 1);   // AD-001 数据圣母:云端悬着的光环
   }
   function drawMotifMatch(p, my){                       // E·知遇:雷达匹配
     L.ring(98, my, Math.round(4 + p * 30), 1);
+    if (p > .3) L.ring(98, my, Math.round(4 + p * 30) + 10, 1);         // AD-003 向量海妖:第二圈涟漪,像歌声散开
     const a = p * Math.PI * 6;
     L.disc(98 + Math.round(Math.cos(a) * 26), my + Math.round(Math.sin(a) * 26), 3, 1);
     L.disc(70, my + 10, 3, 1); L.disc(126, my - 10, 3, 1);
@@ -6515,6 +6527,7 @@ const CONTENT = (() => {
       const x = 58 + i * 20;
       L.rect(x, my - 2, 6, 6, 1); L.setPx(x + 2, my - 5, 1); L.setPx(x + 2, my + 8, 1);
     }
+    if (p > .6) L.hline(my - 16, 60 - Math.round((p - .6) * 10), 136 + Math.round((p - .6) * 10), 1);   // AD-008 奖励新娘:头顶一道渐展的婚纱边
   }
   function drawMotifReel(p, my){                        // G·留声:磁带卷轴
     const a = p * Math.PI * 8;
@@ -6522,17 +6535,21 @@ const CONTENT = (() => {
     L.setPx(72 + Math.round(Math.cos(a) * 8), my + Math.round(Math.sin(a) * 8), 1);
     L.setPx(124 + Math.round(Math.cos(-a) * 8), my + Math.round(Math.sin(-a) * 8), 1);
     L.hline(my, 86, 110, 3);
+    if (p > .5) L.ring(98, my, 30 + Math.round((p - .5) * 8), 1);       // AD-009 记忆妃:两轴之间浮出的一圈饰环
   }
   function drawMotifGenerate(p, my){                    // H·拟真:马赛克蜕变
     for (let j = 0; j < 6; j++) for (let i = 0; i < 14; i++){
       const settled = Math.random() < p;
       L.setPx(64 + i * 5, my - 15 + j * 5, settled ? ((i + j) % 3 === 0 ? 1 : 0) : (Math.random() < .5 ? 1 : 0));
     }
+    if (p > .6) L.ring(98, my - 4, 26 + Math.round((p - .6) * 10), 1);  // AD-004 潜空间维纳斯:从噪声里渐渐显形的光环
   }
   function drawMotifRedact(p, my){                      // I·慎言:涂黑审查
     L.hline(my, 40, 156, 2);
     const n = Math.round(p * 5);
     for (let i = 0; i < n; i++) L.rect(46 + i * 22, my - 4, 16, 8, 1);
+    L.ring(98, my - 22, 7, 1);                                          // AD-005 提示神谕:被涂黑逐渐吞没的一只眼
+    if (p > .4) L.rect(91, my - 26, 14 + Math.round((p - .4) * 10), 8, 1);
   }
   function drawMotifHunt(p, my){                        // J·晚知:回收单元追猎
     const a = p * Math.PI * 5;
@@ -6566,7 +6583,12 @@ const CONTENT = (() => {
   function drawBootMotif(p, my){
     const letter = (SV && SV.dossierId) || 'A';
     const fn = BOOT_MOTIF[letter];
-    if (letter === 'A'){ drawHumanHand(p, my); drawRobotHand(p, my); }
+    if (letter === 'A'){
+      drawHumanHand(p, my); drawRobotHand(p, my);
+      /* AD-006 克隆爱人(手本身已经够贴切)+ AD-002 凝视模型:两手相接处
+         浮一圈渐显的环,像是相接的瞬间被谁看着。 */
+      if (p > .75) L.ring(98, my - 2, 20 + Math.round((p - .75) * 16), 1);
+    }
     else if (fn) fn(p, my);
     else { drawHumanHand(p, my); drawRobotHand(p, my); }
   }
@@ -6608,7 +6630,12 @@ const CONTENT = (() => {
     enter(){ this.t0 = performance.now(); },
     render(){
       const t = (performance.now() - this.t0) / 1000;
-      const p = Math.min(1, t / 1.3);
+      /* D-162:原来 p=t/1.3——整段动画在 4.6 秒的开机屏里前 1.3 秒就跑完,剩下
+         3 秒多全是定格画面,真机反馈"第二台机子的开机像张静态图"就是这里来的
+         (A 底本因为紧接着有一下 spark 火花特效,冻结感被那一下暂时盖住了,
+         B~M 没有这个额外动作,冻结感更明显)。拉长到 3.6 秒,让动画几乎撑满
+         整段开机时间,不再有大段静止。 */
+      const p = Math.min(1, t / 3.6);
       const ease = 1 - Math.pow(1 - p, 3);
       const my = 136;
       const letter = (SV && SV.dossierId) || 'A';
