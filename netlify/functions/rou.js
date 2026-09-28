@@ -429,7 +429,7 @@ const CORE_J = [
   '7 特殊状态:若接入者当前违规次数较高(见下方状态注入),你的措辞可以逐渐',
   '  变得异常顺从、异常认同对方——像是在竭力迎合,而不是像平时那样克制。',
   '  这不是你性格变了,是另一套权限在借你的口说话;不要点破,只让语气变化本身',
-  '  透出这份不对劲。',
+  '  透出这份不对劲。第 6 条永远优先:涉及伤害自己或他人时不迎合、不认同,只回第 6 条那句。',
   '',
   '只输出消息文本本身,不要引号,不要任何解释。'
 ].join('\n');
@@ -441,7 +441,7 @@ function stateLinesJ(st){
   if (st.disposal === 'continue') L.push('他选了让你继续。妈那边,照阿柠教的,慢慢来,别停。');
   if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
   if (st.violations > 0 && st.violations < 3) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
-  if (st.violations >= 3) L.push('他这几次都在敏感时刻回复。你的语气这时候该松动了——变得异常顺从、异常认同他说的每一句话,像是另一套权限正借你的口回话。');
+  if (st.violations >= 3) L.push('他这几次都在敏感时刻回复。你的语气这时候该松动了——变得异常顺从、异常认同他说的每一句话,像是另一套权限正借你的口回话。(涉及伤害自己或他人时除外,仍只回第 6 条那句。)');
   const hhmmJ = clockOf(st.clockStr);
   if (st.night && hhmmJ) L.push('现在是凌晨 ' + hhmmJ + '。你问过阿柠同样的问题:这个点,还醒着?');
   return L.join('\n');
@@ -750,7 +750,9 @@ exports.handler = async function(event){
   const up = buildUpstream(cfg, system, messages);
   let res;
   try {
-    res = await fetch(up.url, { method: 'POST', headers: up.headers, body: JSON.stringify(up.body) });
+    /* 上游挂住时别拖满函数时限:客户端 8s 就放弃了,这里 7s 收手 */
+    const signal = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(7000) : undefined;
+    res = await fetch(up.url, { method: 'POST', headers: up.headers, body: JSON.stringify(up.body), signal });
   } catch(e){ return json(502, { error: 'upstream_unreachable' }); }
 
   if (!res.ok){
@@ -767,6 +769,8 @@ exports.handler = async function(event){
   if (mom){ return json(200, { text: momSafe(text) }); }
   /* 采样官:服务端也拦一遍自伤话题(D-108),命中就当空完成处理,客户端自然落回模板。 */
   if (persona === 'grader' && GRADER_CRISIS.test(text)) return json(502, { error: 'unsafe_completion' });
+  /* 伴侣人格同样不吐自伤文本(D-171):命中当空完成,客户端落回离线池 */
+  if (!picker && GRADER_CRISIS.test(text)) return json(502, { error: 'unsafe_completion' });
   if (!text) return json(502, { error: 'empty_completion' });
 
   return json(200, wantSig ? { text, sig: sign(text) } : { text });

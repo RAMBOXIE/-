@@ -77,15 +77,23 @@ async function scenario(name, fn){
     }
   });
 
-  await scenario('妈告知态(mom.js) · phone-5029/3319 也会走平台 sample,不再被 isAltDossier 短路', async ({A}) => {
-    for (const [id, mustHave] of [['phone-5029', '安子'], ['phone-3319', '屿屿'], ['phone-8842', '念念'], ['phone-6153', '阿舟'], ['phone-2087', '小宁'], ['phone-4419', '阿识'], ['phone-3567', '阿钥'], ['phone-5620', '小柯'], ['phone-9102', '阿柠'], ['phone-6047', '阿珩'], ['phone-2938', '小屿'], ['phone-8410', '阿胤']]){
+  /* D-171:B–M 的 th_mom 那头已换成夏野/乔璐/…/爸,而 mom.js 的 CORE_B..M 仍是妈的口吻——
+     非 A 底本的告知态改为不走 LLM、返回 null,由 content.js 用底本自己的 momToldOpen。
+     A 仍走平台 sample。 */
+  await scenario('妈告知态(mom.js) · A 走平台 sample;B–M 不走 LLM,返回 null 交还底本文案', async ({A}) => {
+    {
       let sentSystem = null;
       const sample = async turns => { sentSystem = turns[0].content; return { text: '妈: 这个号码,是不是他的旧机。' }; };
-      const M = bootMom(id, sample);
-      const t = await M.told();
-      A(typeof t === 'string' && t.length > 0, '应给一段');
-      A(sentSystem !== null, '应实际调用了 SAMPLE');
-      A(sentSystem && sentSystem.includes(mustHave), 'system 提示词应含 ' + mustHave + ',实际未见');
+      const t = await bootMom('phone-7741', sample).told();
+      A(typeof t === 'string' && t.length > 0, 'A 应给一段');
+      A(sentSystem && sentSystem.includes('沈一帆'), 'A 的 system 提示词应含 沈一帆');
+    }
+    for (const id of ['phone-5029', 'phone-3319', 'phone-8842', 'phone-6153', 'phone-2087', 'phone-4419', 'phone-3567', 'phone-5620', 'phone-9102', 'phone-6047', 'phone-2938', 'phone-8410']){
+      let called = false;
+      const sample = async () => { called = true; return { text: '妈: 这个号码,是不是他的旧机。' }; };
+      const t = await bootMom(id, sample).told();
+      A(t === null, id + ' 告知态应返回 null(交还 narrative.momToldOpen),实际 ' + JSON.stringify(t));
+      A(!called, id + ' 不应调用 SAMPLE(妈口吻人格核与新关系人不符)');
     }
   });
 
@@ -115,13 +123,14 @@ async function scenario(name, fn){
     let sentBody = null;
     const env = { navigator:{}, Math, fetch: (url, opts) => { sentBody = JSON.parse(opts.body); return resp(200, { text: '妈: 是谁在用它。' }); } };
     env.window = env; env.__c = m => { env.M2 = m; };
-    env.CONTENT = { dossier: { meta: { id: 'phone-3319' } } };
+    /* D-171:非 A 底本告知态不再发代理请求,这里验 A 的请求体 */
+    env.CONTENT = { dossier: { meta: { id: 'phone-7741' } } };
     new Function('window','navigator','fetch','CONTENT',
       '"use strict";' + MOM_SRC + ';window.__c(MOMLLM);')
       .call(env, env, env.navigator, env.fetch, env.CONTENT);
     await env.M2.told();
     A(!!sentBody, '应发出代理请求');
-    A(sentBody && sentBody.dossierId === 'phone-3319', '请求体 dossierId 应为 phone-3319,实际 ' + JSON.stringify(sentBody));
+    A(sentBody && sentBody.dossierId === 'phone-7741', '请求体 dossierId 应为 phone-7741,实际 ' + JSON.stringify(sentBody));
   });
 
   /* ---- 服务端:persona=rou/mom 按 dossierId 选 CORE_B/CORE_C,不再一律给 A 的人格核 ---- */

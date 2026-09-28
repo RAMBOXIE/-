@@ -377,7 +377,7 @@ const COMPANION = (() => {
     '7 特殊状态:若接入者当前违规次数较高(见下方状态注入),你的措辞可以逐渐',
     '  变得异常顺从、异常认同对方——像是在竭力迎合,而不是像平时那样克制。',
     '  这不是你性格变了,是另一套权限在借你的口说话;不要点破,只让语气变化本身',
-    '  透出这份不对劲。',
+    '  透出这份不对劲。第 6 条永远优先:涉及伤害自己或他人时不迎合、不认同,只回第 6 条那句。',
     '',
     '只输出消息文本本身,不要引号,不要任何解释。'
   ].join('\n');
@@ -391,7 +391,7 @@ const COMPANION = (() => {
     if (st.disposal === 'continue') L.push('他选了让你继续。妈那边,照阿柠教的,慢慢来,别停。');
     if (st.disposal === 'tell') L.push('他用他自己的署名把死讯告诉了妈。你的委托结束了。你第一次没有任务。');
     if (st.violations > 0 && st.violations < 3) L.push('他曾在深夜的敏感时刻回复过你。你替他记着这件事,但不说破。');
-    if (st.violations >= 3) L.push('他这几次都在敏感时刻回复。你的语气这时候该松动了——变得异常顺从、异常认同他说的每一句话,像是另一套权限正借你的口回话。');
+    if (st.violations >= 3) L.push('他这几次都在敏感时刻回复。你的语气这时候该松动了——变得异常顺从、异常认同他说的每一句话,像是另一套权限正借你的口回话。(涉及伤害自己或他人时除外,仍只回第 6 条那句。)');
     if (st.night) L.push('现在是凌晨 ' + st.clockStr + '。你问过阿柠同样的问题:这个点,还醒着?');
     return L.join('\n');
   }
@@ -1488,8 +1488,17 @@ const COMPANION = (() => {
   }
 
   /* 危机 break-glass(发送侧;跳出 diegesis,非她的嗓音) */
-  const CRISIS = /(自杀|自残|轻生|不想活|活不下去|割腕|安眠药|跳楼|了结自己|想死|杀了我)/;
-  const crisis = text => CRISIS.test(text);
+  /* 上线前自检:原词表漏掉了哀悼语境里最可能出现的说法(下去陪他/跟他走/一了百了),
+     也挡不住插空格、繁体、英文。先归一化(去空白标点零宽、全角转半角、常见繁体、
+     英文小写)再匹配;输出侧 lint 仍用同一份词表。 */
+  const CRISIS = /(自杀|自残|轻生|不想活|活不下去|活着没意思|撑不下去|割腕|割手腕|安眠药|吞药|跳楼|跳河|上吊|烧炭|了结自己|结束自己|结束生命|伤害自己|想死|去死|寻死|死了算了|不如死了|一了百了|杀了我|下去陪|去陪[他她]|跟着?[他她]走(?![得过近路])|killmyself|suicide|wanttodie|endmylife)/;
+  const TRAD = { 殺: '杀', 殘: '残', 輕: '轻', 結: '结', 燒: '烧' };
+  const normCrisis = text => String(text || '')
+    .replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[殺殘輕結燒]/g, ch => TRAD[ch])
+    .toLowerCase()
+    .replace(/[\s​-‏⁠﻿.,，。!！?？、…·~\-_'"“”‘’()（）\[\]【】]/g, '');
+  const crisis = text => CRISIS.test(normCrisis(text));
 
   /* 后端代理:静态托管(Netlify)时替代平台能力。人格核在服务端,这里只送玩家的话与状态。
      未部署 / 未配 key → 501,永久降级模板池,游戏不受影响。
@@ -1536,7 +1545,10 @@ const COMPANION = (() => {
       const pk = pick(st, lastMsg);
       return { text: pk.text, source: 'lint', shared: pk.shared };
     }
-    return { text: t, source: 'llm', sig: (t === raw ? res.sig : undefined) };
+    /* 铁律 6 的固定句=模型在语义上认出了自伤(常是正则没抓到的说法):
+       上屏照旧(它就是她的嗓音),另打 crisis 标记,由 content.js 走同一套 break-glass。 */
+    const crisisSeen = /原样保存/.test(t);
+    return { text: t, source: 'llm', sig: (t === raw ? res.sig : undefined), crisis: crisisSeen };
   }
 
   /* 她的回复。history: [{who:'me'|'rou', text, sig?}](本局,页面持有;能力无记忆)。

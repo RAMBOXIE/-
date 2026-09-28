@@ -82,13 +82,23 @@ mini = subprocess.run(
     capture_output=True, check=True).stdout.decode('utf-8')
 os.remove(tmp)
 
-for bad in ('SITE-STRIP', '铁律', '解毒剂', '秘匿', 'window.GAME'):
-    if bad in mini:
+# D-171:esbuild 把中文转成了 \uXXXX,直接在 mini 里搜中文词永远搜不到(门禁静默放行)。
+# 先解码回中文再查;并把人格核的开场句也列进黑名单。
+decoded = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), mini)
+for bad in ('SITE-STRIP', '铁律', '解毒剂', '秘匿', 'window.GAME', '你在扮演一个虚构互动小说里的角色', '角色设定与'):
+    if bad in decoded:
         raise SystemExit('公网产物里仍有「%s」——加固没生效' % bad)
 
 block = '<script>\n' + mini.strip() + '\n</script>\n'
 site = re.sub(r'(<script src="[^"]+"></script>\s*)+', lambda m: block, html, count=1)
 site = re.sub(r'<script src="[^"]+"></script>\s*', '', site)
+# D-171:GitHub Pages 发不了响应头,把 netlify.toml 里同一份 CSP 以 meta 形式带进产物
+# (frame-ancestors 在 meta 里无效,略去;只放在公网站,dev 的 index.html 仍要加载外链 js/)
+CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+       "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'")
+site = site.replace('<meta charset="utf-8">',
+                    '<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="' + CSP + '">', 1)
+assert 'Content-Security-Policy' in site, 'CSP meta 没插进去'
 io.open('dist/site/index.html', 'w', encoding='utf-8', newline='\n').write(site)
 
 # 链接抄错一个字符不该掉进 Netlify 品牌 404 页

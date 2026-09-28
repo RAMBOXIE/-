@@ -272,6 +272,7 @@
     requestAnimationFrame(loop);
   }
   loop();
+  SAVE.bootOk();                                   // 第一帧画出来了:撤掉开机哨兵(见 save.js)
 
   /*[SITE-STRIP-BEGIN]*/
   /* 调试钩子。注意:classic script 的顶层 const 是进全局词法环境的,DevTools 里

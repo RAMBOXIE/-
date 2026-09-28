@@ -104,15 +104,11 @@ async function run(){
     }
     A(sawCheng, 'phone-3319 离线池 20 次抽样应至少一次说"阿澄"');
     A(!sawRuyi, 'phone-3319 离线池不应出现"如愿"(D-113 曾借用 B 池的回归)');
+    /* D-171:B–M 告知态不再走妈口吻的兜底,返回 null 交还底本自己的 momToldOpen */
     const M = bootMom('phone-3319');
-    let sawYu = false, sawAnzi = false;
-    for (let i = 0; i < 20; i++){
-      const t = await M.told();
-      if (/屿屿|阿屿/.test(t)) sawYu = true;
-      if (/安子/.test(t)) sawAnzi = true;
-    }
-    A(sawYu, 'phone-3319 的妈告知态兜底 20 次抽样应至少一次提"屿屿"');
-    A(!sawAnzi, 'phone-3319 的妈告知态兜底不应提"安子"(同一处回归)');
+    let allNull = true;
+    for (let i = 0; i < 20; i++){ if ((await M.told()) !== null) allNull = false; }
+    A(allNull, 'phone-3319 告知态应返回 null(交还底本文案),不借用任何妈口吻兜底');
   }
 
   /* ---- ④ 反召回静态审计:扫描所有离线兜底池,不得出现"怪你缺席"类语式 ---- */

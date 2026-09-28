@@ -478,6 +478,11 @@ const MOMLLM = (() => {
      (D-110 拍板"先出结构,人格核暂缓")。现在 CORE_B/CORE_C 已经接上,三份底本走
      同一条 SAMPLE→代理→fallback 的降级链。 */
   async function told(){
+    /* D-171:D-170 起 B–M 的 th_mom 那头已不是"妈"(夏野/乔璐/林溪 … /爸),而 CORE_B..M
+       与 TOLD_B..M 仍是妈的口吻。按新关系人重写之前,非 A 底本不走 LLM 也不走手写兜底,
+       返回 null——content.js 落回底本作者写的 narrative.momToldOpen。 */
+    const id = dossierId();
+    if (id && id !== 'phone-7741') return null;
     if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
     const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
     return fallback();

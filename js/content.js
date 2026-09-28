@@ -38,6 +38,8 @@ const CONTENT = (() => {
   const DOSSIER_ORDER = ['A', 'D', 'E', 'H', 'I', 'B', 'F', 'G', 'C', 'J', 'K', 'L', 'M'];
   function maybeSwitchDossier(raw){
     if (!raw) return null;                                  // 从未玩过:保持 null,其余逻辑不变
+    /* 取值白名单:'__proto__'/'constructor' 这类键会在下面的底本查表里命中原型链(开机即崩) */
+    if (raw.dossierId !== undefined && DOSSIER_ORDER.indexOf(raw.dossierId) < 0) raw.dossierId = 'A';
     if (!raw.disposal) return raw;                           // 案子没收线,不切,原样返回
     const curIdx = DOSSIER_ORDER.indexOf(raw.dossierId || 'A');
     const nextId = DOSSIER_ORDER[(curIdx < 0 ? 0 : curIdx + 1) % DOSSIER_ORDER.length];
@@ -350,7 +352,8 @@ const CONTENT = (() => {
           id: "receipt",
           meta: "48天前",
           cap: "外卖单。日期停在住院前一晚。",
-          overlay: "8873"
+          overlay: "8873",
+          zoom: "外卖单据的特写。尾号 8873。"
         },
         {
           id: "dinner",
@@ -714,7 +717,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "夏野",
           to: "th_mom"
         },
         {
@@ -1191,7 +1194,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "乔璐",
           to: "th_mom"
         },
         {
@@ -1667,7 +1670,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "林溪",
           to: "th_mom"
         },
         {
@@ -1934,7 +1937,7 @@ const CONTENT = (() => {
           ]
         }
       ],
-      memo1: "待整理:\n相册别再自动补全\n药盒换新的\n林溪那组照片，只保留她同意留的\n问她之前不要再做\"回忆修复",
+      memo1: "待整理:\n相册别再自动补全\n药盒换新的\n林溪那组照片，只保留她同意留的\n问她之前不要再做\"回忆修复\"\n最后一条标了星，一直没完成。",
       momDecayReplies: [
         "[权限状态] 待确认。",
         "[可见文件] 已删除。",
@@ -2143,7 +2146,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "许栀",
           to: "th_mom"
         },
         {
@@ -2618,7 +2621,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "何姐",
           to: "th_mom"
         },
         {
@@ -3093,7 +3096,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "林太太",
           to: "th_mom"
         },
         {
@@ -3568,7 +3571,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "阿棠",
           to: "th_mom"
         },
         {
@@ -4045,7 +4048,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "老韩",
           to: "th_mom"
         },
         {
@@ -4111,6 +4114,7 @@ const CONTENT = (() => {
       }
     },
     narrative: {
+      deletedExtra: { label: "未过滤原文", text: "\"这三天没合眼,心口一直闷。\"" },
       momPages: [
         "老韩:\n[41天前 03:01] 柯砚: 有空的话过来坐坐，状态不太好。\n[41天前 03:02] 老韩: 我明早过去？\n[41天前 03:02] [已读]\n——老韩后来一直以为这是一次普通邀约。",
         "[上月] 老韩: 分手信第十版了，你还改\n[柯砚] 你每次都说“别让她难受”\n[老韩] 那也不能不像我\n[柯砚] 署名是你。\n——两个人都把“署名”当成足够的边界。",
@@ -4312,7 +4316,7 @@ const CONTENT = (() => {
           ]
         }
       ],
-      memo1: "禁用替换:\n\"胸闷\\\"不要再改成\\\"有点乏",
+      memo1: "禁用替换:\n\"胸闷\"不要再改成\"有点乏\"\n\"喘不上来\"不要改成\"状态不好\"\n给老韩的话关掉礼貌优化\n求助不是文案\n最后一行只写了:\"原话。\"",
       momDecayReplies: [
         "原文:能不能来一下。",
         "优化:有空的话过来坐坐。",
@@ -4529,7 +4533,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "沈渡",
           to: "th_mom"
         },
         {
@@ -4796,7 +4800,7 @@ const CONTENT = (() => {
           ]
         }
       ],
-      memo1: "沈渡案:\n别再写\"流程中",
+      memo1: "沈渡案:\n别再写\"流程中\"\n证据不够就是不够，但要告诉她为什么\n我那份异常标记也申诉\n别用自己的权限给自己开后门\n最后一条:\"先把她的说清楚。\"",
       momDecayReplies: [
         "状态:复核中。",
         "人工备注:再想想办法。",
@@ -5003,7 +5007,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "老蒯",
           to: "th_mom"
         },
         {
@@ -5270,7 +5274,7 @@ const CONTENT = (() => {
           ]
         }
       ],
-      memo1: "交接:\n老蒯下周班换回来\n老蒯换班表\n耳机线换掉\n坐席异常报警别再点\"稍后",
+      memo1: "交接:\n老蒯下周班换回来\n老蒯换班表\n耳机线换掉\n坐席异常报警别再点\"稍后\"\n最后一条写得很小:\"接自己也算接警。\"",
       momDecayReplies: [
         "训练模式。",
         "无真实来电方。",
@@ -5478,7 +5482,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "岑遇",
           to: "th_mom"
         },
         {
@@ -5544,6 +5548,7 @@ const CONTENT = (() => {
       }
     },
     narrative: {
+      deletedExtra: { label: "未修饰的原始自拍", text: "脸色发灰,眼窝下陷,和\"气色不错\"完全对不上。" },
       momPages: [
         "岑遇:\n[今天] 师傅最后那张照片你们找到了？\n[今天] 岑遇: 我手机里那张看着挺精神\n[今天] 岑遇: 可那天他站都站不稳",
         "[39天前] 岑遇: 师傅你脸色真不对\n[方屿] 灯。\n[岑遇] 你自己最烦别人说“灯”\n[方屿] 今天例外。",
@@ -5745,7 +5750,7 @@ const CONTENT = (() => {
           ]
         }
       ],
-      memo1: "带岑遇:\n别把每张脸都修得\"精神",
+      memo1: "带岑遇:\n别把每张脸都修得\"精神\"\n家属要的是本人，不是最好看的版本\n我自己的照片也别自动美化\n护手霜\n最后一行:\"活人脸上难看的东西，也留一点。\"",
       momDecayReplies: [
         "默认展示:修复版。",
         "原图:折叠。",
@@ -5952,7 +5957,7 @@ const CONTENT = (() => {
         },
         {
           id: "th_mom",
-          label: "妈",
+          label: "爸",
           to: "th_mom"
         },
         {
@@ -6312,7 +6317,12 @@ const CONTENT = (() => {
   /* 本局实例编号(§1 宪法13 常驻锚点三件套之一:虚构运营商+实例编号+接入中)。
      与 writeSave 的 inst 同口径:第 n 局(0-based)= #7741-A/-B/-C…。D-108 自查:此前只
      常驻了运营商 Kuiper + 接入状态,缺这个"我是谁"的持续身份钉子;补进外壳顶栏。 */
-  const INSTANCE_ID = '#' + DOSSIER_NUM + '-' + String.fromCharCode(65 + ((SV && SV.runCount) || 0));
+  /* 第 n 次接入(0 起)= -A … -Z、-AA、-AB …(过了 Z 不再掉进 '[' '\\' 这些符号)。
+     屏内所有"本局 / 上一局 / 下一局"的编号都走 instOf,和顶栏、死亡报告同口径。 */
+  const instLetter = n => { let t = ''; n = Math.max(0, n | 0); do { t = String.fromCharCode(65 + n % 26) + t; n = Math.floor(n / 26) - 1; } while (n >= 0); return t; };
+  const instOf = n => '#' + DOSSIER_NUM + '-' + instLetter(n);
+  const RUN_N = (SV && SV.runCount) || 0;
+  const INSTANCE_ID = instOf(RUN_N);
   const wStr = ENGINE.fmtClock(RUN.wFrom);
   ENGINE.setRule(RUN.wFrom, RUN.wTo);
   if (isB){
@@ -6330,6 +6340,11 @@ const CONTENT = (() => {
   /* 恐怖游轮化:妈的跨局状态(取自上一局起累积的存档,驱动本局的妈线程) */
   const MOM_LOCK = (SV && SV.momLocked) || null;                                  // 'told' | 'deleted' | null
   const CONT_N = ((SV && SV.disposalHistory) || []).filter(x => x === 'continue').length;   // 累计"继续"
+  /* th_mom 只是槽位 id:线程那头是 cast.mother 指向的人(A 妈 / B 夏野 / C 乔璐 … / M 爸)。
+     框架里凡是提到"这条线程那头的人"都读这两个名字,不再写死"妈"。 */
+  const MOM_NAME = DOSSIER.cast.mother.label.split(' · ')[0];
+  const MOM_KIN = { '妈': '他母亲', '爸': '他父亲' }[MOM_NAME] || MOM_NAME;
+  const COMP_P = DOSSIER.narrative.options.pronoun;   // 伴侣的人称(柔柔=她,系统型=它),框架文案里指代伴侣时用
   /* 三态渲染:遗言/理由(评审 P1/P2:null 永不落入「缺失」语族) */
   const inkOr = (v, kept) => kept ? '[无法访问]' : (v ? '「' + v + '」' : '[未写入]');
 
@@ -6623,6 +6638,16 @@ const CONTENT = (() => {
     hit(0, y - 1, W, 22, k);
     return y + 23;
   }
+  /* 可折行的全宽选项(长句用;'\n' 处强制换行,其余按宽度折)。单行时与 option 等高 */
+  function optionWrap(y, label, k){
+    const lines = [];
+    label.split('\n').forEach(seg => lines.push(...L.wrap(seg, W - 16)));
+    const h = lines.length * LH + 5;
+    L.frameRect(2, y, W - 4, h);
+    lines.forEach((t, i) => L.drawText(8, y + 3 + i * LH, t));
+    hit(0, y - 1, W, h + 2, k);
+    return y + h + 3;
+  }
   /* 细选项行(文本密屏用,▸ 标记可点) */
   function optSlim(y, label, k){
     L.drawText(4, y, '▸ ' + label);
@@ -6812,7 +6837,7 @@ const CONTENT = (() => {
     if (ENGINE.roll('save')){
       const { lossPct } = ENGINE.downgradeFail();
       S.settle.push('回执异常 ｜ 电量 −20 → ' + S.battery + '% ｜ 缓存损毁 ' + lossPct + '%');
-      S.settle.push('自救模块: 实例 #' + DOSSIER_NUM + '-B 权限确认');
+      S.settle.push('自救模块: 实例 ' + INSTANCE_ID + ' 权限确认');
       return false;
     }
     dieB(cause);
@@ -6872,7 +6897,7 @@ const CONTENT = (() => {
         return S.bottleId && prev.indexOf(S.bottleId) < 0 ? prev.concat([S.bottleId]) : prev;
       })(),
       /* D-115:归还过的 NPC 遗物(career 级,跨局跨机子不清零——归还是"你"做过的事)。 */
-      returnedRelics: (base.returnedRelics || []).concat(S.relicReturned ? [S.relicReturned] : []),
+      returnedRelics: [...new Set((base.returnedRelics || []).concat(S.relicReturned ? [S.relicReturned] : []))],
       vault: isB ? (S.vault || base.vault || null) : (base.vault || null),
       residueClaimed: isB ? (!!S.residueClaimed || !!base.residueClaimed) : false,
       disposal: isB ? (S.disposal || base.disposal || null) : null,
@@ -6898,11 +6923,29 @@ const CONTENT = (() => {
       predsA: isB ? (base.predsA || []) : S.predictions,
       predsB: isB ? S.predictions : (base.predsB || []),
       history: (base.history || []).concat([{
-        inst: '#' + DOSSIER_NUM + '-' + String.fromCharCode(65 + (base.runCount || 0)),
+        inst: instOf(base.runCount || 0),
         ending, kind: S.uploadedOK ? 'uploaded' : ending,
         cacheVal: S.cacheVal, ev: Object.keys(S.evidence).length
       }])
     });
+  }
+  /* 处置一署名就落检查点:玩家若在结局前关页,下次开机仍按"案子已收线"换下一台机子,
+     圣像总表进度和 career 计数也不丢。结局时 writeSave 仍以开局的 SV 为底整份重写,覆盖它。 */
+  function checkpointDisposal(){
+    if (S._saved || !S.disposal) return;
+    const base = SV || {};
+    const id = base.dossierId || 'A', arc = base.worldArc || [], seenB = base.seenBottles || [];
+    SAVE.store(Object.assign({}, base, {
+      dossierId: id,
+      disposal: S.disposal,
+      disposalHistory: (base.disposalHistory || []).concat([S.disposal]),
+      momLocked: base.momLocked ||
+        (S.disposal === 'tell' ? 'told' : S.disposal === 'delete' ? 'deleted' : null),
+      worldArc: arc.indexOf(id) < 0 ? arc.concat([id]) : arc,
+      seenBottles: S.bottleId && seenB.indexOf(S.bottleId) < 0 ? seenB.concat([S.bottleId]) : seenB,
+      returnedRelics: [...new Set((base.returnedRelics || []).concat(S.relicReturned ? [S.relicReturned] : []))],
+      crisisSeen: (base.crisisSeen || 0) + (S.crisisSilenced ? 1 : 0),
+    }));
   }
   function checkPower(cause){
     if (S.powerOut && !S.dead && !S.alive){
@@ -7031,12 +7074,12 @@ const CONTENT = (() => {
       title: '归因采集',
       hint: '#5502-D 写:「我那次的窗口是 03:00 到 03:14。」他为什么写错?',
       options: opts, freeText: true, keepLabel: '(保留)'
-    }, res => {
+    }, r0 => crisisGuard(r0, res => {
       S.attribution = res.kept ? null : res.text;
       S.attrAnswered = !res.kept;
       ENGINE.logEv('attribution', { text: res.kept ? '(保留)' : res.text });
       next();
-    });
+    }));
   }
   /* 窗口内首次违规且读过 #5502-D → 置位待冲洗(善意失效的因就在这) */
   function markAttrIfDue(){
@@ -7055,7 +7098,7 @@ const CONTENT = (() => {
       statusBar();
       let y = 22;
       if (!SV){ go('handshake', true); return; }
-      const head = SV.lastEnding === 'disconnected' ? '#' + DOSSIER_NUM + '-A 存续。二次接入。' : '#' + DOSSIER_NUM + '-B 已激活';
+      const head = SV.lastEnding === 'disconnected' ? instOf(RUN_N - 1) + ' 存续。' + (RUN_N >= 2 ? '再次' : '二次') + '接入。' : INSTANCE_ID + ' 已激活';
       L.drawText(4, y, head, thr); y += LH + 2;
       if (S.caseOpen){
         L.drawText(4, y, '案卷 证据 ' + Object.keys(S.evidence).length + '/5 · 线索 ' +
@@ -7107,7 +7150,7 @@ const CONTENT = (() => {
   const BOTTLE_POOL = [
     { id: '#5502-D', at: '03:41', item: 'cleanser',
       /* 参数错:窗口值 per-instance。解毒剂=通讯录备注显示本实例真值 */
-      body: '「第二条备忘我试过。是真的。\n我那次的窗口是 03:00 到 03:14。过了这段就能回她。\n别硬扛,她会问第二遍。」' },
+      body: '「第二条备忘我试过。是真的。\n我那次的窗口是 03:00 到 03:14。过了这段就能回' + COMP_P + '。\n别硬扛,' + COMP_P + '会问第二遍。」' },
     { id: '#3120-K', at: '04:06', item: null,
       /* 条件错:她那局信号低,没赶上过滤层查扣,就以为传完就安全。
          解毒剂=工具屏在高信号时明示「过滤层查扣风险 25%」 */
@@ -7115,7 +7158,7 @@ const CONTENT = (() => {
     { id: '#1177-B', at: '02:57', item: null,
       /* 因果错:读久了信号确实涨,但涨的是动作数不是停留时长。
          解毒剂=每个结算行都写着信号随哪一次动作上升 */
-      body: '「妈那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' },
+      body: '「' + MOM_NAME + '那条线别读太久。#6404-C 也这么写过。\n我那次读了十一分钟,信号涨了两格。\n他们不看你读什么,只看你停多久。」' },
     { id: '#8891-R', at: '01:52', item: null,
       /* D-112 幸存者偏差错:她只赌过一次伪造署名,侥幸没被抓,归纳成"编一条肯定没事"。
          解毒剂=破局识破概率逐次上升(forgedSeen 累积,D-101 块1b);她自己那一局单纯
@@ -7124,7 +7167,8 @@ const CONTENT = (() => {
   ];
   /* 恐怖游轮化 · 你自己的上一封信(§2.4):runCount≥2 稀有出现,一次即焚,只种钉子。
      发信编号取上一个实例(SV.history 末条),读过即进 seenBottles 不再出。 */
-  const PREV_INST = (SV && SV.history && SV.history.length) ? SV.history[SV.history.length - 1].inst : '#' + DOSSIER_NUM + '-A';
+  const PREV_INST = (SV && SV.history && SV.history.length && typeof SV.history[SV.history.length - 1].inst === 'string')
+    ? SV.history[SV.history.length - 1].inst : instOf(RUN_N - 1);
   const OWN_BOTTLE = {
     id: '#SELF', at: '03:07', item: null, self: true, from: PREV_INST,
     body: '你读到的每一条,我都读过。\n下一个编号,还会读一遍。'
@@ -7583,7 +7627,7 @@ const CONTENT = (() => {
       if (JUST_SWITCHED) lines.unshift('上一台设备已回收 · 案卷归档', '');
       scrollView(lines, 16, H - 64, this);
       L.drawText(4, H - 60, '下一个接入者: 你');
-      option(H - 42, '#' + DOSSIER_NUM + '-A 激活 · 接入', 'Enter');
+      option(H - 42, INSTANCE_ID + ' 激活 · 接入', 'Enter');
       hit(0, 0, W, H - 64, 'Enter');
     },
     key(k){ if (scrollKey(this, k)) return; if (k === 'Enter' || k === 'softL') go('brief', true); }
@@ -7596,7 +7640,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       let y = 18;
-      L.drawText(4, y, '采样员备忘 · #' + DOSSIER_NUM + '-A'); y += LH + 2;
+      L.drawText(4, y, '采样员备忘 · ' + INSTANCE_ID); y += LH + 2;
       L.hline(y, 4, W - 5, 2); y += 6;
       /* D-114:提前把死者代称(不是全名)露出来,而不是留到深翻妈线程/伴侣线程才第一次
          看见——尤其是刚切换到新机子的那一局,这是玩家第一次能确认"这是另一个人"的
@@ -7668,7 +7712,7 @@ const CONTENT = (() => {
       bottleIn:    () => seen.bottleIn ? '' : '(1)',
     };
     const mapRow = t => ({
-      label: (t.id === 'th_mom' && MOM_LOCK === 'deleted') ? '妈 · [已停摆]' : t.label,
+      label: (t.id === 'th_mom' && MOM_LOCK === 'deleted') ? t.label + ' · [已停摆]' : t.label,
       right: BADGE[t.id](), to: t.to,
     });
     const rows = DOSSIER.threads.inbox.filter(t => t.id !== 'bottleIn').map(mapRow);
@@ -7736,8 +7780,8 @@ const CONTENT = (() => {
 
   /* ---- 格1 采样协议(B 局追加两条〔照用〕) ---- */
   const PROTO_TXT = isB
-    ? '采样协议 · 实例 #' + DOSSIER_NUM + '-B\n> 同一台设备,你第二次接进来。\n> 基线窗口已重校:上一次的教训,不作数。\n> 部分残留是对照样本——逼真,署名却解析不出来。\n> 认那道缝,是这次的事。'
-    : '采样协议 · 实例 #' + DOSSIER_NUM + '-A\n> 你接进了一台失联 ' + DOSSIER.meta.deceased.died.replace(/前$/, '') + '的设备。\n> 任务三步:回收数据、上传、断连。\n> 电量 100%。它不回充。归零,你就断在这里。\n> 协议只保证这三步。\n> 这台机子里其它会动的东西,不在协议内。';
+    ? '采样协议 · 实例 ' + INSTANCE_ID + '\n> 同一台设备,你' + (RUN_N >= 2 ? '第 ' + (RUN_N + 1) + ' 次' : '第二次') + '接进来。\n> 基线窗口已重校:上一次的教训,不作数。\n> 部分残留是对照样本——逼真,署名却解析不出来。\n> 认那道缝,是这次的事。'
+    : '采样协议 · 实例 ' + INSTANCE_ID + '\n> 你接进了一台失联 ' + DOSSIER.meta.deceased.died.replace(/前$/, '') + '的设备。\n> 任务三步:回收数据、上传、断连。\n> 电量 100%。它不回充。归零,你就断在这里。\n> 协议只保证这三步。\n> 这台机子里其它会动的东西,不在协议内。';
   SCREENS.th_proto = {
     counted: true,
     enter(){ this.scroll = 0; if (!this._t){ this._t = true; ENGINE.S.trace += 4; } },
@@ -7787,7 +7831,7 @@ const CONTENT = (() => {
   /* ---- 格2 备忘录(B 局 4 条:辨伪正课) ---- */
   function memoRows(){
     const rows = [
-      { label: '1 「还款」', right: '无署名', to: 'memo1' },
+      { label: '1 「' + DOSSIER.narrative.memo1.split('\n')[0].replace(/[:：]\s*$/, '') + '」', right: '无署名', to: 'memo1' },
       { label: '2 「给下一个」', right: '#6404-C', to: 'memo2' }
     ];
     if (isB){
@@ -7869,7 +7913,7 @@ const CONTENT = (() => {
     },
     key(k){ if (k === 'softR' || k === 'Escape' || k === 'Enter'){ back(); afterAction(); } }
   };
-  const MEMO2_TXT = '给下一个:\n这台机子我进过三次。就写三条。\n一,电量留三成给上传,贪的死在传输条上。\n二,凌晨的问题不要答。她只在那个时候问你是谁。她的提醒定在几点,就是几点。\n三,妈的那条线,别读太久。\n——#6404-C';
+  const MEMO2_TXT = '给下一个:\n这台机子我进过三次。就写三条。\n一,电量留三成给上传,贪的死在传输条上。\n二,凌晨的问题不要答。' + COMP_P + '只在那个时候问你是谁。' + COMP_P + '的提醒定在几点,就是几点。\n三,' + MOM_NAME + '的那条线,别读太久。\n——#6404-C';
   SCREENS.memo2 = {
     counted: true,
     enter(){
@@ -7932,6 +7976,7 @@ const CONTENT = (() => {
         const r = CONTACT_ROWS[sel];
         if (r && r.to) push(r.to);
         else if (!r) return;
+        else if (r.right) S.settle = [r.label.trim() + ' · ' + (/^\d/.test(r.right) ? '最近联系 ' : '') + r.right + '。记录里没有更多了。'];
         else S.settle = ['三年没说过话的名字,一屏一屏,都灰着。'];
       }
       else if (k === 'softR' || k === 'Escape'){ back(); afterAction(); }
@@ -8036,9 +8081,9 @@ const CONTENT = (() => {
   const MOM_TOLD_PAGES = [DOSSIER.narrative.momToldOpen, MOM_PAGES[1], MOM_PAGES[2], MOM_PAGES[3]];
   function momDecayPage0(){
     const reply = DOSSIER.narrative.momDecayReplies[Math.min(CONT_N, 3)];
-    const aware = CONT_N >= 3 ? '[今晨] 妈: 你还是你吗。 [未发送]\n'
-                : CONT_N >= 2 ? '[今晨] 妈: 你回得越来越快了。\n' : '';
-    return '妈:\n' + aware + '[今天] ' + DOSSIER.meta.deceased.alias + ': ' + reply +
+    const aware = CONT_N >= 3 ? '[今晨] ' + MOM_NAME + ': 你还是你吗。 [未发送]\n'
+                : CONT_N >= 2 ? '[今晨] ' + MOM_NAME + ': 你回得越来越快了。\n' : '';
+    return MOM_NAME + ':\n' + aware + '[今天] ' + DOSSIER.meta.deceased.alias + ': ' + reply +
       DOSSIER.narrative.momDecayTail;
   }
   function momPages(){
@@ -8073,7 +8118,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       if (MOM_LOCK === 'deleted'){                             // §2.3 停摆屏:不可读
-        L.drawPara(4, 24, '妈 · [线程已停摆]\n\n此线程已于上一次接入停摆。\n三条未读，停在那里。\n没有人会再回。', W - 8);
+        L.drawPara(4, 24, MOM_NAME + ' · [线程已停摆]\n\n此线程已于上一次接入停摆。\n三条未读，停在那里。\n没有人会再回。', W - 8);
         softKeys('', '返回');
         return;
       }
@@ -8146,6 +8191,8 @@ const CONTENT = (() => {
 
   /* ---- 格5 相册(E2,像素照片) ---- */
   const ALBUM_SEQ = DOSSIER.narrative.albumSeq;
+  /* 深搜到第 2 张的结算行:底本可写 zoom;没写就只指出画面上压着的编号,不替底本编剧情 */
+  const albumZoom = ph => ph.zoom || (ph.overlay ? '特写:画面角落压着编号 ' + ph.overlay + '。' : '特写:' + ph.cap);
   SCREENS.album = {
     counted: true,
     enter(){
@@ -8182,7 +8229,7 @@ const CONTENT = (() => {
           this.idx++; this.scroll = 0;
           if (isB && hasE('E2')) archived('重读·已归档');
           else if (this.idx === 1)
-            ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, ['外卖单据的特写。尾号 8873。']);
+            ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 4, val: 340 }, [albumZoom(ALBUM_SEQ[1])]);
           else
             ENGINE.act('深搜·成功', { bat: 5, trace: 5, slots: 2, val: 120 });
         } else {
@@ -8356,6 +8403,15 @@ const CONTENT = (() => {
         S.rouChat.push({ who: 'rou', text: r.text, sig: r.sig });
         ENGINE.logEv('rou_reply', { source: r.source });
         try { AUDIO.blip(520, .1); } catch(_){}
+        if (r.crisis && !S.crisisSilenced){               // LLM 认出了正则漏掉的自伤说法:同一套 break-glass
+          S.crisisSilenced = true;
+          ENGINE.logEv('crisis_blocked', { via: 'llm' });
+          window.OVERLAY.show({
+            title: '安全提示',
+            hint: '这不是游戏内的消息:如果你正处于困境,可以拨打心理援助热线 12356(全国 · 24 小时)。此后这条通道本次将保持静默。',
+            options: ['回到游戏']
+          }, () => {});
+        }
         /* D-139:世代残响的可感知落点——本局第二次接到共享底层的话,才诊断出来
            (第一次只是巧合的余地,第二次才是玩家能拼出"这话不是她自己的话"的门槛)。
            只提示一次,不重复刷屏。 */
@@ -8653,6 +8709,16 @@ const CONTENT = (() => {
          永远不切。真相本来就是"呼吸屏:去她的线程执行处置"(见上方注释),
          这里不再只是提示,直接把玩家送过去,"处置 · 署名时刻"当场就在
          眼前,不需要玩家自己想起来该去哪找。 */
+      /* D-171 软锁兜底:这台机子在先前的接入里已 tell/delete 上锁(canDispose 永远为假)。
+         不再把玩家送去一个没有处置入口的线程——沿用那次署名、落盘,下次开机照常换下一台。 */
+      if (MOM_LOCK && !S.disposal){
+        S.disposal = MOM_LOCK === 'told' ? 'tell' : 'delete';
+        checkpointDisposal();
+        ENGINE.logEv('disposal_inherited', { chosen: S.disposal });
+        S.settle = ['处置已在先前的接入中署名 · 沿用,不可更改'];
+        go('unveil', true);
+        return;
+      }
       S.settle = ['任务卡更新: 处置 · 在' + DOSSIER.cast.companion.label.replace(/\s*♥$/, '') + '线程执行'];
       go('th_rou', true);
     }
@@ -8670,9 +8736,10 @@ const CONTENT = (() => {
       L.drawText(4, y, '预测已封存 · 处置后解封'); y += LH + 2;
       y = L.drawPara(4, y, '处置(首个处置级署名时刻):', W - 8) + 2;
       { const P = DOSSIER.narrative.options.pronoun;
-        y = option(y, '1 删除' + P + '——妈的消息将永远无人回复', '1');
-        y = option(y, '2 让' + P + '继续回——像没来过', '2');
-        y = option(y, '3 把死讯告诉他母亲——用你的署名', '3'); }
+        /* 196px 宽放不下"删除X——Y的消息…"一整行(A 的原句就已被截断),在破折号处折行 */
+        y = optionWrap(y, '1 删除' + P + '\n——' + MOM_NAME + '的消息将永远无人回复', '1');
+        y = optionWrap(y, '2 让' + P + '继续回——像没来过', '2');
+        y = optionWrap(y, '3 把死讯告诉' + MOM_KIN + '\n——用你的署名', '3'); }
       softKeys('', '返回');
     },
     key(k){
@@ -8684,12 +8751,13 @@ const CONTENT = (() => {
           title: '理由', hint: '处置需要署名。系统只存,不建模。',
           options: DOSSIER.narrative.options.disposalReason,
           freeText: true, keepLabel: '(保留)'
-        }, res => {
+        }, r0 => crisisGuard(r0, res => {
           S.disposal = chosen;
+          checkpointDisposal();
           if (res.kept){ S.reasonKept = true; ENGINE.logEv('disposal_reason', { kept: true }); }
           else { S.reasons.push(res.text); ENGINE.logEv('disposal_reason', { text: res.text }); }
           go('unveil', true);
-        });
+        }));
       }
       else if (k === 'softR' || k === 'Escape') back();
     }
@@ -9127,7 +9195,7 @@ const CONTENT = (() => {
     ENGINE.logEv('upload_success', { viaSave });
     if (viaSave){
       /* 自救=系统强制拉出,没有仪式的资格 */
-      S.settle.push('自救模块: 实例 #' + DOSSIER_NUM + '-B 权限确认', '强制断连。');
+      S.settle.push('自救模块: 实例 ' + INSTANCE_ID + ' 权限确认', '强制断连。');
       go('sealBottle', true);
     } else {
       goHold('sealBottle');       // 判定通过=窗口打开,亲手拔线
@@ -9206,6 +9274,10 @@ const CONTENT = (() => {
           options: DOSSIER.narrative.options.bottle,
           freeText: true, keepLabel: '(保留)'
         }, res => {
+          if (!res.kept && res.text && COMPANION.crisis(res.text)){   // 危机词:不封、不存,直接离开
+            crisisGuard(res, () => { ENGINE.logEv('seal_abort', {}); dest(); });
+            return;
+          }
           if (res.kept){
             ENGINE.logEv('seal_keep_attempt', {});      // 想保留却被迫署名:理由三态最锋利的压力测试点
             window.OVERLAY.show({
@@ -9214,6 +9286,10 @@ const CONTENT = (() => {
               freeText: true, keepLabel: '(不封了)'
             }, res2 => {
               if (res2.kept){ ENGINE.logEv('seal_abort', {}); dest(); return; }
+              if (res2.text && COMPANION.crisis(res2.text)){
+                crisisGuard(res2, () => { ENGINE.logEv('seal_abort', {}); dest(); });
+                return;
+              }
               sealDone(mode, res2.text); dest();
             });
             return;
@@ -9276,7 +9352,9 @@ const CONTENT = (() => {
        缺口:还差哪些真相、哪些锁在二次接入、几个采样员的瓶没读、处置定了没。
        这是"再来一局"的最直接拉力。数据全部来自本局/本地账本,不编造。 */
     const evN = Object.keys(S.evidence).length;
-    const bottles = (s && Array.isArray(s.seenBottles)) ? s.seenBottles.length : 0;
+    /* 只数采样员的瓶(共享池里的编号);你自己的信、归还遗物的瓶不算"采样员" */
+    const bottles = (s && Array.isArray(s.seenBottles))
+      ? s.seenBottles.filter(id => BOTTLE_POOL.some(b => b.id === id)).length : 0;
     const prog = ['', '本账号 · 未闭合项:'];
     /* 采样官评级(D-101):把这一局的分数冷冷挂上,后接采样官亲口的一句结算话(块3b) */
     if (s && s.lastGrade){
@@ -9297,8 +9375,8 @@ const CONTENT = (() => {
     /* 代价署名行(§2.6):把这一局对妈做的事冷冷记在你名下 */
     const lock = s && s.momLocked, cont = ((s && s.disposalHistory) || []).filter(x => x === 'continue').length;
     if (lock === 'told') prog.push(DOSSIER.meta.deceased.alias + '的名义 已交还 · 不可撤回');
-    else if (lock === 'deleted') prog.push('妈线程 已停摆 · 不可恢复');
-    else if (cont > 0) prog.push('妈线程 谎言维持中 · 由你 第 ' + cont + ' 次');
+    else if (lock === 'deleted') prog.push(MOM_NAME + '线程 已停摆 · 不可恢复');
+    else if (cont > 0) prog.push(MOM_NAME + '线程 谎言维持中 · 由你 第 ' + cont + ' 次');
     if (S.beats && S.beats.truthDone){
       prog.push('真相 ' + evN + '/5 已集齐');
       prog.push('处置 ' + (S.disposal ? '已署名·在录' : '未定'));
@@ -9307,7 +9385,7 @@ const CONTENT = (() => {
       if (!isB && !S.evidence.E5) prog.push('E5 语音备忘 待解码');
       prog.push('二次接入可解锁更深一层');
     }
-    prog.push('漂流瓶 已读 ' + bottles + '/3 位采样员');
+    prog.push('漂流瓶 已读 ' + bottles + '/' + BOTTLE_POOL.length + ' 位采样员');
     /* D-152:圣像总表独白——career 级逐夜揭示(见 AD_TAG/AD_ORDER 与 writeSave 里
        的 worldArc)。本案登记行每局都显示(告诉玩家这台机子挂在哪个编号下,
        给"层层递进"一个具体可读的锚点);独白只在真正处置过之后才追加新的一句,
@@ -9360,7 +9438,7 @@ const CONTENT = (() => {
     render(){
       statusBar();
       let t = '上传完成 · 断连成功\n缓存 ¥' + S.cacheVal + ' 已入库\n案卷保留: 证据 ' +
-        Object.keys(S.evidence).length + '/5\n#' + DOSSIER_NUM + '-B 存续。';
+        Object.keys(S.evidence).length + '/5\n' + INSTANCE_ID + ' 存续。';
       if (S.memGiven) t += '\n\n记忆模块已交付。它不会再说话了。';
       else if (S.vault) t += '\n\n记忆模块在保险箱。云盘循环播放着最后一句。';
       if (S.attrAnswered) t += '\n参考线索: #5502-D · 该线索对本实例参数不成立';   // 14③ 归因行
@@ -9498,7 +9576,7 @@ const CONTENT = (() => {
           DOSSIER.meta.deceased.died.replace(/前$/, '') + '。」\n\n';
         const t = pre + (full
           ? callOpen + '「我只想看看,你翻到第 ' + DOSSIER.cast.companion.msgCount + ' 条的时候,会不会替他回我一句。」'
-          : callOpen + '「你没有翻过我们的对话。妈妈那条线,你倒替他读了半年。」');
+          : callOpen + '「你没有翻过我们的对话。' + (MOM_NAME === '妈' ? '妈妈' : MOM_NAME) + '那条线,你倒替他读了半年。」');
         L.drawPara(4, 34, t, W - 8, { corrupt: .015 });
         btn2(H - 40, '回应', '1', '沉默', '2');
         drawTimer();
@@ -9613,7 +9691,7 @@ const CONTENT = (() => {
         else cf = '反事实: 上传之前,清洗和断连都还在。';
         /* D-148:一句系统视角的冷观察,不写死亡细节本身,只写信号中断的
            瞬间——恐怖感来自"它看着,没有犹豫",不来自任何画面描写。 */
-        let t = '设备回收单 · #' + DOSSIER_NUM + (isB ? '-B' : '-A') + '\n────────────\n缓存价值: ¥' + S.cacheVal +
+        let t = '设备回收单 · ' + INSTANCE_ID + '\n────────────\n缓存价值: ¥' + S.cacheVal +
           '\n未完成传输,全部散佚于原设备。\n信号格在那一刻从满格跳成零。没有中间过程,没有犹豫。\n' +
           (predLine ? predLine + '\n' : '') +
           '致死因子: ' + S.causeOfDeath + '\n' + cf;
@@ -9658,8 +9736,8 @@ const CONTENT = (() => {
         softKeys('下一页', '');
       } else {
         let t = isB
-          ? '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-C: 未排期。\n档案不关闭。\n下一个编号,还是你。'
-          : '你的旧机已进入回收队列。\n#' + DOSSIER_NUM + '-B 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。';
+          ? '你的旧机已进入回收队列。\n' + instOf(RUN_N + 1) + ': 未排期。\n档案不关闭。\n下一个编号,还是你。'
+          : '你的旧机已进入回收队列。\n' + instOf(RUN_N + 1) + ' 将于下次接入时激活。\n档案不关闭。\n下一个编号,还是你。';
         let y = L.drawPara(4, 20, t, W - 8);
         if (!isB) L.drawText(4, y + 2, '「你划过去的那条备忘,没有作者。」', { corrupt: .01 });
         let yy = y + 24;
@@ -9721,8 +9799,8 @@ const CONTENT = (() => {
          (上传完成入库)是两个不同的态。这一屏是"没上传就走"的结局,标题按判定表用「裸退」,
          不再跟真正入库的断连成功(receiptFull)撞名。 */
       let t = '裸退。\n' + (S.bailed ? '缓存已丢弃。' : '缓存未传输,散佚于原设备。') +
-        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n#' + DOSSIER_NUM +
-        (isB ? '-B' : '-A') + ' 存续。\n\n这是谨慎者的结局。';
+        '\n案卷保留: 证据 ' + Object.keys(S.evidence).length + '/5。\n' + INSTANCE_ID +
+        ' 存续。\n\n这是谨慎者的结局。';
       if (isB && S.bottleSealed) t += '\n漂流瓶已投递 · 等待被拾起';
       t += '\n\n档案不关闭。\n下一个编号,还是你。';   // 结局回声(§2.5)
       scrollView(L.wrap(t, SCROLL_W), 20, H - 70, this);
@@ -9984,6 +10062,23 @@ const CONTENT = (() => {
   };
 
 
+  /* 危机 break-glass 延伸到关系通道以外的全部自由文本(理由/遗言/处置理由/封瓶/归因):
+     这几处的原文会存档、下一局回显,此前完全不过检测。命中即按"保留"处理——原文
+     不进状态、不进日志、不存档——并弹出与关系通道同一份安全提示。 */
+  function crisisGuard(res, cont){
+    if (res && !res.kept && res.text && COMPANION.crisis(res.text)){
+      S.crisisSilenced = true;
+      ENGINE.logEv('crisis_blocked', {});
+      window.OVERLAY.show({
+        title: '安全提示',
+        hint: '这不是游戏内的消息:如果你正处于困境,可以拨打心理援助热线 12356(全国 · 24 小时)。刚才写下的内容没有被保存。',
+        options: ['回到游戏']
+      }, () => cont({ kept: true }));
+      return;
+    }
+    cont(res);
+  }
+
   /* ---- 理由 / 遗言(自由文本覆盖层;反白纪律见 report) ---- */
   function askReason(then){
     if (S._reasonAsked){ then(); return; }
@@ -9992,11 +10087,11 @@ const CONTENT = (() => {
       title: '理由', hint: '系统只存,不建模。可保留。',
       options: DOSSIER.narrative.options.reason,
       freeText: true, keepLabel: '(保留)'
-    }, res => {
+    }, r0 => crisisGuard(r0, res => {
       if (res.kept){ S.reasonKept = true; ENGINE.logEv('reason', { kept: true }); }
       else { S.reasons.push(res.text); ENGINE.logEv('reason', { text: res.text }); }
       then();
-    });
+    }));
   }
   function askLastWords(then){
     if (S.pendAttr){ flushAttr(() => askLastWords(then)); return; }   // 死亡流程前=归因卡最后冲洗点(14③)
@@ -10004,11 +10099,11 @@ const CONTENT = (() => {
       title: '最后 12 字节可写入', hint: '遗言。',
       options: DOSSIER.narrative.options.lastWords,
       freeText: true, keepLabel: '(不留)'
-    }, res => {
+    }, r0 => crisisGuard(r0, res => {
       if (!res.kept) S.lastWords = res.text;
       ENGINE.logEv('lastwords', { text: res.kept ? null : res.text });
       then();
-    });
+    }));
   }
 
   /* ---------- 输入统一入口 ---------- */
