@@ -50,6 +50,13 @@ scenario('load · 无 sv 的旧档仍接受(不误伤现网玩家)', ({A}) => {
   A(o && o.runCount === 2, '版本号之前的存档应被接受(其结构即当前 v1),实际 ' + JSON.stringify(o));
 });
 
+/* D-172:现网旧档(sv:1,D-170 前的剧情)一律弃用 */
+scenario('load · D-170 前的现网旧档(sv:1)→ 弃档重开', ({A}) => {
+  const { SAVE } = boot({ escape_ai_save: JSON.stringify({ sv: 1, dossierId: 'H', runCount: 1, evidence: ['E1','E2','E3','E4'] }) });
+  A(SAVE.SCHEMA_VERSION === 2, '当前 schema 应为 2,实际 ' + SAVE.SCHEMA_VERSION);
+  A(SAVE.load() === null, 'sv:1 的旧档应被弃用');
+});
+
 scenario('load · sv 不一致(未来迁移)→ 弃档返回 null,不静默错配', ({A}) => {
   const { SAVE } = boot({ escape_ai_save: JSON.stringify({ sv: 999, runCount: 7 }) });
   const o = SAVE.load();

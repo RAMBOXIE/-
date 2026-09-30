@@ -15,6 +15,9 @@
 #      script 的顶层 const 在 DevTools 里本来是够得着的,只删 window.GAME 不够。
 # 残留风险(诚实记账):RULE / CHECK 的数值仍在压缩后的代码里,肯花时间反编译
 # 的人还是能推出来。这一步挡的是随手一搜,不是有决心的人。
+# D-172(用户拍板:仓库保持公开):GitHub 仓库是 public 的,源码、人格核、design/
+# 文档、dist/escape-ai.html 在仓库里都能直接读到——上面这层加固只管"玩家在游戏页面
+# 上 F12/Ctrl+F 不直达答案",**不是保密**,别把它当成谜底不外泄的保证。
 set -euo pipefail
 cd "$(dirname "$0")"
 

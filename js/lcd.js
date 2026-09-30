@@ -107,7 +107,9 @@ const LCD = (() => {
     return cx;
   }
 
-  const NO_LINE_START = '。，、：；！？）」』】·…%>';
+  const NO_LINE_START = '。，、：；！？）」』】·…%>”’';
+  /* D-172 行尾禁则:开引号/开括号不单独挂在行尾(否则"这些“ / 回忆”"会把引号和词拆开) */
+  const NO_LINE_END = '“‘「『（【';
   /* 不可在中间折断的 token 字符:ASCII 字母数字 + 编号/时刻/千分位里的连接符。
      这样 #7741-A、03:14、2,417、#6404-C 折行时整段一起走,不会被拦腰断成两行。 */
   const TOKEN = /[0-9A-Za-z#:._,\-]/;
@@ -117,16 +119,17 @@ const LCD = (() => {
       if (ch === '\n'){ out.push(line); line = ''; w = 0; continue; }
       const cw = ch === ' ' ? CW_ASC : cellW(ch);
       if (w + cw > maxW){
-        if (NO_LINE_START.includes(ch) && line.length > 1){
-          const carry = line[line.length - 1];
-          out.push(line.slice(0, -1)); line = carry; w = cellW(carry);
-        } else if (TOKEN.test(ch) && line.length && TOKEN.test(line[line.length - 1])){
-          /* 正落在一个 token 中间:退到 token 起点,把整段挪到下一行 */
-          let i = line.length;
-          while (i > 0 && TOKEN.test(line[i - 1])) i--;
-          if (i > 0){ const carry = line.slice(i); out.push(line.slice(0, i)); line = carry; w = textWidth(carry); }
-          else { out.push(line); line = ''; w = 0; }   // 整行都是 token(超长)才硬断
-        } else { out.push(line); line = ''; w = 0; }
+        /* 统一回退找断点(D-172):下一行不能以禁则字符开头、token 不能拦腰断、开引号不挂行尾;
+           一步不够就继续往回退(如 “REC_047”。 整体挪行)。退到行首都不行才硬断。 */
+        const firstOf = k => k === line.length ? ch : line[k];
+        let k = line.length;
+        while (k > 0){
+          const f = firstOf(k);
+          if (NO_LINE_START.includes(f) || (TOKEN.test(f) && TOKEN.test(line[k - 1])) || NO_LINE_END.includes(line[k - 1])) k--;
+          else break;
+        }
+        if (k <= 0) k = line.length;
+        out.push(line.slice(0, k)); line = line.slice(k); w = textWidth(line);
       }
       line += ch; w += cw;
     }

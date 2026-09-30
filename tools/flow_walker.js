@@ -176,5 +176,9 @@ const allB = Object.keys(mkEnv(SAVE_CAPTURED).CONTENT.SCREENS);
 console.log('');
 
 console.log('');
-console.log('结论: 断头路 ' + (rA.dead.length+rB.dead.length+rBB.dead.length+rBC.dead.length+rBD.dead.length+rBE.dead.length+rBF.dead.length+rBG.dead.length+rBH.dead.length+rBI.dead.length+rBJ.dead.length+rBK.dead.length+rBL.dead.length+rBM.dead.length) +
-  ' 处 | 异常 ' + (rA.errs.length+rB.errs.length+rBB.errs.length+rBC.errs.length+rBD.errs.length+rBE.errs.length+rBF.errs.length+rBG.errs.length+rBH.errs.length+rBI.errs.length+rBJ.errs.length+rBK.errs.length+rBL.errs.length+rBM.errs.length) + ' 处');
+const ALL_RUNS = [rA, rB, rBB, rBC, rBD, rBE, rBF, rBG, rBH, rBI, rBJ, rBK, rBL, rBM];
+const DEAD_N = ALL_RUNS.reduce((n, r) => n + r.dead.length, 0), ERR_N = ALL_RUNS.reduce((n, r) => n + r.errs.length, 0);
+console.log('结论: 断头路 ' + DEAD_N + ' 处 | 异常 ' + ERR_N + ' 处');
+/* D-172:此前只打印结论、永远 exit 0——run_all 靠退出码判门禁,于是断头路出现了也"全部门禁通过"
+   (D-172 两难结算页就这样被放过一次,是人读日志才发现的)。现在有断头路/异常即失败。 */
+process.exit(DEAD_N || ERR_N ? 1 : 0);

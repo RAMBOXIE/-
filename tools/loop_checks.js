@@ -140,9 +140,13 @@ scenario('结局回声·receiptAlive / receiptFull', bMom({ momLocked:null, evid
   });
 
 /* ---- 抹除屏加句 ---- */
-scenario('抹除屏·加句在场', bMom({}), ({A, CONTENT, frame}) => {
+/* D-172:抹除文案改成与实际行为一致(清整条生涯、从第一台重开),旧加句
+   「不再有编号回到这里 / 这一台就到此为止」与行为相反,已删。 */
+scenario('抹除屏·文案与行为一致', bMom({}), ({A, CONTENT, frame}) => {
   CONTENT.go('wipe', true);
-  A(frame().includes('不再有编号回到这里'), '抹除确认屏应含加句');
+  const t = frame();
+  A(t.includes('从第一台设备重新接入'), '抹除确认屏应说明从第一台重新接入');
+  A(!t.includes('就到此为止') && !t.includes('不再有编号回到这里'), '不得再写与行为相反的旧加句');
 });
 
 /* ---- 你自己的信:runCount≥2 可被选中,读过即焚 ---- */

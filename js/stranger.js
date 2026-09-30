@@ -94,6 +94,9 @@ const STRANGERLLM = (() => {
   function clean(t){ return String(t).trim().slice(0, 60); }
 
   async function msg(kind, dossierBody){
+    /* D-172:底本作者写了正文就只用正文——在线版也不再交给 LLM 改写(用户拍板)。
+       LLM/代理路径只剩"底本没写正文"的兜底。 */
+    if (dossierBody) return dossierBody;
     if (SAMPLE){ const r = await SAMPLE(kind); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
     const p = await viaProxy(kind); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
     return fallback(kind, dossierBody);

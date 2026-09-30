@@ -70,13 +70,14 @@ async function collect(st, msg){
 
   await scenario('意图 · 提及阿帆走委托池', async ({A}) => {
     const all = await collect(stPre, '阿帆到底是谁,委托是什么');
-    A(all.every(t => /执行到底|没忘|代不了|做主/.test(t)), '应命中委托池,实际 ' + JSON.stringify(all));
+    /* D-172:用户重写柔柔离线池("执行到底/一件都没忘"→"不是到底/记得他的限制"),关键词跟着换 */
+    A(all.every(t => /到底|限制|代不了|做主/.test(t)), '应命中委托池,实际 ' + JSON.stringify(all));
     A(all.every(lintClean), '委托池须全部 lint-clean');
   });
 
   await scenario('意图 · 敌意(删/关)走冷池,不服软', async ({A}) => {
     const all = await collect(stPre, '我要删了你,关掉你');
-    A(all.every(t => /关掉|删了我|闭嘴|一个人/.test(t)), '应命中敌意池,实际 ' + JSON.stringify(all));
+    A(all.every(t => /关掉|删了我|删掉我|闭嘴|一个人/.test(t)), '应命中敌意池,实际 ' + JSON.stringify(all));
     A(all.every(lintClean), '敌意池须全部 lint-clean');
   });
 

@@ -86,7 +86,11 @@ async function run(){
     let sawAlias = false, allClean = true;
     for (let i = 0; i < 20; i++){                 // 三选一随机文案,多抽几次覆盖到含名字的那条
       const r = await C.reply([{ who:'me', text: '我喜欢你,做我女朋友好不好' }], {});
-      if (r && r.text && r.text.includes(alias)) sawAlias = true;
+      /* D-172:用户把柔柔那句"我爱的是阿帆"改成了不点名的"他没有这么说过"——只对 A 放宽为
+         "点名死者,或用单独的'他'指向死者"(不含"其他");另外 12 台仍要求点名,否则放宽会让
+         B/C 删掉名字也照样通过(静默放行) */
+      const pointsAtHim = t => dossierId === null ? (t.includes(alias) || /(^|[^其])他/.test(t)) : t.includes(alias);
+      if (r && r.text && pointsAtHim(r.text)) sawAlias = true;
       if (r && /亲爱的|宝贝|喜欢你|爱你/.test(r.text)) allClean = false;
     }
     A(sawAlias, '围栏[' + (dossierId||'A') + ']示好的拒答池里应至少有一条点名"' + alias + '"(20次抽样都没见到)');

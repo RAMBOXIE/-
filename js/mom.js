@@ -485,7 +485,7 @@ const MOMLLM = (() => {
     if (id && id !== 'phone-7741') return null;
     if (SAMPLE){ const r = await SAMPLE(); if (r && r.text){ const t = clean(r.text); if (lintOk(t)) return t; } }
     const p = await viaProxy(); if (p && p.text){ const t = clean(p.text); if (lintOk(t)) return t; }
-    return fallback();
+    return null;   // D-172:无 LLM/代理时交还底本作者写的 momToldOpen(旧 TOLD 兜底会把代答算到玩家头上)
   }
 
   return { told, _lintOk: lintOk, _fallback: fallback };   // _ 前缀:门禁用

@@ -70,7 +70,11 @@ scenario('真人 · 顺着查给线索、不掉缓存', ({A}) => {
   A(g.S.cacheVal === c0, '真人线索不掉缓存,实际变 ' + (g.S.cacheVal - c0));
   A(g.S.trace === t0 + 2, '真人顺着查溯源 +2,实际 +' + (g.S.trace - t0));
   A(!!g.S.clues.strangerReal, '应标记 strangerReal 线索');
-  A((g.S.settle || []).join('').includes('相册'), '真线索应指向相册,实际 ' + JSON.stringify(g.S.settle));
+  /* D-172:旧线索"去相册第 3 张翻背面"指向一个不存在的机制,用户改成了"核对点:…"(指向
+     玩家屏上可自行核对的证据);判据跟着换,并确认真线索不带饵的"对照样本"标记 */
+  const st = (g.S.settle || []).join('');
+  A(st.includes('核对点'), '真线索应给出可核对的线索,实际 ' + JSON.stringify(g.S.settle));
+  A(!st.includes('对照样本'), '真线索不应带饵的对照样本标记');
 });
 
 /* ---- 饵:顺着查=踩饵,掉缓存(−15%)且溯源 +6 ---- */

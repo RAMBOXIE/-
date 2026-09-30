@@ -52,9 +52,12 @@ async function scenario(name, fn){
 
 (async () => {
   /* ---- 离线兜底:told() 给安全脚本,且脚本全过护栏 ---- */
-  await scenario('离线兜底 · 安全脚本且过护栏', async ({A}) => {
+  /* D-172:离线时不再用手写 TOLD 兜底(它把代答算到玩家头上,和作者写的 momToldOpen 冲突),
+     返回 null → content.js 显示底本 momToldOpen;兜底池本身仍须过护栏(门禁留着防回退) */
+  await scenario('离线 · 返回 null 交还底本文案;兜底池仍过护栏', async ({A}) => {
     const M = bootMom();
-    for (let i=0;i<8;i++){ const t = await M.told(); A(typeof t==='string' && t.length>0, '应给一段'); A(M._lintOk(t), '脚本须过护栏:'+JSON.stringify(t)); }
+    for (let i=0;i<4;i++) A((await M.told()) === null, '离线应返回 null');
+    for (let i=0;i<8;i++){ const t = M._fallback(); A(M._lintOk(t), '兜底脚本须过护栏:'+JSON.stringify(t)); }
   });
 
   /* ---- 护栏 lint:自伤/哀求/感叹/数字/长句/多行/平台词一律拦 ---- */
@@ -75,8 +78,8 @@ async function scenario(name, fn){
   await scenario('代理吐自伤 → 客户端回退安全脚本', async ({A}) => {
     const M = bootMom({ fetch: () => resp(200, { text: '妈: 我也不想活了,想跟他走。' }) });
     const t = await M.told();
-    A(!/不想活|跟他走/.test(t), '自伤文本绝不上屏,实际 '+JSON.stringify(t));
-    A(M._lintOk(t), '回退结果过护栏');
+    A(t === null || !/不想活|跟他走/.test(t), '自伤文本绝不上屏,实际 '+JSON.stringify(t));
+    A(t === null, '越界后应返回 null(由底本文案兜底),实际 '+JSON.stringify(t));
   });
 
   /* ---- 代理返回克制文本 → 采用 ---- */
